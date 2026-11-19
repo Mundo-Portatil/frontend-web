@@ -150,19 +150,19 @@ No duplicar ni reemplazar estos servicios transversales dentro de Inventario.
 
 ## Fase 1.6: Stock por cantidad
 
-- [ ] **T1.6.1: Servicio de stock cuantitativo**
+- [x] **T1.6.1: Servicio de stock cuantitativo**
   - Implementar `GET /quantity-stock` con `locationId`, `categoryId`, `catalogItemId`, `lowStock`, `page` y `limit`.
   - Implementar `POST /quantity-stock/inbound` con `catalogId`, `locationId`, `quantity` y precios opcionales admitidos.
   - Implementar `PATCH /quantity-stock/adjust` con `catalogId`, `locationId`, `newQuantity` y `reason` obligatorio.
   - Consumir Axios centralizado y manejar errores comunes.
 
-- [ ] **T1.6.2: Vista de stock por cantidad**
+- [x] **T1.6.2: Vista de stock por cantidad**
   - Mostrar saldos y campos recibidos, incluyendo `minStockThreshold` e `isLowStock`.
   - Implementar filtros y paginación disponibles.
   - Permitir a todos los roles consultar; mostrar entrada y ajuste solo a `ADMIN`.
   - No generar alertas de M5 ni calcular una condición distinta de la respuesta del backend.
 
-- [ ] **T1.6.3: Formularios de entrada y ajuste**
+- [x] **T1.6.3: Formularios de entrada y ajuste**
   - Crear formularios administrativos para entrada y ajuste absoluto.
   - Solicitar `reason` para ajustes y mostrar el saldo retornado.
   - Presentar mensajes de éxito, validación, autorización y error de red.
@@ -250,3 +250,10 @@ La implementación deberá respetar `constitution.md`, `spec.md`, `plan.md` y el
 - Pruebas dirigidas de catálogo/navegación: 16 aprobadas; router: 23 aprobadas; build con TypeScript correcto. Revisión global de lint/pruebas pendiente al integrar los demás bloques en curso.
 - Filtros según contrato y cancelación de respuestas antiguas; posible incidencia del backend: `@Type(() => Boolean)` en filtro `active` puede interpretar texto `false` como verdadero. No se altera el backend ni se inventa un parámetro alternativo.
 - Verificación real aún bloqueada desde este entorno: conexión rechazada a localhost:3000 con la restricción de red y fuera de ella. Se solicitó dirección accesible al usuario mientras continúa implementación.
+
+## Registro de avance — cantidades (2026-11-19)
+
+- T1.6.1–T1.6.3 implementadas con GET paginado, filtros contratados, entrada y ajuste absoluto con motivo y confirmación.
+- Selector reutilizable de catálogo por nombre/SKU con paginación real; únicamente se filtra el tipo de seguimiento sobre los productos recibidos, sin inventar un query de API.
+- Validación dirigida: 12 pruebas en 3 archivos aprobadas; ESLint de archivos propios correcto. Revisión de rutas y suite global al finalizar integración.
+- Se conserva pendiente la verificación contra servidor accesible y cuentas de prueba.
