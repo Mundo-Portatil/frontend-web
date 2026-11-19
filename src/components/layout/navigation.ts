@@ -1,7 +1,7 @@
 import type { ComponentType, SVGProps } from 'react';
 import type { Role } from '../../modules/foundation/auth/models';
 import { ROUTES } from '../../router/routes';
-import { AuditLogIcon, LocationsIcon, UsersIcon } from './icons';
+import { AuditLogIcon, CategoriesIcon, LocationsIcon, UsersIcon } from './icons';
 
 /**
  * Centralized, typed navigation definition for the application shell.
@@ -55,12 +55,20 @@ export const NAV_GROUPS: readonly NavGroupDefinition[] = [
 ];
 
 /**
- * Phase 0 navigation: only implemented and available modules.
- * Future modules (Ventas/POS, Inventario, Traslados, Servicio técnico, Caja,
+ * Navigation for implemented and available modules.
+ * Future modules (Ventas/POS, Catálogo, Traslados, Servicio técnico, Caja,
  * Auditoría Express, Aprobaciones, Trazabilidad) must not be added until their
  * phase is implemented, integrated and enabled.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
+  {
+    id: 'inventory-categories',
+    label: 'Categorías',
+    icon: CategoriesIcon,
+    to: ROUTES.inventoryCategories,
+    group: 'operations',
+    roles: ['ADMIN', 'VENDEDOR', 'TECNICO'],
+  },
   {
     id: 'locations',
     label: 'Ubicaciones',

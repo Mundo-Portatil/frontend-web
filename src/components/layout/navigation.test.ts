@@ -8,8 +8,8 @@ const BASE_ITEM: Omit<NavItem, 'id' | 'label' | 'to' | 'group' | 'roles'> = {
 };
 
 describe('getNavigationGroups', () => {
-  it('only exposes the implemented Phase 0 modules', () => {
-    expect(NAV_ITEMS.map((item) => item.id)).toEqual(['locations', 'users', 'audit-logs']);
+  it('only exposes implemented modules', () => {
+    expect(NAV_ITEMS.map((item) => item.id)).toEqual(['inventory-categories', 'locations', 'users', 'audit-logs']);
   });
 
   it('points every navigation item to a registered route', () => {
@@ -23,8 +23,8 @@ describe('getNavigationGroups', () => {
   it('omits groups without available items (e.g. General has no usable screen yet)', () => {
     const groups = getNavigationGroups();
 
-    expect(groups.map((group) => group.id)).toEqual(['administration']);
-    expect(groups[0].items.map((item) => item.label)).toEqual([
+    expect(groups.map((group) => group.id)).toEqual(['operations', 'administration']);
+    expect(groups[1].items.map((item) => item.label)).toEqual([
       'Ubicaciones',
       'Usuarios',
       'Bitácora',

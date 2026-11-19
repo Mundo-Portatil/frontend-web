@@ -1,9 +1,11 @@
 # Plan de Implementación: Fase 1 — M1 Inventario y Catálogo
 
+> **Excepción autorizada por el usuario (2026-11-19):** los documentos de esta fase se registran directamente en `feature/fase-1-inventario` y se permite implementar sin incorporarlos previamente a `develop`. Solo se exceptúa ese prerrequisito; permanecen vigentes la Constitución, los contratos y el alcance definido. No se autorizan merges ni pushes.
+
 **Repositorio:** `frontend-web`
-**Rama:** `feature/fase-1-core`
+**Rama:** `feature/fase-1-inventario`
 **Fase:** 1 — M1 Inventario y Catálogo
-**Estado:** Propuesto
+**Estado:** Autorizado para ejecución progresiva
 **Documento funcional de referencia:** `Casos de Uso - MP.md` (raíz del workspace; RF-01 a RF-04, módulo M1 y Fase 1)
 
 ## 0. Documentos de referencia y estado previo
@@ -16,18 +18,14 @@ Este plan se apoya en las siguientes fuentes de verdad:
 | `specs/fase_0_core/spec.md` | Alcance y criterios ya implementados en los cimientos transversales. |
 | `specs/fase_0_core/plan.md` | Enfoque arquitectónico y decisiones reutilizables. |
 | `specs/fase_0_core/task.md` | Estado real de la infraestructura existente. |
-| `specs/fase_1_core/spec.md` | Especificación funcional de referencia; estado actual: borrador pendiente de aprobación. |
-| `Casos de Uso - MP.md` (raíz del workspace) | Referencia funcional disponible mientras se redacta/aprueba la Spec frontend. |
+| `specs/fase_1_core/spec.md` | Especificación funcional de referencia; autorizada para el alcance implementable. |
+| `Casos de Uso - MP.md` (raíz del workspace) | Referencia funcional del alcance de negocio. |
 | `../backend-api/specs/fase_1_inventario/spec.md` | Referencia de alcance del backend; no sustituye la Spec del frontend. |
 | `../backend-api/specs/API_CONTRACTS.md` (`origin/develop`) | Contrato de integración oficial consultado para esta actualización. |
 
 ### 0.1. Estado de la especificación funcional
 
-`specs/fase_1_core/spec.md` ya existe como borrador y complementa la referencia funcional de casos de uso. **La implementación no debe comenzar** hasta que:
-
-1. Se revisen y aprueben `specs/fase_1_core/spec.md` y `plan.md`.
-2. Ambos documentos se incorporen a `develop`.
-3. La rama `feature/fase-1-core` se actualice desde `develop`.
+La Spec y el plan están autorizados para ejecutar progresivamente las tareas de alcance implementable. Los tres documentos fueron incorporados en `feature/fase-1-inventario` mediante el commit `d8a5b59`, aplicando la excepción de integración previa en `develop` autorizada por el usuario. Las decisiones contractuales aún pendientes no se consideran resueltas por esta autorización.
 
 ### 0.2. Estado de los cimientos de la Fase 0
 
@@ -550,7 +548,7 @@ Los servicios se prueban mockeando la capa HTTP. La verificación contra el back
 | B1 | Cobertura parcial de DTO/respuestas en algunas rutas de hardware y catálogo. | Riesgo de modelos incorrectos. | Verificar contra Swagger/DTO backend antes de fijar modelos; no inferir campos. |
 | B2 | ADR de impresión térmica no aprobado. | Bloquea el envío físico al dispositivo, aunque el contrato permita obtener los datos de etiqueta. | Mantener obtención de datos separada y bloquear solo la integración física hasta el ADR. |
 | B3 | Fase 0 debe estar integrada en `develop`. | La rama de Fase 1 no tendría los cimientos. | Mantener el prerrequisito del plan original. |
-| B4 | `specs/fase_1_core/spec.md` está en borrador, pendiente de aprobación. | Los criterios funcionales todavía no son fuente aprobada para implementación. | Revisar y aprobarlo antes de implementar. |
+| B4 | Resuelto para el alcance implementable: documentos autorizados en la rama de Fase 1. | Permite iniciar los bloques con contratos disponibles. | Excepción registrada; no incluye capacidades diferidas. |
 | B5 | Aprobación de dependencia de codificación de códigos de barras. | Impide generar localmente imágenes Code 128/EAN. | Preferir `barcodeValue` del backend; justificar y aprobar codificación local si sigue siendo necesaria. |
 | B6 | No existe endpoint CRUD de lotes, aunque RF-01 lo exige. | No se pueden consultar/editar/anular lotes desde el frontend usando el contrato actual. | Solicitar definición del backend y actualizar el plan/tareas tras publicación. |
 
@@ -574,7 +572,7 @@ Ninguna de estas decisiones se resolverá por suposición dentro de la implement
 
 La Fase 1 se considerará completada cuando:
 
-1. `specs/fase_1_core/spec.md` esté aprobado e integrado en `develop`.
+1. La Spec esté autorizada y registrada en Git conforme a la excepción documentada.
 2. El contrato M1 esté publicado y verificado.
 3. El catálogo y las categorías estén implementados y probados.
 4. El ingreso masivo serializado respete `POST /hardware-items/batch-inbound`; el CRUD de lotes solo se considera completo cuando el contrato lo soporte o la Spec ajuste formalmente RF-01.

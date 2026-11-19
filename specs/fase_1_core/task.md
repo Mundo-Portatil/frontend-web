@@ -1,11 +1,13 @@
 # Tareas de Implementación — Fase 1: Inventario y Catálogo
 
+> **Excepción autorizada por el usuario (2026-11-19):** los documentos de esta fase se registran directamente en `feature/fase-1-inventario` y se permite implementar sin incorporarlos previamente a `develop`. Solo se exceptúa ese prerrequisito; permanecen vigentes la Constitución, los contratos y el alcance definido. No se autorizan merges ni pushes.
+
 ## Estado documental
 
-- **Spec:** `specs/fase_1_core/spec.md` (borrador pendiente de aprobación).
-- **Plan:** `specs/fase_1_core/plan.md` (propuesto).
+- **Spec:** `specs/fase_1_core/spec.md` (autorizado para el alcance implementable).
+- **Plan:** `specs/fase_1_core/plan.md` (autorizado para ejecución progresiva).
 - **Fase:** 1 — M1 Inventario y Catálogo.
-- **Rama de implementación prevista:** `feature/fase-1-core`, creada desde `develop` actualizado después de aprobar e integrar los documentos SDD.
+- **Rama de implementación prevista:** `feature/fase-1-inventario`, creada desde `develop` actualizado; documentos incorporados en esta rama por excepción autorizada.
 
 Las tareas de este documento cubren las capacidades que cuentan con soporte suficiente en el contrato vigente para su implementación. Se mantienen pendientes, sin tareas de desarrollo en esta lista, las capacidades que requieren nuevos endpoints, DTO incompletos o decisiones de alcance/ADR. Cuando se resuelvan, se actualizará este `task.md` en una intervención posterior.
 
@@ -26,13 +28,13 @@ No duplicar ni reemplazar estos servicios transversales dentro de Inventario.
 
 ## Fase 1.1: Preparación del módulo
 
-- [ ] **T1.1.1: Verificación del repositorio y documentos aprobados**
-  - Confirmar que `spec.md` y `plan.md` estén aprobados e integrados en `develop` antes de implementar.
+- [x] **T1.1.1: Verificación del repositorio y documentos aprobados**
+  - Confirmar autorización de `spec.md` y `plan.md` y su commit en la rama de Fase 1, según la excepción registrada.
   - Verificar la integración de los cimientos de Fase 0.
   - Consultar `backend-api/specs/API_CONTRACTS.md` desde `origin/develop` y contrastar los DTO utilizados con Swagger/DTO backend cuando el contrato escrito sea abreviado.
   - No incluir operaciones cuyo DTO o alcance siga pendiente de definición.
 
-- [ ] **T1.1.2: Estructura del dominio inventory**
+- [x] **T1.1.2: Estructura del dominio inventory**
   - Crear la estructura de `src/modules/inventory/` según `plan.md`.
   - Mantener componentes, hooks, modelos, validación y servicios dentro del módulo.
   - Reutilizar `src/services/api/axiosInstance.ts` y los componentes transversales de Fase 0.
@@ -47,25 +49,25 @@ No duplicar ni reemplazar estos servicios transversales dentro de Inventario.
 
 ## Fase 1.2: Categorías
 
-- [ ] **T1.2.1: Servicio de categorías**
+- [x] **T1.2.1: Servicio de categorías**
   - Implementar `GET /categories` con query opcional `active`.
   - Implementar `POST /categories` con los campos permitidos por el DTO (`name`, `description`, `active`).
   - Implementar `PATCH /categories/:id` con UUID y actualización parcial conforme al DTO.
   - Utilizar Axios centralizado y normalizar errores mediante la infraestructura transversal.
 
-- [ ] **T1.2.2: Consulta y filtros de categorías**
+- [x] **T1.2.2: Consulta y filtros de categorías**
   - Crear la vista de categorías para usuarios autenticados.
   - Mostrar los campos disponibles, incluido `productsCount` cuando esté presente.
   - Permitir filtrar por estado activo usando `active` del backend.
   - Representar estados de carga, vacío y error.
 
-- [ ] **T1.2.3: Formularios de categoría**
+- [x] **T1.2.3: Formularios de categoría**
   - Crear formularios de alta y edición para `ADMIN`.
   - Validar localmente solo las reglas confirmadas por el DTO.
   - Mostrar errores de validación (`400`), conflicto (`409`) y recurso inexistente (`404`) según respuesta backend.
   - Actualizar la vista a partir de la respuesta confirmada por el servidor.
 
-- [ ] **T1.2.4: Autorización de categorías**
+- [x] **T1.2.4: Autorización de categorías**
   - Restringir mutaciones a `ADMIN` mediante `Can`.
   - Mantener lectura para `ADMIN`, `VENDEDOR` y `TECNICO`.
   - Tratar `403` como rechazo del backend, aunque la UI haya ocultado la acción.
@@ -231,3 +233,13 @@ Estas capacidades no tienen tareas de implementación en este documento. Cuando 
 ## Regla de ejecución
 
 La implementación deberá respetar `constitution.md`, `spec.md`, `plan.md` y el contrato vigente. Si una tarea incluida encuentra un DTO incompleto o una discrepancia, se detendrá únicamente esa integración y se documentará la dependencia; no se completará mediante suposiciones ni se ampliará el alcance unilateralmente.
+
+## Registro de avance — bloque 1 (2026-11-19)
+
+- Completadas T1.1.1, T1.1.2 y T1.2.1–T1.2.4 según la excepción autorizada.
+- T1.1.3 parcial: solo modelos de categorías; catálogo, hardware y cantidades se definirán con sus respectivos bloques.
+- Integrados `GET /categories`, `POST /categories`, `PATCH /categories/:id`; ruta `/inventory/categories` y navegación de Operaciones. La integración de T1.8 sigue parcial hasta disponer de las otras pantallas.
+- Validación automatizada: `npm test` 23 archivos/191 pruebas aprobadas; `npm run lint`, `npm run build` (incluye TypeScript) y `git diff --check` correctos. Incluye RBAC de los tres roles, formularios, filtros, estados, carreras de consulta y bloqueo de cambio de edición durante guardado.
+- Revisión frontend-builder/frontend-reviewer: se corrigió la pérdida de edición por respuesta tardía de otra categoría. Skill utilizada: vercel-react-best-practices.
+- Backend real no disponible en `http://localhost:3000/api` (sin respuesta HTTP); pruebas de servicio con HTTP mockeado y contraste estático con contrato/DTO de `origin/develop`. No se afirma verificación en vivo ni visual en navegador.
+- Siguiente bloque: modelos de catálogo y T1.3.1–T1.3.5, manteniendo diferida la actualización de catálogo con DTO incompleto.

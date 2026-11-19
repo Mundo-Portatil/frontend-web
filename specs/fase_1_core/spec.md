@@ -1,9 +1,11 @@
 # Spec: Fase 1 — Inventario y Catálogo
 
-**Rama prevista:** `feature/fase-1-core`
+> **Excepción autorizada por el usuario (2026-11-19):** los documentos de esta fase se registran directamente en `feature/fase-1-inventario` y se permite implementar sin incorporarlos previamente a `develop`. Solo se exceptúa ese prerrequisito; permanecen vigentes la Constitución, los contratos y el alcance definido. No se autorizan merges ni pushes.
+
+**Rama prevista:** `feature/fase-1-inventario`
 **Repositorio:** `frontend-web`
 **Fase:** 1 — M1 Inventario y Catálogo
-**Estado:** Borrador
+**Estado:** Autorizado para el alcance implementable
 **Plan técnico:** `specs/fase_1_core/plan.md`
 
 ---

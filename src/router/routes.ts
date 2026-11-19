@@ -8,6 +8,7 @@ export const ROUTES = {
   locations: '/locations',
   users: '/users',
   profile: '/profile',
+  inventoryCategories: '/inventory/categories',
   auditLogs: '/audit-logs',
   unauthorized: '/unauthorized',
 } as const;

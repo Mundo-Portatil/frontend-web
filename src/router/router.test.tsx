@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppRouter } from './index';
 import { useAuthStore } from '../stores/authStore';
+import * as categoryService from '../modules/inventory/services/categoryService';
 import * as userService from '../modules/foundation/users/services/userService';
 import * as locationService from '../modules/foundation/locations/services/locationService';
 import * as auditLogService from '../modules/foundation/audit-logs/services/auditLogService';
@@ -28,6 +29,8 @@ vi.mock('../modules/foundation/locations/services/locationService', () => ({
 vi.mock('../modules/foundation/audit-logs/services/auditLogService', () => ({
   listAuditLogs: vi.fn(),
 }));
+
+vi.mock('../modules/inventory/services/categoryService', () => ({ listCategories: vi.fn() }));
 
 const ADMIN = {
   id: 'admin-1',
@@ -64,6 +67,7 @@ function renderAt(path: string) {
 describe('AppRouter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(categoryService.listCategories).mockResolvedValue([]);
     useAuthStore.setState({ status: 'unauthenticated', user: null });
     vi.mocked(userService.listUsers).mockResolvedValue([]);
     vi.mocked(locationService.listLocations).mockResolvedValue([]);
@@ -197,4 +201,17 @@ describe('AppRouter', () => {
     expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Usuarios' })).not.toBeInTheDocument();
   });
+});
+
+it.each([ADMIN, VENDEDOR, TECNICO])('allows $role to consult inventory categories', async (user) => {
+  useAuthStore.setState({ status: 'authenticated', user });
+  renderAt('/inventory/categories');
+  expect(await screen.findByRole('heading', { name: 'Categorías' })).toBeInTheDocument();
+  expect(await screen.findByText('No hay categorías disponibles.')).toBeInTheDocument();
+});
+
+it('protects category access for guests', async () => {
+  useAuthStore.setState({ status: 'unauthenticated', user: null });
+  renderAt('/inventory/categories');
+  expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
 });
