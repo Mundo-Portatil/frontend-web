@@ -7,6 +7,7 @@ import { AuditLogsPage } from '../modules/foundation/audit-logs/pages/AuditLogsP
 import { LocationsPage } from '../modules/foundation/locations/pages/LocationsPage';
 import { ProfilePage } from '../modules/foundation/users/pages/ProfilePage';
 import { UsersPage } from '../modules/foundation/users/pages/UsersPage';
+import { CatalogPage } from '../modules/inventory/pages/CatalogPage';
 import { CategoriesPage } from '../modules/inventory';
 import { useAuthStore } from '../stores/authStore';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -60,6 +61,7 @@ export function AppRouter() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
+          <Route path={ROUTES.inventoryCatalog} element={<CatalogPage />} />
           <Route path={ROUTES.inventoryCategories} element={<CategoriesPage />} />
           <Route path={ROUTES.profile} element={<ProfilePage />} />
           <Route path={ROUTES.locations} element={<LocationsPage />} />

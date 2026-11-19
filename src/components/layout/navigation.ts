@@ -62,6 +62,14 @@ export const NAV_GROUPS: readonly NavGroupDefinition[] = [
  */
 export const NAV_ITEMS: readonly NavItem[] = [
   {
+    id: 'inventory-catalog',
+    label: 'Catálogo',
+    icon: CategoriesIcon,
+    to: ROUTES.inventoryCatalog,
+    group: 'operations',
+    roles: ['ADMIN', 'VENDEDOR', 'TECNICO'],
+  },
+  {
     id: 'inventory-categories',
     label: 'Categorías',
     icon: CategoriesIcon,

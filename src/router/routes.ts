@@ -9,6 +9,7 @@ export const ROUTES = {
   users: '/users',
   profile: '/profile',
   inventoryCategories: '/inventory/categories',
+  inventoryCatalog: '/inventory/catalog',
   auditLogs: '/audit-logs',
   unauthorized: '/unauthorized',
 } as const;

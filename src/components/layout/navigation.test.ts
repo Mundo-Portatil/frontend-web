@@ -9,7 +9,7 @@ const BASE_ITEM: Omit<NavItem, 'id' | 'label' | 'to' | 'group' | 'roles'> = {
 
 describe('getNavigationGroups', () => {
   it('only exposes implemented modules', () => {
-    expect(NAV_ITEMS.map((item) => item.id)).toEqual(['inventory-categories', 'locations', 'users', 'audit-logs']);
+    expect(NAV_ITEMS.map((item) => item.id)).toEqual(['inventory-catalog', 'inventory-categories', 'locations', 'users', 'audit-logs']);
   });
 
   it('points every navigation item to a registered route', () => {

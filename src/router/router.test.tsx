@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppRouter } from './index';
 import { useAuthStore } from '../stores/authStore';
+import * as catalogService from '../modules/inventory/services/catalogService';
 import * as categoryService from '../modules/inventory/services/categoryService';
 import * as userService from '../modules/foundation/users/services/userService';
 import * as locationService from '../modules/foundation/locations/services/locationService';
@@ -30,6 +31,7 @@ vi.mock('../modules/foundation/audit-logs/services/auditLogService', () => ({
   listAuditLogs: vi.fn(),
 }));
 
+vi.mock('../modules/inventory/services/catalogService', () => ({ listCatalog: vi.fn() }));
 vi.mock('../modules/inventory/services/categoryService', () => ({ listCategories: vi.fn() }));
 
 const ADMIN = {
@@ -214,4 +216,14 @@ it('protects category access for guests', async () => {
   useAuthStore.setState({ status: 'unauthenticated', user: null });
   renderAt('/inventory/categories');
   expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
+});
+
+
+it.each([ADMIN, VENDEDOR, TECNICO])('allows $role to consult the catalog route', async (user) => {
+  vi.mocked(catalogService.listCatalog).mockResolvedValue({ items: [], total: 0, page: 1, limit: 50 });
+  vi.mocked(categoryService.listCategories).mockResolvedValue([]);
+  useAuthStore.setState({ status: 'authenticated', user });
+  renderAt('/inventory/catalog');
+  expect(await screen.findByRole('heading', { name: 'Catálogo maestro' })).toBeInTheDocument();
+  expect(await screen.findByText('No hay productos disponibles.')).toBeInTheDocument();
 });

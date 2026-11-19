@@ -76,28 +76,28 @@ No duplicar ni reemplazar estos servicios transversales dentro de Inventario.
 
 ## Fase 1.3: Catálogo maestro
 
-- [ ] **T1.3.1: Servicio de catálogo**
+- [x] **T1.3.1: Servicio de catálogo**
   - Implementar `GET /catalog` con `categoryId`, `active`, `search`, `page` y `limit` según el contrato.
   - Implementar `GET /catalog/:id` y adaptar el detalle `{ item, categoryName, stockSummary, totalStockOverall }`.
   - Implementar `POST /catalog` con el DTO confirmado.
   - Usar la instancia Axios centralizada.
 
-- [ ] **T1.3.2: Listado y búsqueda de catálogo**
+- [x] **T1.3.2: Listado y búsqueda de catálogo**
   - Crear la vista del catálogo con búsqueda y filtros contratados.
   - Consumir paginación del backend (`page`, `limit`, `total`), con defaults documentados 1 y 50.
   - Mostrar tipo de seguimiento (`isSerialized`), categoría, precio y estado cuando esos campos estén incluidos en la respuesta.
   - Representar carga, lista vacía, error y reintento.
 
-- [ ] **T1.3.3: Detalle de producto y resumen por ubicación**
+- [x] **T1.3.3: Detalle de producto y resumen por ubicación**
   - Presentar los campos recibidos en `item` y `categoryName`.
   - Mostrar `stockSummary` y `totalStockOverall` por ubicación sin recalcularlos en frontend.
 
-- [ ] **T1.3.4: Formulario administrativo de catálogo**
+- [x] **T1.3.4: Formulario administrativo de catálogo**
   - Implementar creación para `ADMIN` con los campos aceptados por el DTO publicado.
   - Obtener categorías desde `categoryService` y permitir seleccionar una categoría activa.
   - Presentar validaciones, conflictos y errores del backend sin enviar propiedades desconocidas.
 
-- [ ] **T1.3.5: Autorización de catálogo**
+- [x] **T1.3.5: Autorización de catálogo**
   - Permitir consultas a los tres roles.
   - Restringir la creación implementada a `ADMIN` usando `Can`; las actualizaciones siguen diferidas hasta confirmar el DTO de `PATCH /catalog/:id`.
 
@@ -243,3 +243,10 @@ La implementación deberá respetar `constitution.md`, `spec.md`, `plan.md` y el
 - Revisión frontend-builder/frontend-reviewer: se corrigió la pérdida de edición por respuesta tardía de otra categoría. Skill utilizada: vercel-react-best-practices.
 - Backend real no disponible en `http://localhost:3000/api` (sin respuesta HTTP); pruebas de servicio con HTTP mockeado y contraste estático con contrato/DTO de `origin/develop`. No se afirma verificación en vivo ni visual en navegador.
 - Siguiente bloque: modelos de catálogo y T1.3.1–T1.3.5, manteniendo diferida la actualización de catálogo con DTO incompleto.
+
+## Registro de avance — catálogo (2026-11-19)
+
+- T1.3.1–T1.3.5 implementadas: GET paginado, detalle con stock por ubicación y POST administrativo. No se incorpora PATCH diferido.
+- Pruebas dirigidas de catálogo/navegación: 16 aprobadas; router: 23 aprobadas; build con TypeScript correcto. Revisión global de lint/pruebas pendiente al integrar los demás bloques en curso.
+- Filtros según contrato y cancelación de respuestas antiguas; posible incidencia del backend: `@Type(() => Boolean)` en filtro `active` puede interpretar texto `false` como verdadero. No se altera el backend ni se inventa un parámetro alternativo.
+- Verificación real aún bloqueada desde este entorno: conexión rechazada a localhost:3000 con la restricción de red y fuera de ella. Se solicitó dirección accesible al usuario mientras continúa implementación.
