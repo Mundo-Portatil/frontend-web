@@ -1,1 +1,38 @@
 @import "tailwindcss";
+
+@theme {
+  /* Corporate deep-blue scale. Keeps the brand as the primary accent while
+     neutral surfaces and semantic colors stay on Tailwind's default palette. */
+  --color-brand-50: #eff5ff;
+  --color-brand-100: #dbe8fe;
+  --color-brand-200: #bfd7fe;
+  --color-brand-300: #93bbfd;
+  --color-brand-400: #6096fa;
+  --color-brand-500: #3b76f6;
+  --color-brand-600: #2559eb;
+  --color-brand-700: #1d46d8;
+  --color-brand-800: #1e3bad;
+  --color-brand-900: #1e3689;
+  --color-brand-950: #172554;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-slate-100 text-slate-900 antialiased;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
