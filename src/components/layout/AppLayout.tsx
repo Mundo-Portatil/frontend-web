@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useNavigate } from 'react-router-dom';
 import type { Role } from '../../modules/foundation/auth/models';
 import { ROLE_LABELS } from '../../modules/foundation/auth/roleLabels';
 import { LocationSelector } from '../../modules/foundation/locations/components/LocationSelector';
@@ -208,12 +208,30 @@ export function AppLayout({ children }: { children?: ReactNode }) {
             </div>
 
             {user && (
-              <div className="hidden min-w-0 items-center gap-3 lg:flex">
-                <span aria-hidden="true" className="h-8 w-px shrink-0 bg-white/15" />
-                <div className="min-w-0 max-w-56">
-                  <UserIdentity name={user.name} role={user.role} />
-                </div>
-                <button type="button" onClick={handleLogout} className={HEADER_ACTION_BASE_CLASS}>
+              <div className="flex min-w-0 items-center gap-3">
+                <span aria-hidden="true" className="hidden h-8 w-px shrink-0 bg-white/15 lg:block" />
+                <details
+                  className="relative min-w-0 max-w-56"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') {
+                      event.currentTarget.removeAttribute('open');
+                      event.currentTarget.querySelector('summary')?.focus();
+                    }
+                  }}
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.removeAttribute('open');
+                  }}
+                >
+                  <summary className="cursor-pointer rounded-lg p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label="Opciones de mi cuenta">
+                    <span className="hidden lg:block"><UserIdentity name={user.name} role={user.role} /></span>
+                    <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 font-semibold text-white lg:hidden">{user.name.trim().charAt(0).toUpperCase() || '?'}</span>
+                  </summary>
+                  <div className="absolute right-0 mt-2 w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
+                    <p className="truncate px-3 py-2 text-xs text-slate-500" title={user.email}>{user.email}</p>
+                    <Link to={ROUTES.profile} onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')} className="block rounded-md px-3 py-2 text-sm text-slate-800 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Mi perfil</Link>
+                  </div>
+                </details>
+                <button type="button" onClick={handleLogout} className={`${HEADER_ACTION_BASE_CLASS} hidden lg:inline-flex`}>
                   Cerrar sesión
                 </button>
               </div>
@@ -337,6 +355,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
 
             <div className="shrink-0 border-t border-slate-200 p-4">
               <UserIdentity name={user.name} role={user.role} tone="light" />
+              <Link to={ROUTES.profile} onClick={handleMobileNavigate} className={`${DRAWER_ACTION_BASE_CLASS} mt-3 w-full`}>Mi perfil</Link>
               <button
                 type="button"
                 onClick={handleLogout}

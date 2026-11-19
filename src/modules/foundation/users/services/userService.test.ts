@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { apiClient } from '../../../../services/api/axiosInstance';
-import { createUser, deactivateUser, listUsers, reactivateUser, updateUser } from './userService';
+import { createUser, deactivateUser, listUsers, reactivateUser, updateOwnProfile, updateUser } from './userService';
 
 vi.mock('../../../../services/api/axiosInstance', () => ({
   apiClient: {
@@ -71,4 +71,11 @@ describe('userService', () => {
     expect(apiClient.patch).toHaveBeenCalledWith('/users/u-4', { active: true });
     expect(result).toEqual(expected);
   });
+});
+
+it('updates authenticated identity via fixed /users/me and strips administrative fields', async () => {
+  vi.mocked(apiClient.patch).mockResolvedValueOnce({ data: { id: 'self' } });
+  const payload = { name: 'Ana', email: 'ana@mp.pe', password: 'Nueva123', id: 'other', role: 'ADMIN', active: false };
+  await updateOwnProfile(payload);
+  expect(apiClient.patch).toHaveBeenLastCalledWith('/users/me', { name: 'Ana', email: 'ana@mp.pe', password: 'Nueva123' });
 });

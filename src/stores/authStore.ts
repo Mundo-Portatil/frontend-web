@@ -27,6 +27,8 @@ interface AuthState {
    * Returns null when the session could not be refreshed.
    */
   refreshProfile: () => Promise<ProfileUser | null>;
+  /** Applies a confirmed own-profile mutation and invalidates older GET responses. */
+  updateProfileUser: (user: ProfileUser) => void;
   /** Clears the session (user initiated). */
   logout: () => void;
   /** Clears the session after a 401 from a protected endpoint (interceptor). */
@@ -37,8 +39,9 @@ const UNAUTHENTICATED_STATE = { status: 'unauthenticated', user: null } as const
 
 /** Deduplicates concurrent profile refreshes (focus + visibility events). */
 let profileRefresh: Promise<ProfileUser | null> | null = null;
+let profileRevision = 0;
 
-export const useAuthStore = create<AuthState>()((set) => ({
+export const useAuthStore = create<AuthState>()((set, get) => ({
   status: 'initializing',
   user: null,
 
@@ -86,6 +89,12 @@ export const useAuthStore = create<AuthState>()((set) => ({
     }
   },
 
+  updateProfileUser: (user) => {
+    if (get().user?.id !== user.id) return;
+    profileRevision += 1;
+    set({ user });
+  },
+
   refreshProfile: () => {
     if (profileRefresh) {
       return profileRefresh;
@@ -96,18 +105,19 @@ export const useAuthStore = create<AuthState>()((set) => ({
       return Promise.resolve(null);
     }
 
+    const revision = profileRevision;
     profileRefresh = (async () => {
       try {
         const user = await getProfile();
         // Ignore a response that belongs to a session that was closed or
         // replaced while the request was in flight.
-        if (getAccessToken() !== token) {
+        if (getAccessToken() !== token || revision !== profileRevision) {
           return null;
         }
         set({ status: 'authenticated', user });
         return user;
       } catch (error) {
-        if (getAccessToken() !== token) {
+        if (getAccessToken() !== token || revision !== profileRevision) {
           return null;
         }
 

@@ -26,3 +26,10 @@ export interface UpdateUserInput {
   active?: boolean;
   password?: string;
 }
+
+/** PATCH /users/me accepts only editable personal fields; identity comes from JWT. */
+export interface UpdateOwnProfileInput {
+  name?: string;
+  email?: string;
+  password?: string;
+}

@@ -504,6 +504,30 @@ Validaciones ejecutadas el 2026-11-17:
 - Verificación en vivo no ejecutada por bloqueo externo: el checkout de `backend-api` está en `main` sin los módulos de Fase 0, no tiene `.env` ni `node_modules`, no hay PostgreSQL local ni daemon de Docker operativo, no hay credenciales de Supabase y `http://localhost:3000` no responde.
 - No se simularon respuestas reales ni se modificó el repositorio backend.
 
+## Ampliación autorizada — Mi perfil (FR-052–FR-055)
+
+- [x] **T0.12.1: Servicio de perfil propio**
+  - Integrar `PATCH /users/me` con lista explícita `name`, `email`, `password`, sin identificador ni cambios de privilegios.
+  - Verificar contrato y autorización del backend sobre la identidad JWT para los tres roles.
+- [x] **T0.12.2: Interfaz y sesión**
+  - Añadir acceso «Mi perfil» desde el área del usuario en el header y ruta autenticada `/profile` para los tres roles.
+  - Editar nombre, correo y contraseña opcional con validación y feedback existentes.
+  - Actualizar el contexto autenticado/header con la respuesta confirmada y limpiar la contraseña tras guardar.
+- [x] **T0.12.3: Verificación automatizada**
+  - Cubrir formulario, servicio, acceso de los tres roles, sincronización de sesión y ausencia de ID/rol/estado en el payload.
+  - Ejecutar pruebas, TypeScript, ESLint y build; registrar los resultados.
+- [ ] **T0.12.4: Verificación contra backend real**
+  - Confirmar persistencia tras recargar y autenticación con la contraseña nueva, con cuentas de los tres roles.
+  - Requiere backend operativo y cuentas de prueba; no considerar completada con mocks.
+
+### Resultado de la ampliación Mi perfil
+
+- `npm test`: 21 archivos, 169 pruebas superadas. Incluye los tres roles, allowlist del payload, errores, acceso desde header/ruta y descarte de respuestas anteriores al guardado o cambio de cuenta.
+- `npm run lint`: sin errores.
+- `npm run build`: TypeScript y producción correctos.
+- Revisión estática de contrato, controller, RolesGuard y JwtStrategy de backend `origin/develop`: la identidad se deriva del JWT y los tres roles pueden actualizar su propio perfil.
+- T0.12.4 sigue pendiente: `http://localhost:3000/api` no responde; no se verificaron persistencia ni credenciales nuevas contra servidor real.
+
 ## Regla de ejecución
 
 La IA deberá ejecutar las tareas respetando `constitution.md`, `spec.md` y `plan.md` como fuentes de verdad.

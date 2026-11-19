@@ -373,6 +373,7 @@ Las siguientes rutas deberán formar parte de la configuración centralizada de 
 |---|---|---|
 | `/login` | LoginPage | Público |
 | `/users` | UsersPage | ADMIN autorizado |
+| `/profile` | ProfilePage | Usuarios autenticados: ADMIN, VENDEDOR y TECNICO |
 | `/locations` | LocationsPage | Usuarios autenticados; acciones de administración restringidas a ADMIN |
 | `/audit-logs` | AuditLogsPage | ADMIN autorizado |
 | `/unauthorized` | UnauthorizedPage | Usuarios autenticados |
@@ -496,6 +497,7 @@ El frontend no deberá redefinir contratos, inventar campos de respuesta ni modi
 | GET | `/users` | Consultar usuarios. |
 | POST | `/users` | Registrar usuarios. |
 | PATCH | `/users/:id` | Editar usuarios; la baja (desactivación) se realiza mediante `active: false`. |
+| PATCH | `/users/me` | Editar el nombre, correo o contraseña de la identidad autenticada, para los tres roles. |
 
 Las operaciones deberán ejecutarse conforme a los permisos definidos por el backend.
 
@@ -903,6 +905,18 @@ No se deberán incorporar dependencias adicionales sin una justificación arquit
 - La implementación deberá respetar GitFlow y las reglas de Pull Request de la Constitución.
 
 ---
+
+### 12.4. Gestión del perfil personal — ampliación autorizada
+
+**FR-052 — Acceso al perfil personal:** el área del usuario en el header deberá ser un control accesible que permita abrir la opción «Mi perfil». La vista `/profile` estará disponible para `ADMIN`, `VENDEDOR` y `TECNICO`, en escritorio y móvil, mediante las protecciones de sesión existentes.
+
+**FR-053 — Actualización de datos propios:** el formulario permitirá modificar nombre, correo y contraseña mediante `PATCH /users/me`. Solo enviará propiedades modificadas entre `name`, `email` y `password`; no aceptará ID, rol, permisos ni estado administrativo. La identidad la determina el JWT en el backend.
+
+**FR-054 — Validación y seguridad:** validar correo, nombre y contraseña nueva de al menos seis caracteres conforme al DTO. La contraseña será opcional, nunca se recuperará ni mostrará una contraseña existente, y se limpiará tras guardar. El contrato no requiere contraseña actual; no se enviará un campo adicional. Presentar errores de validación, correo duplicado, sesión inválida y red mediante los mecanismos existentes.
+
+**FR-055 — Sincronización de sesión:** tras guardar, reflejar los datos confirmados en el contexto autenticado y el header sin exigir logout. La restauración al recargar seguirá usando `GET /auth/profile` y el JWT de `sessionStorage`.
+
+**Criterios de aceptación del perfil:** los tres roles pueden editar su propia cuenta; no pueden seleccionar otra identidad ni modificar privilegios; nombre/correo actualizados se reflejan en el header; la recarga restaura los datos del servidor; contraseña opcional y errores funcionan conforme al contrato; se mantienen sesión y permisos. La persistencia real y el cambio efectivo de contraseña requieren comprobación con un backend disponible.
 
 ## 13. Definition of Done
 

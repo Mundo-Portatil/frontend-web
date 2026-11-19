@@ -133,6 +133,12 @@ La comunicación se realizará mediante los endpoints definidos en los contratos
 
 Las estructuras de datos, campos obligatorios, validaciones y permisos deberán corresponder a los contratos reales.
 
+### 3.4.1. Ampliación autorizada: gestión del perfil personal (FR-052–FR-055)
+
+Se incorpora `/profile` como ruta autenticada para los tres roles. El header expondrá un control de usuario accesible con la opción «Mi perfil», sin añadir permisos administrativos a la vista. El módulo `foundation/users` reutilizará el cliente Axios para `PATCH /users/me`, con un DTO restringido a `name?`, `email?`, `password?`. La identidad se obtiene del JWT en el backend; no se envía ID, rol ni `active`. La validación de la contraseña nueva será mínimo seis caracteres; no se solicita contraseña actual porque el contrato no la contempla.
+
+La actualización utilizará la respuesta del servidor para sincronizar el usuario de `authStore`, conservando el mecanismo de sesión y evitando aplicar respuestas de una sesión que haya cambiado durante la solicitud. La restauración al recargar conserva `GET /auth/profile`. Se reutilizan feedback y notificaciones y se cubren servicio, formulario, permisos para los tres roles y acceso desde el header mediante Vitest/React Testing Library. La validación en vivo de persistencia y contraseña requiere backend operativo.
+
 ### 3.5. Gestión de ubicaciones
 
 Se implementará el módulo de ubicaciones en la ruta `/locations`.
@@ -445,4 +451,4 @@ La Fase 0 se considerará completada cuando:
 - La compilación del proyecto no presente errores.
 - La implementación cumpla la Constitución Técnica.
 
-**Fin del plan de implementación de la Fase 0.**    
+**Fin del plan de implementación de la Fase 0.**

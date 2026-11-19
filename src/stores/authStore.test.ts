@@ -233,3 +233,17 @@ describe('authStore', () => {
     expect(useLocationStore.getState().activeLocation).toBeNull();
   });
 });
+
+
+it('does not overwrite a successful profile edit with an older profile GET', async () => {
+  saveAccessToken('active-jwt');
+  useAuthStore.setState({ status: 'authenticated', user: PROFILE_USER });
+  let resolve!: (user: typeof PROFILE_USER) => void;
+  vi.mocked(getProfile).mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+  const pending = useAuthStore.getState().refreshProfile();
+  const edited = { ...PROFILE_USER, name: 'Nombre actualizado', email: 'nuevo@mp.pe' };
+  useAuthStore.getState().updateProfileUser(edited);
+  resolve(PROFILE_USER);
+  expect(await pending).toBeNull();
+  expect(useAuthStore.getState().user).toEqual(edited);
+});

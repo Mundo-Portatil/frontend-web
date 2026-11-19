@@ -86,6 +86,19 @@ describe('AppLayout', () => {
     expect(screen.getAllByText('Administrador').length).toBeGreaterThan(0);
   });
 
+  it('opens the account options from the header and links to Mi perfil', async () => {
+    const user = userEvent.setup();
+    renderLayout();
+    await screen.findByText('Sin ubicaciones activas');
+    const trigger = screen.getByLabelText('Opciones de mi cuenta');
+    await user.click(trigger);
+    expect(trigger.closest('details')).toHaveAttribute('open');
+    expect(screen.getByRole('link', { name: 'Mi perfil' })).toHaveAttribute('href', '/profile');
+    await user.keyboard('{Escape}');
+    expect(trigger.closest('details')).not.toHaveAttribute('open');
+    expect(trigger).toHaveFocus();
+  });
+
   it('renders only the implemented modules in the administration group', async () => {
     renderLayout();
     await screen.findByText('Sin ubicaciones activas');

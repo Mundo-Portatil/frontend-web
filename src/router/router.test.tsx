@@ -81,6 +81,18 @@ describe('AppRouter', () => {
     expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
   });
 
+  it.each([ADMIN, VENDEDOR, TECNICO])('allows $role to access their own profile', async (user) => {
+    useAuthStore.setState({ status: 'authenticated', user });
+    renderAt('/profile');
+    expect(await screen.findByRole('heading', { name: 'Mi perfil' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Correo electrónico')).toHaveValue(user.email);
+  });
+
+  it('protects the personal profile when no session exists', async () => {
+    renderAt('/profile');
+    expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
+  });
+
   it('allows an authenticated ADMIN to access /users', async () => {
     useAuthStore.setState({ status: 'authenticated', user: ADMIN });
 

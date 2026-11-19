@@ -5,6 +5,7 @@ import { LoginPage } from '../modules/foundation/auth/pages/LoginPage';
 import { UnauthorizedPage } from '../modules/foundation/auth/pages/UnauthorizedPage';
 import { AuditLogsPage } from '../modules/foundation/audit-logs/pages/AuditLogsPage';
 import { LocationsPage } from '../modules/foundation/locations/pages/LocationsPage';
+import { ProfilePage } from '../modules/foundation/users/pages/ProfilePage';
 import { UsersPage } from '../modules/foundation/users/pages/UsersPage';
 import { useAuthStore } from '../stores/authStore';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -58,6 +59,7 @@ export function AppRouter() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
+          <Route path={ROUTES.profile} element={<ProfilePage />} />
           <Route path={ROUTES.locations} element={<LocationsPage />} />
           <Route path={ROUTES.unauthorized} element={<UnauthorizedPage />} />
           <Route
