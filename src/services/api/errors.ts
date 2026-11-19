@@ -88,9 +88,14 @@ export function mapAxiosError(error: unknown): AppError {
     return {
       kind,
       status,
-      // Known statuses always use the curated Spanish message; unknown ones
-      // may fall back to the backend message for extra context.
-      message: kind === 'unknown' && backendMessage ? backendMessage : KIND_MESSAGES[kind],
+      // Validation and conflict-style messages from the contract are written
+      // for end users and add actionable context. Known statuses without a
+      // backend message and every server error use curated Spanish messages,
+      // so internal details are never exposed.
+      message:
+        (kind === 'validation' || kind === 'unknown') && backendMessage
+          ? backendMessage
+          : KIND_MESSAGES[kind],
     };
   }
   return { kind: 'unknown', message: KIND_MESSAGES.unknown };
