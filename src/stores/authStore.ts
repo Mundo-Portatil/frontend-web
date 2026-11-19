@@ -4,6 +4,7 @@ import type { LoginCredentials, ProfileUser } from '../modules/foundation/auth/m
 import { getProfile, login as requestLogin } from '../modules/foundation/auth/services/authService';
 import { asAppError } from '../services/api/errors';
 import type { AppError } from '../services/api/errors';
+import { useLocationStore } from './locationStore';
 
 export type AuthStatus = 'initializing' | 'authenticated' | 'unauthenticated';
 
@@ -20,6 +21,12 @@ interface AuthState {
   initialize: () => Promise<void>;
   /** Authenticates the user and establishes the session. */
   login: (credentials: LoginCredentials) => Promise<LoginResult>;
+  /**
+   * Re-fetches GET /auth/profile to refresh the authoritative session user and
+   * role. Used after profile/role changes and when the tab regains focus.
+   * Returns null when the session could not be refreshed.
+   */
+  refreshProfile: () => Promise<ProfileUser | null>;
   /** Clears the session (user initiated). */
   logout: () => void;
   /** Clears the session after a 401 from a protected endpoint (interceptor). */
@@ -27,6 +34,9 @@ interface AuthState {
 }
 
 const UNAUTHENTICATED_STATE = { status: 'unauthenticated', user: null } as const;
+
+/** Deduplicates concurrent profile refreshes (focus + visibility events). */
+let profileRefresh: Promise<ProfileUser | null> | null = null;
 
 export const useAuthStore = create<AuthState>()((set) => ({
   status: 'initializing',
@@ -46,6 +56,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
       // Invalid or expired token (401) or user no longer exists (404):
       // clear the stored token and leave the app unauthenticated.
       clearAccessToken();
+      useLocationStore.getState().reset();
       set(UNAUTHENTICATED_STATE);
     }
   },
@@ -75,13 +86,57 @@ export const useAuthStore = create<AuthState>()((set) => ({
     }
   },
 
+  refreshProfile: () => {
+    if (profileRefresh) {
+      return profileRefresh;
+    }
+
+    const token = getAccessToken();
+    if (!token) {
+      return Promise.resolve(null);
+    }
+
+    profileRefresh = (async () => {
+      try {
+        const user = await getProfile();
+        // Ignore a response that belongs to a session that was closed or
+        // replaced while the request was in flight.
+        if (getAccessToken() !== token) {
+          return null;
+        }
+        set({ status: 'authenticated', user });
+        return user;
+      } catch (error) {
+        if (getAccessToken() !== token) {
+          return null;
+        }
+
+        const appError = asAppError(error);
+        if (appError.kind === 'unauthorized' || appError.kind === 'notFound') {
+          clearAccessToken();
+          useLocationStore.getState().reset();
+          set(UNAUTHENTICATED_STATE);
+        }
+        return null;
+      }
+    })().finally(() => {
+      profileRefresh = null;
+    });
+
+    return profileRefresh;
+  },
+
   logout: () => {
     clearAccessToken();
+    // The operative location belongs to the active session; never carry it
+    // over to the next user who signs in on the same tab.
+    useLocationStore.getState().reset();
     set(UNAUTHENTICATED_STATE);
   },
 
   handleSessionExpired: () => {
     clearAccessToken();
+    useLocationStore.getState().reset();
     set(UNAUTHENTICATED_STATE);
   },
 }));
