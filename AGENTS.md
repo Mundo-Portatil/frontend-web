@@ -65,6 +65,25 @@ No es obligatorio utilizar todos los subagentes en cada implementación.
 
 El agente que coordina el trabajo debe comprobar que los resultados de los subagentes respeten los documentos SDD.
 
+### 4.1. Configuración de agentes y skills en GitHub Copilot (compatibilidad OpenCode)
+
+Las definiciones de agentes para Copilot se ubican en `.github/agents/`:
+
+- **Agentes Copilot (`.github/agents/`):**
+  - `frontend.agent.md`: agente principal y orquestador.
+  - `frontend-builder.agent.md`: subagente especialista en construcción e implementación.
+  - `frontend-reviewer.agent.md`: subagente especialista en revisión (solo lectura, sin edición).
+  - `frontend-ui.agent.md`: subagente especialista en interfaz y experiencia de usuario.
+
+Las skills del proyecto se mantienen en `.agents/skills/` para evitar duplicación y preservar la fuente original:
+
+- `vercel-react-best-practices`: optimización y mejores prácticas de React/Next.js. Autorizada para `frontend`, `frontend-builder` y `frontend-reviewer`.
+- `vercel-composition-patterns`: patrones de composición y escalabilidad de componentes. Autorizada para `frontend`, `frontend-builder` y `frontend-ui`.
+- `vercel-react-view-transitions`: animaciones y transiciones de navegación con View Transition API. Autorizada para `frontend`, `frontend-builder` y `frontend-ui`.
+- `web-design-guidelines`: directrices de diseño web, accesibilidad y UX. Autorizada para `frontend`, `frontend-reviewer` y `frontend-ui`.
+
+El agente principal coordina y delega tareas a los subagentes con `runSubagent` en Copilot, respetando responsabilidades, herramientas y skills autorizadas.
+
 ## 5. Tecnologías y arquitectura
 
 Respetar el stack tecnológico establecido en `constitution.md`.

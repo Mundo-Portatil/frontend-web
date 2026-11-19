@@ -1,0 +1,522 @@
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { Can } from '../../../../components/guards/Can';
+import { useAuthStore } from '../../../../stores/authStore';
+import { ROLE_LABELS } from '../../auth/roleLabels';
+import type { Role } from '../../auth/models';
+import { asAppError } from '../../../../services/api/errors';
+import type { AppError } from '../../../../services/api/errors';
+import { formatDate } from '../../../../utils/formatDate';
+import { EmptyState } from '../../../../components/feedback/EmptyState';
+import { ErrorState } from '../../../../components/feedback/ErrorState';
+import { InlineSpinner } from '../../../../components/feedback/InlineSpinner';
+import { LoadingState } from '../../../../components/feedback/LoadingState';
+import {
+  DANGER_BUTTON_CLASS,
+  LABEL_CLASS,
+  PRIMARY_BUTTON_CLASS,
+  SECONDARY_BUTTON_CLASS,
+  TEXT_INPUT_CLASS,
+  TEXT_INPUT_INVALID_CLASS,
+} from '../../../../utils/formStyles';
+import { createUser, deactivateUser, listUsers, reactivateUser, updateUser } from '../services/userService';
+import type { User } from '../models';
+import { isValidEmail, isValidPassword, MIN_PASSWORD_LENGTH } from '../../../../utils/validation';
+import { Notification } from '../../../../components/notifications/Notification';
+import type { NotificationKind } from '../../../../components/notifications/Notification';
+
+const ROLE_OPTIONS: Role[] = ['ADMIN', 'VENDEDOR', 'TECNICO'];
+
+interface Feedback {
+  kind: NotificationKind;
+  message: string;
+}
+
+interface UserFormState {
+  email: string;
+  name: string;
+  role: Role;
+  password: string;
+}
+
+interface UserFormErrors {
+  email?: string;
+  name?: string;
+  role?: string;
+  password?: string;
+}
+
+const EMPTY_FORM: UserFormState = {
+  email: '',
+  name: '',
+  role: 'VENDEDOR',
+  password: '',
+};
+
+function inputClass(hasError: boolean): string {
+  return hasError ? `${TEXT_INPUT_CLASS} ${TEXT_INPUT_INVALID_CLASS}` : TEXT_INPUT_CLASS;
+}
+
+function validateCreateForm(form: UserFormState): UserFormErrors {
+  const errors: UserFormErrors = {};
+
+  if (form.email.trim() === '') {
+    errors.email = 'El correo es obligatorio.';
+  } else if (!isValidEmail(form.email.trim())) {
+    errors.email = 'Ingresa un correo electrónico válido.';
+  }
+
+  if (form.name.trim() === '') {
+    errors.name = 'El nombre es obligatorio.';
+  }
+
+  if (!ROLE_OPTIONS.includes(form.role)) {
+    errors.role = 'Selecciona un rol válido.';
+  }
+
+  if (form.password === '') {
+    errors.password = 'La contraseña es obligatoria.';
+  } else if (!isValidPassword(form.password)) {
+    errors.password = `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`;
+  }
+
+  return errors;
+}
+
+function validateEditForm(form: UserFormState): UserFormErrors {
+  const errors: UserFormErrors = {};
+
+  if (form.name.trim() === '') {
+    errors.name = 'El nombre es obligatorio.';
+  }
+
+  if (!ROLE_OPTIONS.includes(form.role)) {
+    errors.role = 'Selecciona un rol válido.';
+  }
+
+  if (form.password !== '' && !isValidPassword(form.password)) {
+    errors.password = `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`;
+  }
+
+  return errors;
+}
+
+function userFormFromEntity(user: User): UserFormState {
+  return {
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    password: '',
+  };
+}
+
+/**
+ * Users administration screen (ADMIN only): list users, create users,
+ * update users and perform soft-delete via active=false.
+ */
+export function UsersPage() {
+  const currentUserId = useAuthStore((state) => state.user?.id);
+  const refreshProfile = useAuthStore((state) => state.refreshProfile);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUpdatingStatusId, setIsUpdatingStatusId] = useState<string | null>(null);
+
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [form, setForm] = useState<UserFormState>(EMPTY_FORM);
+  const [formErrors, setFormErrors] = useState<UserFormErrors>({});
+  const [formKey, setFormKey] = useState(0);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const [screenError, setScreenError] = useState<AppError | null>(null);
+  const [formError, setFormError] = useState<AppError | null>(null);
+  const [formSuccessMessage, setFormSuccessMessage] = useState<string | null>(null);
+  const [operationFeedback, setOperationFeedback] = useState<Feedback | null>(null);
+
+  const isEditing = selectedUser !== null;
+
+  async function loadUsers() {
+    setIsLoading(true);
+    setScreenError(null);
+    try {
+      const data = await listUsers();
+      setUsers(data);
+    } catch (error) {
+      setScreenError(asAppError(error));
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    // Data loading requires state updates after the async request finishes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadUsers();
+  }, []);
+
+  const activeUsersCount = useMemo(() => users.filter((user) => user.active).length, [users]);
+
+  function resetForm() {
+    setSelectedUser(null);
+    setForm({ ...EMPTY_FORM });
+    setFormErrors({});
+    setFormError(null);
+    // Remount the form after a successful operation. This also clears values
+    // restored by browser autofill while keeping input state controlled.
+    setFormKey((key) => key + 1);
+    formRef.current?.reset();
+  }
+
+  function startEdit(user: User) {
+    setSelectedUser(user);
+    setForm(userFormFromEntity(user));
+    setFormErrors({});
+    setFormError(null);
+    setFormSuccessMessage(null);
+    setOperationFeedback(null);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isSubmitting) {
+      return;
+    }
+
+    const errors = isEditing ? validateEditForm(form) : validateCreateForm(form);
+    setFormErrors(errors);
+    setFormError(null);
+    setFormSuccessMessage(null);
+    setOperationFeedback(null);
+
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      if (selectedUser) {
+        const payload: Parameters<typeof updateUser>[1] = {
+          name: form.name.trim(),
+          role: form.role,
+        };
+        if (form.password.trim() !== '') {
+          payload.password = form.password;
+        }
+
+        const updated = await updateUser(selectedUser.id, payload);
+        setUsers((previous) => previous.map((item) => (item.id === updated.id ? updated : item)));
+        if (updated.id === currentUserId) {
+          // Editing the current account can change its role or name. Refresh
+          // the session profile before continuing so navigation, route guards
+          // and visible actions never keep the previous role.
+          await refreshProfile();
+        }
+        setOperationFeedback({ kind: 'success', message: 'Usuario actualizado correctamente.' });
+      } else {
+        const created = await createUser({
+          email: form.email.trim(),
+          name: form.name.trim(),
+          password: form.password,
+          role: form.role,
+        });
+        setUsers((previous) => [created, ...previous]);
+        setFormSuccessMessage('Usuario creado correctamente.');
+      }
+      resetForm();
+    } catch (error) {
+      setFormError(asAppError(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleStatusChange(user: User, nextActive: boolean) {
+    if (isUpdatingStatusId || user.active === nextActive) {
+      return;
+    }
+    setFormSuccessMessage(null);
+    setOperationFeedback(null);
+    setIsUpdatingStatusId(user.id);
+
+    try {
+      const updated = nextActive ? await reactivateUser(user.id) : await deactivateUser(user.id);
+      setUsers((previous) => previous.map((item) => (item.id === updated.id ? updated : item)));
+      if (updated.id === currentUserId) {
+        // Deactivating the current account must invalidate the active session
+        // immediately (GET /auth/profile returns 401 for inactive users).
+        await refreshProfile();
+      }
+      if (selectedUser?.id === updated.id) {
+        resetForm();
+      }
+      setOperationFeedback({
+        kind: 'success',
+        message: nextActive
+          ? 'Usuario reactivado correctamente.'
+          : 'Usuario desactivado correctamente.',
+      });
+    } catch (error) {
+      setOperationFeedback({ kind: 'error', message: asAppError(error).message });
+    } finally {
+      setIsUpdatingStatusId(null);
+    }
+  }
+
+  return (
+    <section className="mx-auto w-full max-w-6xl">
+      <header className="mb-6">
+        <h1 className="text-2xl font-semibold text-slate-900">Usuarios</h1>
+        <p className="mt-2 text-sm text-slate-500">
+          Administra las cuentas, roles y estado de acceso del personal.
+        </p>
+      </header>
+
+      <div className="mb-6 grid gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-3">
+        <article>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Total</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-900">{users.length}</p>
+        </article>
+        <article>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Activos</p>
+          <p className="mt-1 text-2xl font-semibold text-emerald-700">{activeUsersCount}</p>
+        </article>
+        <article>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Inactivos</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-700">{users.length - activeUsersCount}</p>
+        </article>
+      </div>
+
+      <Can roles={['ADMIN']}>
+        <section className="mb-8 rounded-xl border border-slate-200 bg-white p-4">
+          <h2 className="text-lg font-semibold text-slate-900">
+            {isEditing ? 'Editar usuario' : 'Registrar usuario'}
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {isEditing
+              ? 'Actualiza nombre, rol o contraseña del usuario seleccionado.'
+              : 'Crea una nueva cuenta de acceso para el sistema.'}
+          </p>
+
+          {formSuccessMessage && (
+            <div className="mt-4"><Notification kind="success">{formSuccessMessage}</Notification></div>
+          )}
+
+          {formError && (
+            <div className="mt-4"><Notification kind="error">{formError.message}</Notification></div>
+          )}
+
+          <form
+            key={formKey}
+            ref={formRef}
+            className="mt-4 grid gap-4 md:grid-cols-2"
+            onSubmit={handleSubmit}
+            noValidate
+          >
+            <div>
+              <label className={LABEL_CLASS} htmlFor="user-email">
+                Correo electrónico
+              </label>
+              <input
+                id="user-email"
+                type="email"
+                value={form.email}
+                disabled={isEditing || isSubmitting}
+                onChange={(event) => setForm((previous) => ({ ...previous, email: event.target.value }))}
+                className={inputClass(Boolean(formErrors.email))}
+                aria-invalid={Boolean(formErrors.email)}
+                aria-describedby={formErrors.email ? 'user-email-error' : undefined}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {formErrors.email && (
+                <p id="user-email-error" className="mt-1 text-sm text-red-600">{formErrors.email}</p>
+              )}
+            </div>
+
+            <div>
+              <label className={LABEL_CLASS} htmlFor="user-name">
+                Nombre completo
+              </label>
+              <input
+                id="user-name"
+                type="text"
+                value={form.name}
+                disabled={isSubmitting}
+                onChange={(event) => setForm((previous) => ({ ...previous, name: event.target.value }))}
+                className={inputClass(Boolean(formErrors.name))}
+                aria-invalid={Boolean(formErrors.name)}
+                aria-describedby={formErrors.name ? 'user-name-error' : undefined}
+                autoComplete="off"
+              />
+              {formErrors.name && (
+                <p id="user-name-error" className="mt-1 text-sm text-red-600">{formErrors.name}</p>
+              )}
+            </div>
+
+            <div>
+              <label className={LABEL_CLASS} htmlFor="user-role">
+                Rol
+              </label>
+              <select
+                id="user-role"
+                value={form.role}
+                disabled={isSubmitting}
+                onChange={(event) => setForm((previous) => ({ ...previous, role: event.target.value as Role }))}
+                className={inputClass(Boolean(formErrors.role))}
+                aria-invalid={Boolean(formErrors.role)}
+                aria-describedby={formErrors.role ? 'user-role-error' : undefined}
+              >
+                {ROLE_OPTIONS.map((role) => (
+                  <option key={role} value={role}>
+                    {ROLE_LABELS[role]}
+                  </option>
+                ))}
+              </select>
+              {formErrors.role && (
+                <p id="user-role-error" className="mt-1 text-sm text-red-600">{formErrors.role}</p>
+              )}
+            </div>
+
+            <div>
+              <label className={LABEL_CLASS} htmlFor="user-password">
+                {isEditing ? 'Nueva contraseña (opcional)' : 'Contraseña'}
+              </label>
+              <input
+                id="user-password"
+                type="password"
+                value={form.password}
+                disabled={isSubmitting}
+                onChange={(event) => setForm((previous) => ({ ...previous, password: event.target.value }))}
+                className={inputClass(Boolean(formErrors.password))}
+                aria-invalid={Boolean(formErrors.password)}
+                aria-describedby={formErrors.password ? 'user-password-error' : undefined}
+                autoComplete="new-password"
+              />
+              {formErrors.password && (
+                <p id="user-password-error" className="mt-1 text-sm text-red-600">{formErrors.password}</p>
+              )}
+            </div>
+
+            <div className="md:col-span-2 flex flex-wrap items-center gap-3">
+              <button type="submit" disabled={isSubmitting} className={`${PRIMARY_BUTTON_CLASS} inline-flex items-center gap-2`}>
+                {isSubmitting && <InlineSpinner className="border-white" />}
+                {isSubmitting
+                  ? isEditing
+                    ? 'Guardando cambios...'
+                    : 'Creando usuario...'
+                  : isEditing
+                    ? 'Guardar cambios'
+                    : 'Crear usuario'}
+              </button>
+              {isEditing && (
+                <button type="button" disabled={isSubmitting} onClick={resetForm} className={SECONDARY_BUTTON_CLASS}>
+                  Cancelar edición
+                </button>
+              )}
+            </div>
+          </form>
+        </section>
+      </Can>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-slate-900">Listado de usuarios</h2>
+          <button type="button" onClick={() => void loadUsers()} disabled={isLoading} className={SECONDARY_BUTTON_CLASS}>
+            Recargar
+          </button>
+        </div>
+
+        {operationFeedback && (
+          <div className="mb-4">
+            <Notification kind={operationFeedback.kind}>{operationFeedback.message}</Notification>
+          </div>
+        )}
+
+        {screenError && (
+          <ErrorState error={screenError} onRetry={() => void loadUsers()} />
+        )}
+
+        {!screenError && isLoading && <LoadingState message="Cargando usuarios..." />}
+
+        {!screenError && !isLoading && users.length === 0 && (
+          <EmptyState message="No hay usuarios registrados." />
+        )}
+
+        {!screenError && !isLoading && users.length > 0 && (
+          <div
+            role="region"
+            aria-label="Listado de usuarios"
+            tabIndex={0}
+            className="overflow-x-auto rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
+          >
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th scope="col" className="px-3 py-2 text-left font-medium text-slate-600">Nombre</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium text-slate-600">Correo</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium text-slate-600">Rol</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium text-slate-600">Estado</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium text-slate-600">Actualizado</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium text-slate-600">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {users.map((user) => (
+                  <tr key={user.id}>
+                    <td className="px-3 py-2 text-slate-900">{user.name}</td>
+                    <td className="px-3 py-2 text-slate-700">{user.email}</td>
+                    <td className="px-3 py-2 text-slate-700">{ROLE_LABELS[user.role]}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={
+                          user.active
+                            ? 'rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700'
+                            : 'rounded-full bg-slate-200 px-2 py-1 text-xs font-medium text-slate-700'
+                        }
+                      >
+                        {user.active ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">{formatDate(user.updatedAt)}</td>
+                    <td className="px-3 py-2">
+                      <Can roles={['ADMIN']}>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => startEdit(user)}
+                            className={SECONDARY_BUTTON_CLASS}
+                            disabled={isSubmitting || isUpdatingStatusId === user.id}
+                          >
+                            Editar
+                          </button>
+                          {user.active ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleStatusChange(user, false)}
+                              className={DANGER_BUTTON_CLASS}
+                              disabled={isSubmitting || isUpdatingStatusId === user.id}
+                            >
+                              {isUpdatingStatusId === user.id ? 'Desactivando...' : 'Dar de baja'}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void handleStatusChange(user, true)}
+                              className={PRIMARY_BUTTON_CLASS}
+                              disabled={isSubmitting || isUpdatingStatusId === user.id}
+                            >
+                              {isUpdatingStatusId === user.id ? 'Reactivando...' : 'Reactivar'}
+                            </button>
+                          )}
+                        </div>
+                      </Can>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </section>
+  );
+}
