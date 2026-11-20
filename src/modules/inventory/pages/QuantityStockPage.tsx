@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useRestoreFocus } from '../../../hooks/useRestoreFocus';
 import { Can } from '../../../components/guards/Can';
 import { EmptyState } from '../../../components/feedback/EmptyState';
@@ -24,6 +25,7 @@ import { QuantityStockForm } from '../components/QuantityStockForm';
 import { InventoryBadge } from '../components/InventoryBadge';
 
 export function QuantityStockPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { query, setQuery, data, loading, error, reload } = useQuantityStock();
   const [locations, setLocations] = useState<Location[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -37,13 +39,19 @@ export function QuantityStockPage() {
   const [limit, setLimit] = useState('50');
   const [filterError, setFilterError] = useState<string | null>(null);
   const [saved, setSaved] = useState<QuantityStock | null>(null);
-  const [showMovement, setShowMovement] = useState(false);
+  const showMovement = searchParams.get('operation') === 'inbound';
   const [movementKey, setMovementKey] = useState(0);
+  const [movementBusy, setMovementBusy] = useState(false);
+  const movementPending = useRef(false);
   const movementTriggerRef = useRef<HTMLButtonElement>(null);
   const restoreMovementFocus = useRestoreFocus(showMovement, movementTriggerRef);
 
   function closeMovement() {
-    setShowMovement(false);
+    if (searchParams.has('operation')) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('operation');
+      setSearchParams(nextParams, { replace: true });
+    }
     setMovementKey((value) => value + 1);
     restoreMovementFocus();
   }
@@ -84,7 +92,7 @@ export function QuantityStockPage() {
       return;
     }
     if (!limit.trim() || !Number.isSafeInteger(Number(limit)) || Number(limit) < 1) {
-      setFilterError('El tamaño de página debe ser un entero mayor que cero.');
+      setFilterError('Indica cuántos resultados mostrar: usa un número entero mayor que cero.');
       return;
     }
     setQuery({
@@ -110,18 +118,22 @@ export function QuantityStockPage() {
           <button
             ref={movementTriggerRef}
             type="button"
+            disabled={movementBusy}
             aria-expanded={showMovement}
             aria-controls="stock-movement-panel"
             onClick={() => {
+              if (movementPending.current) return;
               if (showMovement) {
                 closeMovement();
               } else {
-                setShowMovement(true);
+                const nextParams = new URLSearchParams(searchParams);
+                nextParams.set('operation', 'inbound');
+                setSearchParams(nextParams);
               }
             }}
             className={showMovement ? SECONDARY_BUTTON_CLASS : PRIMARY_BUTTON_CLASS}
           >
-            {showMovement ? 'Cerrar registro' : 'Registrar movimiento'}
+            {showMovement ? 'Cerrar registro' : 'Agregar o corregir cantidades'}
           </button>
         </Can>
       </header>
@@ -143,6 +155,10 @@ export function QuantityStockPage() {
             <QuantityStockForm
               key={movementKey}
               locations={locations}
+              onBusyChange={(value) => {
+                movementPending.current = value;
+                setMovementBusy(value);
+              }}
               onSaved={(result) => {
                 setSaved(result);
                 closeMovement();
@@ -281,10 +297,10 @@ export function QuantityStockPage() {
                   <tr className="text-left text-slate-600">
                     {[
                       'Producto',
-                      'SKU',
+                      'Código de producto',
                       'Ubicación',
                       'Cantidad',
-                      'Umbral',
+                      'Mínimo recomendado',
                       'Stock bajo',
                       'Costo',
                       'Precio',

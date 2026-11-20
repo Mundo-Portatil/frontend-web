@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QuantityStockPage } from './QuantityStockPage';
@@ -26,14 +27,14 @@ beforeEach(() => {
 });
 describe('QuantityStockPage', () => {
   it.each(['ADMIN', 'VENDEDOR', 'TECNICO'] as const)('allows %s to consult and limits mutations to admin', async (role) => {
-    useAuthStore.setState({ user: { ...session, role } }); render(<QuantityStockPage />);
+    useAuthStore.setState({ user: { ...session, role } }); render(<MemoryRouter><QuantityStockPage /></MemoryRouter>);
     expect(await screen.findByText('Mouse Logitech')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText('Cargando ubicaciones y categorías…')).not.toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: 'Registrar movimiento' }) !== null).toBe(role === 'ADMIN');
+    expect(screen.queryByRole('button', { name: 'Agregar o corregir cantidades' }) !== null).toBe(role === 'ADMIN');
     expect(screen.getByRole('cell', { name: 'Sí' })).toBeInTheDocument();
   });
   it('applies real filters with page reset and paginates', async () => {
-    const user = userEvent.setup(); render(<QuantityStockPage />); await screen.findByText('Mouse Logitech');
+    const user = userEvent.setup(); render(<MemoryRouter><QuantityStockPage /></MemoryRouter>); await screen.findByText('Mouse Logitech');
     await user.click(screen.getByRole('button', { name: 'Siguiente' }));
     await waitFor(() => expect(service.listQuantityStock).toHaveBeenLastCalledWith({ page: 2, limit: 50 }, expect.any(AbortSignal)));
     await user.selectOptions(screen.getByLabelText('Filtrar por ubicación'), placeId);
@@ -50,8 +51,8 @@ describe('QuantityStockPage', () => {
   });
   it('creates inbound only after confirmation and displays server balance', async () => {
     vi.mocked(service.inboundQuantityStock).mockResolvedValue({ ...stock, quantity: 7 });
-    const user = userEvent.setup(); render(<QuantityStockPage />);
-    await user.click(screen.getByRole('button', { name: 'Registrar movimiento' }));
+    const user = userEvent.setup(); render(<MemoryRouter><QuantityStockPage /></MemoryRouter>);
+    await user.click(screen.getByRole('button', { name: 'Agregar o corregir cantidades' }));
     await user.selectOptions(await screen.findByLabelText('Producto por cantidad'), productId);
     await user.selectOptions(screen.getByLabelText('Ubicación de ingreso o ajuste'), placeId);
     await user.type(screen.getByLabelText('Cantidad que ingresa'), '5');
@@ -63,8 +64,8 @@ describe('QuantityStockPage', () => {
   });
   it('requires reason and sends an absolute zero adjustment', async () => {
     vi.mocked(service.adjustQuantityStock).mockResolvedValue({ ...stock, quantity: 0 });
-    const user = userEvent.setup(); render(<QuantityStockPage />);
-    await user.click(screen.getByRole('button', { name: 'Registrar movimiento' }));
+    const user = userEvent.setup(); render(<MemoryRouter><QuantityStockPage /></MemoryRouter>);
+    await user.click(screen.getByRole('button', { name: 'Agregar o corregir cantidades' }));
     await user.selectOptions(await screen.findByLabelText('Producto por cantidad'), productId);
     await user.selectOptions(screen.getByLabelText('Operación'), 'adjust');
     await user.selectOptions(screen.getByLabelText('Ubicación de ingreso o ajuste'), placeId);
@@ -80,7 +81,7 @@ describe('QuantityStockPage', () => {
   });
   it('shows errors and retries empty lists', async () => {
     vi.mocked(service.listQuantityStock).mockRejectedValueOnce({ kind: 'network', message: 'Sin conexión' }).mockResolvedValueOnce({ items: [], total: 0, page: 1, limit: 50 });
-    render(<QuantityStockPage />); await screen.findByText('Sin conexión');
+    render(<MemoryRouter><QuantityStockPage /></MemoryRouter>); await screen.findByText('Sin conexión');
     await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
     expect(await screen.findByText('No hay existencias para estos filtros.')).toBeInTheDocument();
   });
@@ -88,8 +89,8 @@ describe('QuantityStockPage', () => {
 
 it('keeps backend validation failure visible and does not claim success', async () => {
   vi.mocked(service.inboundQuantityStock).mockRejectedValue({ kind: 'validation', message: 'El producto no admite stock por cantidad.' });
-  const user = userEvent.setup(); render(<QuantityStockPage />);
-  await user.click(screen.getByRole('button', { name: 'Registrar movimiento' }));
+  const user = userEvent.setup(); render(<MemoryRouter><QuantityStockPage /></MemoryRouter>);
+  await user.click(screen.getByRole('button', { name: 'Agregar o corregir cantidades' }));
   await user.selectOptions(await screen.findByLabelText('Producto por cantidad'), productId);
   await user.selectOptions(screen.getByLabelText('Ubicación de ingreso o ajuste'), placeId);
   await user.type(screen.getByLabelText('Cantidad que ingresa'), '3');
@@ -97,4 +98,31 @@ it('keeps backend validation failure visible and does not claim success', async 
   await user.click(screen.getByRole('button', { name: 'Confirmar operación' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('El producto no admite stock por cantidad.');
   expect(screen.queryByText(/Saldo confirmado/)).not.toBeInTheDocument();
+});
+
+ it.each(['ADMIN', 'VENDEDOR', 'TECNICO'] as const)('opens quantity entry directly only for ADMIN from a merchandise link (%s)', async (role) => {
+  useAuthStore.setState({ user: { ...session, role } });
+  render(<MemoryRouter initialEntries={['/inventory/stock?operation=inbound']}><QuantityStockPage /></MemoryRouter>);
+  await screen.findByRole('cell', { name: 'Mouse Logitech' });
+  await waitFor(() => expect(screen.queryByText('Cargando ubicaciones y categorías…')).not.toBeInTheDocument());
+  expect(screen.queryByRole('button', { name: 'Revisar operación' }) !== null).toBe(role === 'ADMIN');
+});
+
+it('keeps the quantity form mounted until the pending operation finishes', async () => {
+  let finish!: (result: typeof stock) => void;
+  vi.mocked(service.inboundQuantityStock).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  const user = userEvent.setup();
+  render(<MemoryRouter initialEntries={['/inventory/stock?operation=inbound']}><QuantityStockPage /></MemoryRouter>);
+  await user.selectOptions(await screen.findByLabelText('Producto por cantidad'), productId);
+  await user.selectOptions(screen.getByLabelText('Ubicación de ingreso o ajuste'), placeId);
+  await user.type(screen.getByLabelText('Cantidad que ingresa'), '5');
+  await user.click(screen.getByRole('button', { name: 'Revisar operación' }));
+  await user.click(screen.getByRole('button', { name: 'Confirmar operación' }));
+  expect(screen.getByRole('button', { name: 'Cerrar registro' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: 'Cerrar registro' }));
+  expect(service.inboundQuantityStock).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('button', { name: 'Guardando…' })).toBeDisabled();
+  finish({ ...stock, quantity: 7 });
+  expect(await screen.findByText(/Saldo confirmado: 7/)).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Agregar o corregir cantidades' })).toBeEnabled();
 });

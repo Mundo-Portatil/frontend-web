@@ -1,7 +1,7 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Can } from '../../../components/guards/Can';
 import { ROUTES } from '../../../router/routes';
-import { PRIMARY_BUTTON_CLASS } from '../../../utils/formStyles';
+import { PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS } from '../../../utils/formStyles';
 
 const AREAS = [
   {
@@ -39,14 +39,24 @@ export function InventoryLayout() {
           </div>
           {!isProducts && (
             <Can roles={['ADMIN']}>
-              <NavLink
-                to={ROUTES.inventoryInbound}
-                className={({ isActive }) =>
-                  `${PRIMARY_BUTTON_CLASS} inline-flex min-h-10 items-center ${isActive ? 'ring-2 ring-brand-500 ring-offset-2' : ''}`
-                }
-              >
-                Ingresar equipos y piezas
-              </NavLink>
+              <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+                <NavLink
+                  to={ROUTES.inventoryInbound}
+                  className={({ isActive }) =>
+                    `${PRIMARY_BUTTON_CLASS} inline-flex min-h-10 items-center ${isActive ? 'ring-2 ring-brand-500 ring-offset-2' : ''}`
+                  }
+                >
+                  Ingresar equipos y piezas
+                </NavLink>
+                {path === ROUTES.inventory && (
+                  <Link
+                    to={`${ROUTES.inventoryStock}?operation=inbound`}
+                    className={`${SECONDARY_BUTTON_CLASS} inline-flex min-h-10 items-center`}
+                  >
+                    Agregar cantidades
+                  </Link>
+                )}
+              </div>
             </Can>
           )}
         </div>

@@ -48,7 +48,7 @@ export function InventoryPage() {
       <header>
         <h2 className="text-lg font-semibold text-slate-900">Buscar equipo o pieza</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Escanea o escribe la serie para localizar un equipo o pieza.
+          Escanea o escribe el número de serie o código del equipo o pieza.
         </p>
       </header>
 
@@ -64,11 +64,13 @@ export function InventoryPage() {
             <span className={LABEL_CLASS}>Serie o código</span>
             <input
               aria-label="Serie o código"
+              name="code"
               value={code}
               onChange={(event) => setCode(event.target.value)}
               disabled={mutating}
               className={TEXT_INPUT_CLASS}
               autoComplete="off"
+              placeholder="Número de serie o código…"
               spellCheck={false}
             />
           </label>
@@ -76,7 +78,7 @@ export function InventoryPage() {
             disabled={busy || mutating}
             className={`${PRIMARY_BUTTON_CLASS} w-full sm:w-auto`}
           >
-            {busy ? 'Buscando...' : 'Buscar equipo o pieza'}
+            {busy ? 'Buscando…' : 'Buscar equipo o pieza'}
           </button>
         </div>
       </form>
@@ -173,7 +175,7 @@ export function InventoryPage() {
                 className={PRIMARY_BUTTON_CLASS}
                 disabled={mutating || busy}
               >
-                {mutating ? 'Guardando...' : 'Acoplar componentes'}
+                {mutating ? 'Guardando…' : 'Acoplar componentes'}
               </button>
             </form>
           </Can>

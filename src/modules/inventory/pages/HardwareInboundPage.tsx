@@ -1,3 +1,7 @@
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '../../../router/routes';
+import type { CatalogItem } from '../catalogModels';
 import { Can } from '../../../components/guards/Can';
 import { Notification } from '../../../components/notifications/Notification';
 import { LoadingState } from '../../../components/feedback/LoadingState';
@@ -40,19 +44,45 @@ function InboundForm() {
     confirm,
   } = useHardwareInbound();
 
+  const [products, setProducts] = useState<Record<string, CatalogItem>>({});
+  const reviewHeading = useRef<HTMLHeadingElement>(null);
+  const errorNotice = useRef<HTMLDivElement>(null);
+  const locationSelect = useRef<HTMLSelectElement>(null);
+  const editPending = useRef(false);
+
+  useEffect(() => {
+    if (review) reviewHeading.current?.focus();
+    else if (editPending.current) {
+      editPending.current = false;
+      locationSelect.current?.focus();
+    }
+  }, [review]);
+  useEffect(() => {
+    if (error) errorNotice.current?.focus();
+  }, [error]);
+
+  function rememberProduct(product: CatalogItem | null) {
+    if (product) setProducts((current) => ({ ...current, [product.id]: product }));
+  }
+  function productName(catalogId: string) {
+    const product = products[catalogId];
+    return product ? `${product.name} · ${product.sku}` : 'Producto seleccionado';
+  }
+
   return (
     <section className="space-y-6">
-      <header>
-        <h2 className="text-lg font-semibold text-slate-900">Ingresar equipos y piezas</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Registra equipos, piezas y sus componentes.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Ingresar equipos y piezas</h2>
+          <p className="mt-1 text-sm text-slate-500">Registra cada unidad con su serie o un código asignado.</p>
+        </div>
+        <Link to={`${ROUTES.inventoryStock}?operation=inbound`} className={SECONDARY_BUTTON_CLASS}>Agregar unidades por cantidad</Link>
       </header>
 
-      {error && <Notification kind="error">{error}</Notification>}
+      {error && <div ref={errorNotice} tabIndex={-1} className="rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"><Notification kind="error">{error}</Notification></div>}
 
       {loading ? (
-        <LoadingState message="Cargando ubicaciones..." />
+        <LoadingState message="Cargando ubicaciones…" />
       ) : !locations.length ? (
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
           <EmptyState message="No hay ubicaciones activas disponibles. Crea o activa una ubicación para registrar ingresos." />
@@ -72,7 +102,7 @@ function InboundForm() {
         <section className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
           <Notification kind="success">Ingreso registrado correctamente.</Notification>
           <div>
-            <h3 className="font-semibold text-slate-900">Equipos registrados</h3>
+            <h3 className="font-semibold text-slate-900">Equipos y piezas registrados</h3>
             <ul className="mt-2 list-inside list-disc text-sm text-slate-700">
               {created.map((item) => (
                 <li key={item.id}>
@@ -86,11 +116,11 @@ function InboundForm() {
       )}
 
       {review ? (
-        <section className="space-y-4 rounded-xl border border-brand-200 bg-white p-4 sm:p-5">
+        <section aria-busy={busy} className="space-y-4 rounded-xl border border-brand-200 bg-white p-4 sm:p-5">
           <div>
-            <h3 className="text-lg font-semibold text-slate-900">Confirmar ingreso</h3>
+            <h3 ref={reviewHeading} tabIndex={-1} className="rounded text-lg font-semibold text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Confirmar ingreso</h3>
             <p className="mt-1 text-sm text-slate-500">
-              Revisa los equipos antes de confirmar.
+              Revisa los productos, series y precios antes de guardar.
             </p>
           </div>
           <dl className="grid gap-3 rounded-lg bg-slate-50 p-3 text-sm sm:grid-cols-3">
@@ -101,7 +131,7 @@ function InboundForm() {
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500">Equipos</dt>
+              <dt className="text-slate-500">Equipos y piezas sueltas</dt>
               <dd className="font-medium text-slate-900">{review.items.length}</dd>
             </div>
             <div>
@@ -113,19 +143,44 @@ function InboundForm() {
           </dl>
           <ul className="divide-y divide-slate-100">
             {review.items.map((item, index) => (
-              <li key={index} className="py-2 text-sm text-slate-700">
-                Equipo {index + 1} — {item.serialNumber ?? 'Sin serie: se asignará un código'}
+              <li key={index} className="min-w-0 space-y-2 py-3 text-sm text-slate-700">
+                <p className="break-words font-medium text-slate-900">{productName(item.catalogId)}</p>
+                <p>Equipo o pieza {index + 1} — {item.serialNumber ?? 'Sin serie: se asignará un código'}</p>
+                {(item.costPrice !== undefined || item.salePrice !== undefined) && (
+                  <p className="text-slate-600">
+                    {item.costPrice !== undefined && `Costo: ${item.costPrice}`}
+                    {item.costPrice !== undefined && item.salePrice !== undefined && ' · '}
+                    {item.salePrice !== undefined && `Venta: ${item.salePrice}`}
+                  </p>
+                )}
+                {item.children?.length ? (
+                  <ul aria-label={`Componentes del equipo o pieza ${index + 1}`} className="space-y-2 border-l-2 border-slate-200 pl-3">
+                    {item.children.map((child, childIndex) => (
+                      <li key={childIndex} className="break-words">
+                        <p className="font-medium">{productName(child.catalogId)}</p>
+                        <p>Serie: {child.serialNumber ?? 'Se asignará un código'}</p>
+                        {(child.costPrice !== undefined || child.salePrice !== undefined) && (
+                          <p className="text-slate-600">
+                            {child.costPrice !== undefined && `Costo: ${child.costPrice}`}
+                            {child.costPrice !== undefined && child.salePrice !== undefined && ' · '}
+                            {child.salePrice !== undefined && `Venta: ${child.salePrice}`}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </li>
             ))}
           </ul>
           <div className="flex flex-wrap gap-2">
             <button disabled={busy} className={PRIMARY_BUTTON_CLASS} onClick={() => void confirm()}>
-              {busy ? 'Guardando...' : 'Confirmar ingreso'}
+              {busy ? 'Guardando…' : 'Confirmar ingreso'}
             </button>
             <button
               disabled={busy}
               className={SECONDARY_BUTTON_CLASS}
-              onClick={() => setReview(null)}
+              onClick={() => { editPending.current = true; setReview(null); }}
             >
               Volver a editar
             </button>
@@ -136,14 +191,12 @@ function InboundForm() {
           <fieldset disabled={busy || loading || review !== null} className="space-y-5">
             <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
               <h3 className="font-semibold text-slate-900">Ubicación inicial</h3>
-              <p className="mt-1 text-sm text-slate-500">
-                Todos los equipos del ingreso se registran en esta ubicación activa.
-              </p>
               <div className="mt-4 max-w-md">
                 <label htmlFor="inbound-location" className={LABEL_CLASS}>
                   Ubicación inicial
                 </label>
                 <select
+                  ref={locationSelect}
                   id="inbound-location"
                   aria-label="Ubicación inicial"
                   value={locationId}
@@ -168,10 +221,7 @@ function InboundForm() {
                 >
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <h3 className="font-semibold text-slate-900">Equipo {index + 1}</h3>
-                      <p className="text-sm text-slate-500">
-                        Producto con serie, serie y precios opcionales.
-                      </p>
+                      <h3 className="font-semibold text-slate-900">Equipo o pieza {index + 1}</h3>
                     </div>
                     <RemoveDraftButton
                       onClick={() => setItems((all) => all.filter((_, position) => position !== index))}
@@ -182,12 +232,13 @@ function InboundForm() {
                     id={`inbound-item-${index}`}
                     label={`Equipo ${index + 1}`}
                     showLegend={false}
+                    onProductSelect={rememberProduct}
                     value={item}
                     onChange={(next) => update(index, next)}
                   />
 
                   <div className="mt-4 space-y-3 border-l-2 border-slate-200 pl-4">
-                    <h4 className="text-sm font-semibold text-slate-900">Componentes internos</h4>
+                    <h4 className="text-sm font-semibold text-slate-900">Componentes del equipo</h4>
                     {item.children.map((child, childIndex) => (
                       <div
                         key={child.draftId}
@@ -212,6 +263,7 @@ function InboundForm() {
                           id={`inbound-item-${index}-child-${childIndex}`}
                           label={`Equipo ${index + 1} componente ${childIndex + 1}`}
                           showLegend={false}
+                          onProductSelect={rememberProduct}
                           value={child}
                           onChange={(next) =>
                             update(index, {
@@ -244,10 +296,10 @@ function InboundForm() {
                 className={SECONDARY_BUTTON_CLASS}
                 onClick={() => setItems((all) => [...all, newDraft()])}
               >
-                Añadir equipo
+                Añadir equipo o pieza
               </button>
               <button className={PRIMARY_BUTTON_CLASS}>
-                {busy ? 'Validando...' : 'Revisar ingreso'}
+                {busy ? 'Validando…' : 'Revisar ingreso'}
               </button>
             </div>
           </fieldset>

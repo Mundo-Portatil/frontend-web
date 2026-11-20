@@ -31,6 +31,7 @@ describe('InventoryLayout', () => {
     expect(within(nav).getByRole('link', { name: 'Por cantidad' })).toHaveAttribute('href', '/inventory/stock');
     expect(within(nav).queryByRole('link', { name: 'Categorías' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ingresar equipos y piezas' })).toHaveAttribute('href', '/inventory/inbound');
+    expect(screen.getByRole('link', { name: 'Agregar cantidades' })).toHaveAttribute('href', '/inventory/stock?operation=inbound');
   });
 
   it('shows the products subsections when arriving from its sidebar link', () => {

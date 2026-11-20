@@ -58,7 +58,7 @@ export function CatalogDetailPanel({ id, onClose }: { id: string; onClose: () =>
 
           <dl className="grid gap-4 border-t border-slate-100 pt-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
             {Object.entries({
-              SKU: detail.item.sku,
+              'Código de producto': detail.item.sku,
               Categoría: detail.categoryName,
               Marca: detail.item.brand,
               Modelo: detail.item.model,
@@ -68,8 +68,8 @@ export function CatalogDetailPanel({ id, onClose }: { id: string; onClose: () =>
               GPU: detail.item.gpu,
               Pantalla: detail.item.screenSize,
               'Precio base (PEN)': detail.item.basePrice,
-              'Umbral mínimo': detail.item.minStockThreshold,
-              Seguimiento: detail.item.isSerialized ? 'Por serie' : 'Por cantidad',
+              'Mínimo recomendado': detail.item.minStockThreshold,
+              'Control de unidades': detail.item.isSerialized ? 'Por serie' : 'Por cantidad',
               Condición: detail.item.isSecondHand ? 'Usado' : 'Nuevo',
               Estado: detail.item.active ? 'Activo' : 'Inactivo',
             }).map(([label, value]) => (
@@ -107,7 +107,7 @@ export function CatalogDetailPanel({ id, onClose }: { id: string; onClose: () =>
                   {detail.stockSummary.map((stock) => (
                     <tr key={stock.locationId}>
                       <td className="px-3 py-2 text-slate-900">{stock.locationName}</td>
-                      <td className="px-3 py-2 text-slate-700">{stock.locationType}</td>
+                      <td className="px-3 py-2 text-slate-700">{stock.locationType === 'ALMACEN_CENTRAL' ? 'Almacén central' : stock.locationType === 'PUESTO' ? 'Puesto' : '—'}</td>
                       <td className="px-3 py-2 text-slate-700">{stock.serializedCount}</td>
                       <td className="px-3 py-2 text-slate-700">{stock.quantityCount}</td>
                       <td className="px-3 py-2 font-medium text-slate-900">{stock.totalAvailable}</td>

@@ -111,12 +111,12 @@ export function CatalogPage() {
                 setQuery({ ...query, search: event.target.value || undefined, page: 1 })
               }
               className={TEXT_INPUT_CLASS}
-              placeholder="SKU, nombre, marca o modelo"
+              placeholder="Nombre, marca, modelo o código…"
             />
           </div>
           <div>
             <label htmlFor="catalog-filter-category" className={LABEL_CLASS}>
-              Categoría del catálogo
+              Categoría
             </label>
             <select
               id="catalog-filter-category"
@@ -195,10 +195,10 @@ export function CatalogPage() {
                   <thead className="bg-slate-50">
                     <tr>
                       {[
-                        'SKU',
+                        'Código de producto',
                         'Producto',
                         'Categoría',
-                        'Seguimiento',
+                        'Control de unidades',
                         'Precio base (PEN)',
                         'Estado',
                         'Acciones',
