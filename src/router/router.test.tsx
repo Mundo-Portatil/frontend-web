@@ -106,8 +106,8 @@ describe('AppRouter', () => {
     expect(await screen.findByRole('heading', { name: 'Buscar equipo o pieza' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Por serie o código' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Por cantidad' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Productos y modelos' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Categorías' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Productos' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Categorías' })).not.toBeInTheDocument();
   });
 
   it.each([VENDEDOR, TECNICO])('denies $role access to hardware intake', async (user) => {
