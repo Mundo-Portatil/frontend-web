@@ -12,3 +12,8 @@ export async function createCatalogItem(payload: CreateCatalogInput): Promise<Ca
   const { data } = await apiClient.post<CatalogItem>('/catalog', payload);
   return data;
 }
+/** Change availability without enabling unrelated catalogue editing. */
+export async function setCatalogActive(id: string, active: boolean): Promise<CatalogItem> {
+  const { data } = await apiClient.patch<CatalogItem>(`/catalog/${encodeURIComponent(id)}`, { active });
+  return data;
+}

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRestoreFocus } from '../../../hooks/useRestoreFocus';
 import { Can } from '../../../components/guards/Can';
 import { EmptyState } from '../../../components/feedback/EmptyState';
@@ -16,6 +16,11 @@ import { useCatalog } from '../hooks/useCatalog';
 import { CatalogForm } from '../components/CatalogForm';
 import { CatalogDetailPanel } from '../components/CatalogDetailPanel';
 import { InventoryBadge } from '../components/InventoryBadge';
+import type { CatalogItem } from '../catalogModels';
+import { setCatalogActive } from '../services/catalogService';
+import { asAppError } from '../../../services/api/errors';
+import { useAuthStore } from '../../../stores/authStore';
+import { getAccessToken } from '../../../config/authToken';
 
 export function CatalogPage() {
   const categories = useCategories();
@@ -24,13 +29,48 @@ export function CatalogPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [createKey, setCreateKey] = useState(0);
+  const [pendingDeactivation, setPendingDeactivation] = useState<CatalogItem | null>(null);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [detailRevision, setDetailRevision] = useState(0);
+  const statusPending = useRef(false);
+  const deactivationButtonRef = useRef<HTMLButtonElement>(null);
   const createTriggerRef = useRef<HTMLButtonElement>(null);
   const restoreCreateFocus = useRestoreFocus(showCreate, createTriggerRef);
+
+  useEffect(() => {
+    if (pendingDeactivation) deactivationButtonRef.current?.focus();
+  }, [pendingDeactivation]);
 
   function closeCreate() {
     setShowCreate(false);
     setCreateKey((value) => value + 1);
     restoreCreateFocus();
+  }
+
+  async function changeStatus(item: CatalogItem, active: boolean) {
+    if (statusPending.current || useAuthStore.getState().user?.role !== 'ADMIN') return;
+    statusPending.current = true;
+    const accountId = useAuthStore.getState().user?.id;
+    const token = getAccessToken();
+    setStatusBusy(true);
+    setStatusError(null);
+    setMessage(null);
+    try {
+      const updated = await setCatalogActive(item.id, active);
+      if (getAccessToken() !== token || useAuthStore.getState().user?.id !== accountId) return;
+      setMessage(updated.active ? 'Producto activado correctamente.' : 'Producto desactivado correctamente.');
+      setPendingDeactivation(null);
+      setDetailRevision((value) => value + 1);
+      reload();
+    } catch (failure) {
+      if (getAccessToken() === token && useAuthStore.getState().user?.id === accountId) {
+        setStatusError(asAppError(failure).message);
+      }
+    } finally {
+      statusPending.current = false;
+      setStatusBusy(false);
+    }
   }
 
   return (
@@ -85,9 +125,25 @@ export function CatalogPage() {
       </Can>
 
       {message && <Notification kind="success">{message}</Notification>}
+      {statusError && <Notification kind="error">{statusError}</Notification>}
+
+      <Can roles={['ADMIN']}>
+        {pendingDeactivation && (
+          <section aria-label="Confirmar desactivación de producto" className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="font-semibold text-slate-900">Desactivar {pendingDeactivation.name}</h3>
+            <p className="text-sm text-slate-600">Dejará de estar disponible para nuevos ingresos. Podrás volver a activarlo.</p>
+            <div className="flex flex-wrap gap-2">
+              <button ref={deactivationButtonRef} type="button" disabled={statusBusy} className={PRIMARY_BUTTON_CLASS} onClick={() => void changeStatus(pendingDeactivation, false)}>
+                {statusBusy ? 'Guardando…' : 'Confirmar desactivación'}
+              </button>
+              <button type="button" disabled={statusBusy} className={SECONDARY_BUTTON_CLASS} onClick={() => setPendingDeactivation(null)}>Cancelar</button>
+            </div>
+          </section>
+        )}
+      </Can>
 
       {selectedId && (
-        <CatalogDetailPanel key={selectedId} id={selectedId} onClose={() => setSelectedId(null)} />
+        <CatalogDetailPanel key={`${selectedId}-${detailRevision}`} id={selectedId} onClose={() => setSelectedId(null)} />
       )}
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
@@ -228,12 +284,29 @@ export function CatalogPage() {
                           </InventoryBadge>
                         </td>
                         <td className="px-3 py-2">
-                          <button
-                            className={SECONDARY_BUTTON_CLASS}
-                            onClick={() => setSelectedId(item.id)}
-                          >
-                            Ver ficha
-                          </button>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              className={SECONDARY_BUTTON_CLASS}
+                              onClick={() => setSelectedId(item.id)}
+                            >
+                              Ver ficha
+                            </button>
+                            <Can roles={['ADMIN']}>
+                              <button
+                                type="button"
+                                disabled={statusBusy}
+                                className={SECONDARY_BUTTON_CLASS}
+                                onClick={() => {
+                                  if (statusPending.current) return;
+                                  setStatusError(null);
+                                  if (item.active) setPendingDeactivation(item);
+                                  else void changeStatus(item, true);
+                                }}
+                              >
+                                {item.active ? 'Desactivar' : 'Activar'}
+                              </button>
+                            </Can>
+                          </div>
                         </td>
                       </tr>
                     ))}

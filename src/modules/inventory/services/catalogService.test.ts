@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { apiClient } from '../../../services/api/axiosInstance';
-import { createCatalogItem, getCatalogDetail, listCatalog } from './catalogService';
-vi.mock('../../../services/api/axiosInstance', () => ({ apiClient: { get: vi.fn(), post: vi.fn() } }));
+import { createCatalogItem, getCatalogDetail, listCatalog, setCatalogActive } from './catalogService';
+vi.mock('../../../services/api/axiosInstance', () => ({ apiClient: { get: vi.fn(), post: vi.fn(), patch: vi.fn() } }));
 beforeEach(() => vi.clearAllMocks());
 it('sends catalog query including false and pagination without altering the envelope', async () => {
   const result = { items: [], total: 80, page: 2, limit: 50 };
@@ -22,4 +22,12 @@ it('creates product with POST /catalog and propagates API errors', async () => {
   expect(await createCatalogItem(payload)).toMatchObject({ id: 'p' });
   expect(apiClient.post).toHaveBeenCalledWith('/catalog', payload);
   await expect(createCatalogItem(payload)).rejects.toEqual({ status: 409 });
+});
+
+it('reactivates or deactivates only with the contracted active field', async () => {
+  vi.mocked(apiClient.patch).mockResolvedValueOnce({ data: { id: 'p', active: true } }).mockResolvedValueOnce({ data: { id: 'p', active: false } });
+  expect(await setCatalogActive('p', true)).toEqual({ id: 'p', active: true });
+  expect(apiClient.patch).toHaveBeenLastCalledWith('/catalog/p', { active: true });
+  expect(await setCatalogActive('p', false)).toEqual({ id: 'p', active: false });
+  expect(apiClient.patch).toHaveBeenLastCalledWith('/catalog/p', { active: false });
 });

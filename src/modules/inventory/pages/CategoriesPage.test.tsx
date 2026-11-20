@@ -92,3 +92,42 @@ it('prevents switching the edited category while its save is pending', async () 
   await screen.findByText('Categoría actualizada correctamente.');
   for (const button of screen.getAllByRole('button', { name: 'Editar' })) expect(button).toBeEnabled();
 });
+
+
+it.each(['ADMIN', 'VENDEDOR', 'TECNICO'] as const)('limits explicit category reactivation to ADMIN (%s)', async (role) => {
+  useAuthStore.setState({ user: { ...session, role } });
+  vi.mocked(service.listCategories).mockResolvedValue([{ ...category, active: false }]);
+  render(<CategoriesPage />);
+  await screen.findByText('Inactiva');
+  expect(screen.queryByRole('button', { name: 'Activar' }) !== null).toBe(role === 'ADMIN');
+});
+
+it('reactivates a category once and refreshes the inactive filter', async () => {
+  vi.mocked(service.listCategories).mockResolvedValue([{ ...category, active: false }]);
+  let finish!: (result: typeof category) => void;
+  vi.mocked(service.updateCategory).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  const user = userEvent.setup();
+  render(<CategoriesPage />);
+  await user.selectOptions(screen.getByLabelText('Estado de categorías'), 'inactive');
+  await user.dblClick(await screen.findByRole('button', { name: 'Activar' }));
+  expect(service.updateCategory).toHaveBeenCalledTimes(1);
+  expect(service.updateCategory).toHaveBeenCalledWith(category.id, { active: true });
+  expect(screen.getByRole('button', { name: 'Activar' })).toBeDisabled();
+  vi.mocked(service.listCategories).mockResolvedValue([]);
+  await act(async () => finish(category));
+  expect(await screen.findByText('Categoría activada correctamente.')).toBeInTheDocument();
+  await waitFor(() => expect(service.listCategories).toHaveBeenLastCalledWith({ active: false }, expect.any(AbortSignal)));
+  expect(await screen.findByText('No hay categorías disponibles.')).toBeInTheDocument();
+});
+
+it('shows category reactivation failure without changing its state or claiming success', async () => {
+  vi.mocked(service.listCategories).mockResolvedValue([{ ...category, active: false }]);
+  vi.mocked(service.updateCategory).mockRejectedValue({ kind: 'validation', message: 'No se pudo activar la categoría.' });
+  const user = userEvent.setup();
+  render(<CategoriesPage />);
+  await user.click(await screen.findByRole('button', { name: 'Activar' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo activar la categoría.');
+  expect(screen.getByText('Inactiva')).toBeInTheDocument();
+  expect(screen.queryByText('Categoría activada correctamente.')).not.toBeInTheDocument();
+  expect(service.listCategories).toHaveBeenCalledTimes(1);
+});
