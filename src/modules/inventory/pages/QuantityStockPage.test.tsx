@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QuantityStockPage } from './QuantityStockPage';
@@ -40,7 +40,12 @@ describe('QuantityStockPage', () => {
     await user.selectOptions(screen.getByLabelText('Filtrar por categoría'), categoryId);
     await user.selectOptions(await screen.findByLabelText('Filtrar por producto'), productId);
     await user.click(screen.getByLabelText('Solo stock bajo'));
-    await user.click(screen.getByRole('button', { name: 'Aplicar filtros' }));
+    const apply = screen.getByRole('button', { name: 'Aplicar filtros' });
+    const filterActions = apply.parentElement!.parentElement!;
+    expect(filterActions).toHaveClass('flex-wrap', 'min-w-0');
+    expect(within(filterActions).getByLabelText('Registros por página')).toBeInTheDocument();
+    expect(within(filterActions).getByLabelText('Solo stock bajo')).toBeInTheDocument();
+    await user.click(apply);
     await waitFor(() => expect(service.listQuantityStock).toHaveBeenLastCalledWith({ page: 1, limit: 50, locationId: placeId, categoryId, catalogItemId: productId, lowStock: true }, expect.any(AbortSignal)));
   });
   it('creates inbound only after confirmation and displays server balance', async () => {

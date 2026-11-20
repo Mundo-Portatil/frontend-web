@@ -176,79 +176,85 @@ export function QuantityStockPage() {
             Recargar
           </button>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <label htmlFor="quantity-location-filter" className={LABEL_CLASS}>
-              Filtrar por ubicación
-            </label>
-            <select
-              id="quantity-location-filter"
-              value={locationId}
-              onChange={(event) => setLocationId(event.target.value)}
-              className={TEXT_INPUT_CLASS}
-            >
-              <option value="">Todas las ubicaciones</option>
-              {locations.map((location) => (
-                <option key={location.id} value={location.id}>
-                  {location.name}
-                  {location.active ? '' : ' (inactiva)'}
-                </option>
-              ))}
-            </select>
+        <div className="grid min-w-0 items-start gap-4 lg:grid-cols-2">
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:col-start-1 lg:row-start-1">
+            <div>
+              <label htmlFor="quantity-location-filter" className={LABEL_CLASS}>
+                Filtrar por ubicación
+              </label>
+              <select
+                id="quantity-location-filter"
+                value={locationId}
+                onChange={(event) => setLocationId(event.target.value)}
+                className={TEXT_INPUT_CLASS}
+              >
+                <option value="">Todas las ubicaciones</option>
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.name}
+                    {location.active ? '' : ' (inactiva)'}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="quantity-category-filter" className={LABEL_CLASS}>
+                Filtrar por categoría
+              </label>
+              <select
+                id="quantity-category-filter"
+                value={categoryId}
+                onChange={(event) => setCategoryId(event.target.value)}
+                className={TEXT_INPUT_CLASS}
+              >
+                <option value="">Todas las categorías</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div>
-            <label htmlFor="quantity-category-filter" className={LABEL_CLASS}>
-              Filtrar por categoría
-            </label>
-            <select
-              id="quantity-category-filter"
-              value={categoryId}
-              onChange={(event) => setCategoryId(event.target.value)}
-              className={TEXT_INPUT_CLASS}
-            >
-              <option value="">Todas las categorías</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <CatalogProductPicker
-            id="quantity-product-filter"
-            serialized={false}
-            label="Filtrar por producto"
-            searchLabel="Buscar producto para filtrar"
-            onChange={setCatalogItemId}
-          />
-          <div>
-            <label htmlFor="quantity-limit" className={LABEL_CLASS}>
-              Registros por página
-            </label>
-            <input
-              id="quantity-limit"
-              type="number"
-              min="1"
-              step="1"
-              value={limit}
-              onChange={(event) => setLimit(event.target.value)}
-              className={TEXT_INPUT_CLASS}
+          <div className="min-w-0 border-t border-slate-100 pt-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+            <CatalogProductPicker
+              id="quantity-product-filter"
+              serialized={false}
+              label="Filtrar por producto"
+              searchLabel="Buscar producto para filtrar"
+              onChange={setCatalogItemId}
             />
           </div>
-          <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={lowStock}
-              onChange={(event) => setLowStock(event.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-            />
-            Solo stock bajo
-          </label>
-          <div className="flex items-end">
-            <button className={`${PRIMARY_BUTTON_CLASS} w-full sm:w-auto`}>Aplicar filtros</button>
+          <div className="flex min-w-0 flex-wrap items-end gap-3 border-t border-slate-100 pt-4 lg:col-start-1 lg:row-start-2">
+            <div className="w-full min-w-0 sm:w-28">
+              <label htmlFor="quantity-limit" className={LABEL_CLASS}>
+                Registros por página
+              </label>
+              <input
+                id="quantity-limit"
+                type="number"
+                min="1"
+                step="1"
+                value={limit}
+                onChange={(event) => setLimit(event.target.value)}
+                className={TEXT_INPUT_CLASS}
+              />
+            </div>
+            <label className="flex items-center gap-2 min-h-10 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={lowStock}
+                onChange={(event) => setLowStock(event.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              />
+              Solo stock bajo
+            </label>
+            <div className="w-full sm:ml-auto sm:w-auto">
+              <button className={`${PRIMARY_BUTTON_CLASS} w-full sm:w-auto`}>Aplicar filtros</button>
+            </div>
           </div>
           {filterError && (
-            <div className="sm:col-span-2 lg:col-span-3">
+            <div className="lg:col-span-2">
               <Notification kind="error">{filterError}</Notification>
             </div>
           )}
