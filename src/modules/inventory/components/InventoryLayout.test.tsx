@@ -23,7 +23,7 @@ describe('InventoryLayout', () => {
 
   it('shows only the current area subsections without duplicating the sidebar areas', () => {
     renderAt();
-    expect(screen.getByRole('heading', { name: 'Existencias' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Consultar inventario' })).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Áreas de inventario' })).not.toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Secciones de inventario' });
     expect(within(nav).getAllByRole('link')).toHaveLength(2);
@@ -35,7 +35,7 @@ describe('InventoryLayout', () => {
 
   it('shows the products subsections when arriving from its sidebar link', () => {
     renderAt('/inventory/catalog');
-    expect(screen.getByRole('heading', { name: 'Productos' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Productos y categorías' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Productos y modelos' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Categorías' })).toHaveAttribute('href', '/inventory/categories');
     expect(screen.queryByRole('link', { name: 'Por cantidad' })).not.toBeInTheDocument();

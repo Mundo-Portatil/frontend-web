@@ -5,14 +5,16 @@ import { PRIMARY_BUTTON_CLASS } from '../../../utils/formStyles';
 
 const AREAS = [
   {
-    label: 'Existencias',
+    label: 'Consultar inventario',
+    description: 'Busca equipos y piezas o revisa cantidades por ubicación.',
     links: [
       { to: ROUTES.inventory, label: 'Por serie o código', end: true },
       { to: ROUTES.inventoryStock, label: 'Por cantidad', end: false },
     ],
   },
   {
-    label: 'Productos',
+    label: 'Productos y categorías',
+    description: 'Modelos y categorías usados al registrar equipos y piezas.',
     links: [
       { to: ROUTES.inventoryCatalog, label: 'Productos y modelos', end: false },
       { to: ROUTES.inventoryCategories, label: 'Categorías', end: false },
@@ -31,7 +33,10 @@ export function InventoryLayout() {
     <section className="mx-auto w-full max-w-6xl">
       <header className="mb-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold text-slate-900">{selectedArea.label}</h1>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold text-slate-900">{selectedArea.label}</h1>
+            <p className="mt-1 text-sm text-slate-600">{selectedArea.description}</p>
+          </div>
           {!isProducts && (
             <Can roles={['ADMIN']}>
               <NavLink

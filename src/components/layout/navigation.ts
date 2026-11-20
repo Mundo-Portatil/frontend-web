@@ -81,14 +81,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     children: [
       {
         id: 'inventory-stock',
-        label: 'Existencias',
+        label: 'Consultar inventario',
         to: ROUTES.inventory,
         roles: ['ADMIN', 'VENDEDOR', 'TECNICO'],
         activePaths: [ROUTES.inventory, ROUTES.inventoryStock, ROUTES.inventoryInbound],
       },
       {
         id: 'inventory-products',
-        label: 'Productos',
+        label: 'Productos y categorías',
         to: ROUTES.inventoryCatalog,
         roles: ['ADMIN', 'VENDEDOR', 'TECNICO'],
         activePaths: [ROUTES.inventoryCatalog, ROUTES.inventoryCategories],
