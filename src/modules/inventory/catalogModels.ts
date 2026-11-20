@@ -22,6 +22,8 @@ export interface CreateCatalogInput {
   processor?: string; ramCapacity?: string; storageCapacity?: string; gpu?: string; screenSize?: string;
   isSerialized?: boolean; minStockThreshold?: number; isSecondHand?: boolean; active?: boolean;
 }
+/** SKU is immutable; changing the inventory tracking type is outside the frontend scope. */
+export type UpdateCatalogInput = Partial<Omit<CreateCatalogInput, 'sku' | 'isSerialized'>>;
 export interface CatalogQuery { categoryId?: string; active?: boolean; search?: string; page?: number; limit?: number }
 export interface CatalogPageResult { items: CatalogItem[]; total: number; page: number; limit: number }
 export interface CatalogDetail {

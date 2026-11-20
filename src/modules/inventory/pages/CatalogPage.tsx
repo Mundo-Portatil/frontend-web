@@ -13,6 +13,8 @@ import {
 } from '../../../utils/formStyles';
 import { useCategories } from '../hooks/useCategories';
 import { useCatalog } from '../hooks/useCatalog';
+import { getAvailableQuantity, useCatalogAvailability } from '../hooks/useCatalogAvailability';
+import { useLocationStore } from '../../../stores/locationStore';
 import { CatalogForm } from '../components/CatalogForm';
 import { CatalogDetailPanel } from '../components/CatalogDetailPanel';
 import { InventoryBadge } from '../components/InventoryBadge';
@@ -25,10 +27,15 @@ import { getAccessToken } from '../../../config/authToken';
 export function CatalogPage() {
   const categories = useCategories();
   const { query, setQuery, result, loading, error, reload } = useCatalog();
+  const activeLocation = useLocationStore((state) => state.activeLocation);
+  const availability = useCatalogAvailability(result.items, !loading && !error);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [createKey, setCreateKey] = useState(0);
+  const [editingItem, setEditingItem] = useState<CatalogItem | undefined>();
+  const [formBusy, setFormBusy] = useState(false);
+  const formPending = useRef(false);
   const [pendingDeactivation, setPendingDeactivation] = useState<CatalogItem | null>(null);
   const [statusBusy, setStatusBusy] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -44,12 +51,13 @@ export function CatalogPage() {
 
   function closeCreate() {
     setShowCreate(false);
+    setEditingItem(undefined);
     setCreateKey((value) => value + 1);
     restoreCreateFocus();
   }
 
   async function changeStatus(item: CatalogItem, active: boolean) {
-    if (statusPending.current || useAuthStore.getState().user?.role !== 'ADMIN') return;
+    if (statusPending.current || formPending.current || (showCreate && editingItem?.id === item.id) || useAuthStore.getState().user?.role !== 'ADMIN') return;
     statusPending.current = true;
     const accountId = useAuthStore.getState().user?.id;
     const token = getAccessToken();
@@ -86,12 +94,15 @@ export function CatalogPage() {
           <button
             ref={createTriggerRef}
             type="button"
+            disabled={formBusy || statusBusy}
             aria-expanded={showCreate}
             aria-controls="catalog-create-panel"
             onClick={() => {
+              if (formPending.current || statusPending.current) return;
               if (showCreate) {
                 closeCreate();
               } else {
+                setEditingItem(undefined);
                 setShowCreate(true);
               }
             }}
@@ -110,13 +121,17 @@ export function CatalogPage() {
           id="catalog-create-panel"
           hidden={!showCreate || categories.loading || Boolean(categories.error)}
         >
-          {!categories.loading && !categories.error && (
+          {showCreate && !categories.loading && !categories.error && (
             <CatalogForm
-              key={createKey}
+              key={`${editingItem?.id ?? 'new'}-${createKey}`}
               categories={categories.items}
+              initialItem={editingItem}
+              onCancel={closeCreate}
+              onBusyChange={(value) => { formPending.current = value; setFormBusy(value); }}
               onSaved={() => {
-                setMessage('Producto creado correctamente.');
+                setMessage(editingItem ? 'Producto actualizado correctamente.' : 'Producto creado correctamente.');
                 closeCreate();
+                setDetailRevision((value) => value + 1);
                 reload();
               }}
             />
@@ -148,7 +163,10 @@ export function CatalogPage() {
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-semibold text-slate-900">Productos</h3>
+          <div>
+            <h3 className="font-semibold text-slate-900">Productos</h3>
+            <p className="mt-1 text-sm text-slate-600">{activeLocation ? `Cantidades en ${activeLocation.name}` : 'Cantidad total en ubicaciones activas'}</p>
+          </div>
           <button className={SECONDARY_BUTTON_CLASS} disabled={loading} onClick={reload}>
             Recargar catálogo
           </button>
@@ -251,7 +269,7 @@ export function CatalogPage() {
                   <thead className="bg-slate-50">
                     <tr>
                       {[
-                        'Código de producto',
+                        'Cantidad disponible',
                         'Producto',
                         'Categoría',
                         'Control de unidades',
@@ -268,7 +286,18 @@ export function CatalogPage() {
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {result.items.map((item) => (
                       <tr key={item.id}>
-                        <td className="px-3 py-2 font-mono text-xs text-slate-700">{item.sku}</td>
+                        <td className="px-3 py-2 font-semibold tabular-nums text-slate-900">
+                          {availability.entries[item.id] === undefined ? (
+                            <span className="text-xs font-normal text-slate-500">Cargando…</span>
+                          ) : availability.entries[item.id].status === 'error' ? (
+                            <div className="space-y-1">
+                              <span className="block text-xs font-normal text-slate-600">No disponible</span>
+                              <button type="button" onClick={availability.retry} aria-label={`Reintentar cantidades de ${item.name}`} className="rounded text-xs font-medium text-brand-700 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Reintentar</button>
+                            </div>
+                          ) : getAvailableQuantity(availability.entries[item.id], activeLocation?.id) === undefined ? (
+                            <span className="text-xs font-normal text-slate-600">Sin datos</span>
+                          ) : getAvailableQuantity(availability.entries[item.id], activeLocation?.id)}
+                        </td>
                         <td className="px-3 py-2 text-slate-900">{item.name}</td>
                         <td className="px-3 py-2 text-slate-700">
                           {categories.items.find((category) => category.id === item.categoryId)
@@ -294,10 +323,24 @@ export function CatalogPage() {
                             <Can roles={['ADMIN']}>
                               <button
                                 type="button"
-                                disabled={statusBusy}
+                                className={SECONDARY_BUTTON_CLASS}
+                                disabled={formBusy || statusBusy}
+                                onClick={() => {
+                                  if (formPending.current || statusPending.current) return;
+                                  setEditingItem(item);
+                                  setPendingDeactivation(null);
+                                  setShowCreate(true);
+                                  setMessage(null);
+                                }}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                disabled={statusBusy || formBusy || (showCreate && editingItem?.id === item.id)}
                                 className={SECONDARY_BUTTON_CLASS}
                                 onClick={() => {
-                                  if (statusPending.current) return;
+                                  if (statusPending.current || formPending.current) return;
                                   setStatusError(null);
                                   if (item.active) setPendingDeactivation(item);
                                   else void changeStatus(item, true);

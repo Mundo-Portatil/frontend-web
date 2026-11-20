@@ -31,3 +31,12 @@ it('reactivates or deactivates only with the contracted active field', async () 
   expect(await setCatalogActive('p', false)).toEqual({ id: 'p', active: false });
   expect(apiClient.patch).toHaveBeenLastCalledWith('/catalog/p', { active: false });
 });
+
+it('updates only the supplied catalogue fields and propagates failures', async () => {
+  const { updateCatalogItem } = await import('./catalogService');
+  const payload = { name: 'Nuevo nombre', ramCapacity: '32 GB' };
+  vi.mocked(apiClient.patch).mockResolvedValueOnce({ data: { id: 'item', ...payload } }).mockRejectedValueOnce({ status: 403 });
+  expect(await updateCatalogItem('item', payload)).toEqual({ id: 'item', ...payload });
+  expect(apiClient.patch).toHaveBeenCalledWith('/catalog/item', payload);
+  await expect(updateCatalogItem('item', payload)).rejects.toEqual({ status: 403 });
+});

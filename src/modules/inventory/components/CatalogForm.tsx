@@ -1,49 +1,169 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Notification } from '../../../components/notifications/Notification';
 import { asAppError } from '../../../services/api/errors';
 import { useAuthStore } from '../../../stores/authStore';
-import { LABEL_CLASS, PRIMARY_BUTTON_CLASS, TEXT_INPUT_CLASS } from '../../../utils/formStyles';
+import { getAccessToken } from '../../../config/authToken';
+import { LABEL_CLASS, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, TEXT_INPUT_CLASS } from '../../../utils/formStyles';
 import type { Category } from '../models';
-import type { CreateCatalogInput } from '../catalogModels';
-import { createCatalogItem } from '../services/catalogService';
-const TEXT_FIELDS = [ ['sku', 'Código de producto'], ['name', 'Nombre'], ['brand', 'Marca'], ['model', 'Modelo'], ['processor', 'Procesador'], ['ramCapacity', 'RAM'], ['storageCapacity', 'Almacenamiento'], ['gpu', 'GPU'], ['screenSize', 'Pantalla'] ] as const;
-export function CatalogForm({ categories, onSaved }: { categories: Category[]; onSaved: () => void }) {
-  const [fields, setFields] = useState<Record<string, string>>({});
-  const [serialized, setSerialized] = useState(true);
-  const [secondHand, setSecondHand] = useState(false);
-  const [active, setActive] = useState(true);
+import type { CatalogItem, CreateCatalogInput, UpdateCatalogInput } from '../catalogModels';
+import { createCatalogItem, updateCatalogItem } from '../services/catalogService';
+
+const GENERAL_FIELDS = [['name', 'Nombre'], ['brand', 'Marca'], ['model', 'Modelo']] as const;
+const TECHNICAL_FIELDS = [
+  ['processor', 'Procesador'], ['ramCapacity', 'Memoria RAM'],
+  ['storageCapacity', 'Almacenamiento'], ['gpu', 'Tarjeta gráfica'], ['screenSize', 'Tamaño de pantalla'],
+] as const;
+
+function initialFields(item?: CatalogItem): Record<string, string> {
+  if (!item) return {};
+  const fields: Record<string, string> = {
+    sku: item.sku, categoryId: item.categoryId,
+    basePrice: String(item.basePrice), minStockThreshold: String(item.minStockThreshold),
+  };
+  for (const [key] of [...GENERAL_FIELDS, ...TECHNICAL_FIELDS]) fields[key] = item[key] ?? '';
+  return fields;
+}
+
+interface CatalogFormProps {
+  categories: Category[];
+  initialItem?: CatalogItem;
+  onSaved: () => void;
+  onCancel?: () => void;
+  onBusyChange?: (busy: boolean) => void;
+}
+
+export function CatalogForm({ categories, initialItem, onSaved, onCancel, onBusyChange }: CatalogFormProps) {
+  const [fields, setFields] = useState<Record<string, string>>(() => initialFields(initialItem));
+  const [serialized, setSerialized] = useState(initialItem?.isSerialized ?? true);
+  const [secondHand, setSecondHand] = useState(initialItem?.isSecondHand ?? false);
+  const [active, setActive] = useState(initialItem?.active ?? true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const sending = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const editing = Boolean(initialItem);
+  const unchangedCategory = Boolean(initialItem && fields.categoryId === initialItem.categoryId);
+  const currentCategory = categories.find((category) => category.id === initialItem?.categoryId);
+
+  useEffect(() => { headingRef.current?.focus(); }, []);
+
+  function reject(message: string, key: string) {
+    setError(message);
+    const input = formRef.current?.querySelector<HTMLElement>(`#catalog-${key}`);
+    input?.closest('details')?.setAttribute('open', '');
+    input?.focus();
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || useAuthStore.getState().user?.role !== 'ADMIN') return;
+    if (sending.current || useAuthStore.getState().user?.role !== 'ADMIN') return;
+    setError(null);
     const required = ['sku', 'name', 'brand', 'model', 'categoryId', 'basePrice'];
-    if (required.some((key) => !(fields[key] ?? '').trim())) { setError('Completa el código de producto, nombre, marca, modelo, categoría y precio base.'); return; }
-    if (!categories.some((item) => item.id === fields.categoryId && item.active)) { setError('Selecciona una categoría activa.'); return; }
+    const missing = required.find((key) => !(fields[key] ?? '').trim());
+    if (missing) return reject('Completa el código de producto, nombre, marca, modelo, categoría y precio base.', missing === 'basePrice' ? 'price' : missing);
+    if (!unchangedCategory && !categories.some((category) => category.id === fields.categoryId && category.active)) {
+      return reject('Selecciona una categoría activa.', 'categoryId');
+    }
     const price = Number(fields.basePrice);
     const threshold = Number(fields.minStockThreshold ?? '2');
-    if (!Number.isFinite(price) || price < 0 || !Number.isFinite(threshold) || threshold < 0) { setError('El precio y el umbral deben ser números mayores o iguales a cero.'); return; }
-    const payload: CreateCatalogInput = { sku: fields.sku.trim(), name: fields.name.trim(), brand: fields.brand.trim(), model: fields.model.trim(), categoryId: fields.categoryId, basePrice: price, minStockThreshold: threshold, isSerialized: serialized, isSecondHand: secondHand, active };
-    for (const key of ['processor', 'ramCapacity', 'storageCapacity', 'gpu', 'screenSize'] as const) {
-      if (fields[key]?.trim()) payload[key] = fields[key].trim();
+    if (!Number.isFinite(price) || price < 0) return reject('El precio y el umbral deben ser números mayores o iguales a cero.', 'price');
+    if (!Number.isFinite(threshold) || threshold < 0) return reject('El precio y el umbral deben ser números mayores o iguales a cero.', 'threshold');
+
+    const payload: CreateCatalogInput = {
+      sku: fields.sku.trim(), name: fields.name.trim(), brand: fields.brand.trim(), model: fields.model.trim(),
+      categoryId: fields.categoryId, basePrice: price, minStockThreshold: threshold,
+      isSerialized: serialized, isSecondHand: secondHand, active,
+    };
+    for (const [key] of TECHNICAL_FIELDS) if (fields[key]?.trim()) payload[key] = fields[key].trim();
+
+    const update: UpdateCatalogInput = {};
+    if (initialItem) {
+      for (const [key] of [...GENERAL_FIELDS, ...TECHNICAL_FIELDS]) {
+        const value = fields[key] ?? '';
+        if (value !== (initialItem[key] ?? '')) update[key] = value.trim();
+      }
+      if (fields.categoryId !== initialItem.categoryId) update.categoryId = fields.categoryId;
+      if (price !== initialItem.basePrice) update.basePrice = price;
+      if (threshold !== initialItem.minStockThreshold) update.minStockThreshold = threshold;
+      if (secondHand !== initialItem.isSecondHand) update.isSecondHand = secondHand;
+      if (active !== initialItem.active) update.active = active;
     }
-    setBusy(true); setError(null);
-    try { await createCatalogItem(payload); setFields({}); setSerialized(true); setSecondHand(false); setActive(true); onSaved(); }
-    catch (reason) { setError(asAppError(reason).message); }
-    finally { setBusy(false); }
+
+    sending.current = true;
+    const token = getAccessToken();
+    const accountId = useAuthStore.getState().user?.id;
+    setBusy(true);
+    onBusyChange?.(true);
+    try {
+      if (initialItem) {
+        if (Object.keys(update).length) await updateCatalogItem(initialItem.id, update);
+      } else {
+        await createCatalogItem(payload);
+      }
+      if (getAccessToken() !== token || useAuthStore.getState().user?.id !== accountId) return;
+      if (!initialItem) {
+        setFields({}); setSerialized(true); setSecondHand(false); setActive(true);
+      }
+      onSaved();
+    } catch (failure) {
+      if (getAccessToken() === token && useAuthStore.getState().user?.id === accountId) setError(asAppError(failure).message);
+    } finally {
+      sending.current = false;
+      setBusy(false);
+      onBusyChange?.(false);
+    }
   }
-  function field(key: string, value: string) { setFields((current) => ({ ...current, [key]: value })); }
-  return <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5"><h2 className="text-lg font-semibold text-slate-900">Registrar producto</h2><p className="mt-1 text-sm text-slate-500">Datos del modelo, categoría y precios. Las unidades se registran al ingresar mercancía.</p>
-    {error && <Notification kind="error">{error}</Notification>}
-    <form onSubmit={(event) => void submit(event)} noValidate className="mt-4"><fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {TEXT_FIELDS.map(([key, label], index) => <div key={key}><label htmlFor={`catalog-${key}`} className={LABEL_CLASS}>{label}{index < 4 ? ' *' : ''}</label><input id={`catalog-${key}`} value={fields[key] ?? ''} onChange={(event) => field(key, event.target.value)} className={TEXT_INPUT_CLASS} required={index < 4} /></div>)}
-      <div><label htmlFor="catalog-category" className={LABEL_CLASS}>Categoría *</label><select id="catalog-category" value={fields.categoryId ?? ''} onChange={(event) => field('categoryId', event.target.value)} className={TEXT_INPUT_CLASS} required><option value="">Seleccionar categoría</option>{categories.filter((category) => category.active).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></div>
-      <div><label htmlFor="catalog-price" className={LABEL_CLASS}>Precio base (PEN) *</label><input id="catalog-price" type="number" min="0" step="any" required value={fields.basePrice ?? ''} onChange={(event) => field('basePrice', event.target.value)} className={TEXT_INPUT_CLASS} /></div>
-      <div><label htmlFor="catalog-threshold" className={LABEL_CLASS}>Mínimo recomendado</label><input id="catalog-threshold" type="number" min="0" step="any" value={fields.minStockThreshold ?? '2'} onChange={(event) => field('minStockThreshold', event.target.value)} className={TEXT_INPUT_CLASS} /></div>
-      <div><label htmlFor="catalog-tracking" className={LABEL_CLASS}>Cómo registrar las unidades</label><select id="catalog-tracking" value={String(serialized)} onChange={(event) => setSerialized(event.target.value === 'true')} className={TEXT_INPUT_CLASS}><option value="true">Una por una, con serie o código</option><option value="false">Agrupadas por cantidad</option></select></div>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={secondHand} onChange={(event) => setSecondHand(event.target.checked)} />Segunda mano</label>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} />Activo</label>
-      <div className="sm:col-span-2 lg:col-span-3"><button className={PRIMARY_BUTTON_CLASS} disabled={busy}>{busy ? 'Guardando...' : 'Crear producto'}</button></div>
-    </fieldset></form>
-  </section>;
+
+  function field(key: string, value: string) {
+    setFields((current) => ({ ...current, [key]: value }));
+  }
+
+  return (
+    <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+      <h2 ref={headingRef} tabIndex={-1} className="rounded text-lg font-semibold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">{editing ? 'Editar producto' : 'Registrar producto'}</h2>
+      <p className="mt-1 text-sm text-slate-500">Datos del modelo. Las unidades se registran al ingresar mercancía.</p>
+      {error && <div className="mt-3"><Notification kind="error">{error}</Notification></div>}
+      <form ref={formRef} onSubmit={(event) => void submit(event)} noValidate className="mt-4">
+        <fieldset disabled={busy} className="min-w-0 space-y-5">
+          <fieldset className="min-w-0">
+            <legend className="mb-3 font-medium text-slate-900">Información general</legend>
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {GENERAL_FIELDS.map(([key, label]) => (
+                <div key={key} className="min-w-0"><label htmlFor={`catalog-${key}`} className={LABEL_CLASS}>{label} *</label><input id={`catalog-${key}`} name={key} value={fields[key] ?? ''} onChange={(event) => field(key, event.target.value)} className={TEXT_INPUT_CLASS} required /></div>
+              ))}
+              <div className="min-w-0">
+                <label htmlFor="catalog-categoryId" className={LABEL_CLASS}>Categoría *</label>
+                <select id="catalog-categoryId" name="categoryId" value={fields.categoryId ?? ''} onChange={(event) => field('categoryId', event.target.value)} className={TEXT_INPUT_CLASS} required>
+                  <option value="">Seleccionar categoría</option>
+                  {initialItem && !currentCategory?.active && <option value={initialItem.categoryId}>{currentCategory ? `${currentCategory.name} (inactiva)` : 'Categoría actual'}</option>}
+                  {categories.filter((category) => category.active).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </select>
+              </div>
+              <div><label htmlFor="catalog-price" className={LABEL_CLASS}>Precio base (PEN) *</label><input id="catalog-price" name="basePrice" type="number" inputMode="decimal" min="0" step="any" required value={fields.basePrice ?? ''} onChange={(event) => field('basePrice', event.target.value)} className={TEXT_INPUT_CLASS} /></div>
+              <div><label htmlFor="catalog-sku" className={LABEL_CLASS}>Código de producto *</label><input id="catalog-sku" name="sku" value={fields.sku ?? ''} readOnly={editing} onChange={(event) => field('sku', event.target.value)} className={TEXT_INPUT_CLASS} required autoComplete="off" spellCheck={false} /></div>
+              <div><label htmlFor="catalog-threshold" className={LABEL_CLASS}>Mínimo recomendado</label><input id="catalog-threshold" name="minStockThreshold" type="number" inputMode="decimal" min="0" step="any" value={fields.minStockThreshold ?? '2'} onChange={(event) => field('minStockThreshold', event.target.value)} className={TEXT_INPUT_CLASS} /></div>
+              <div><label htmlFor="catalog-tracking" className={LABEL_CLASS}>Cómo registrar las unidades</label><select id="catalog-tracking" name="tracking" value={String(serialized)} disabled={editing} onChange={(event) => setSerialized(event.target.value === 'true')} className={TEXT_INPUT_CLASS}><option value="true">Una por una, con serie o código</option><option value="false">Agrupadas por cantidad</option></select></div>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={secondHand} onChange={(event) => setSecondHand(event.target.checked)} />Segunda mano</label>
+                <label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} />Activo</label>
+              </div>
+            </div>
+          </fieldset>
+          <details className="rounded-lg border border-slate-200 p-3">
+            <summary className="w-fit cursor-pointer rounded font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Características técnicas (opcional)</summary>
+            <div className="mt-3 grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {TECHNICAL_FIELDS.map(([key, label]) => (
+                <div key={key} className="min-w-0"><label htmlFor={`catalog-${key}`} className={LABEL_CLASS}>{label}</label><input id={`catalog-${key}`} name={key} value={fields[key] ?? ''} onChange={(event) => field(key, event.target.value)} className={TEXT_INPUT_CLASS} /></div>
+              ))}
+            </div>
+          </details>
+          <div className="flex flex-wrap gap-2">
+            <button className={PRIMARY_BUTTON_CLASS} disabled={busy}>{busy ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear producto'}</button>
+            {onCancel && <button type="button" disabled={busy} className={SECONDARY_BUTTON_CLASS} onClick={onCancel}>Cancelar</button>}
+          </div>
+        </fieldset>
+      </form>
+    </section>
+  );
 }

@@ -1,5 +1,5 @@
 import { apiClient } from '../../../services/api/axiosInstance';
-import type { CatalogDetail, CatalogItem, CatalogPageResult, CatalogQuery, CreateCatalogInput } from '../catalogModels';
+import type { CatalogDetail, CatalogItem, CatalogPageResult, CatalogQuery, CreateCatalogInput, UpdateCatalogInput } from '../catalogModels';
 export async function listCatalog(query: CatalogQuery = {}, signal?: AbortSignal): Promise<CatalogPageResult> {
   const { data } = await apiClient.get<CatalogPageResult>('/catalog', { params: query, signal });
   return data;
@@ -15,5 +15,9 @@ export async function createCatalogItem(payload: CreateCatalogInput): Promise<Ca
 /** Change availability without enabling unrelated catalogue editing. */
 export async function setCatalogActive(id: string, active: boolean): Promise<CatalogItem> {
   const { data } = await apiClient.patch<CatalogItem>(`/catalog/${encodeURIComponent(id)}`, { active });
+  return data;
+}
+export async function updateCatalogItem(id: string, payload: UpdateCatalogInput): Promise<CatalogItem> {
+  const { data } = await apiClient.patch<CatalogItem>(`/catalog/${encodeURIComponent(id)}`, payload);
   return data;
 }

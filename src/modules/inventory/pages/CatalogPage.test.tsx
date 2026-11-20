@@ -1,21 +1,23 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../../../stores/authStore';
+import { useLocationStore } from '../../../stores/locationStore';
 import { CatalogPage } from './CatalogPage';
 import * as service from '../services/catalogService';
 import { listCategories } from '../services/categoryService';
-vi.mock('../services/catalogService', () => ({ listCatalog: vi.fn(), getCatalogDetail: vi.fn(), createCatalogItem: vi.fn(), setCatalogActive: vi.fn() }));
+vi.mock('../services/catalogService', () => ({ listCatalog: vi.fn(), getCatalogDetail: vi.fn(), createCatalogItem: vi.fn(), setCatalogActive: vi.fn(), updateCatalogItem: vi.fn() }));
 vi.mock('../services/categoryService', () => ({ listCategories: vi.fn() }));
 const account = { id: 'self', email: 'a@mp.pe', name: 'Ana', active: true, role: 'ADMIN' as const };
 const category = { id: '77e45678-e89b-42d3-a456-426614174000', name: 'Laptops', description: null, active: true, createdAt: '' };
 const item = { id: 'p', sku: 'NB', name: 'Acer Aspire', brand: 'Acer', model: 'A5', categoryId: category.id, processor: null, ramCapacity: null, storageCapacity: null, gpu: null, screenSize: null, isSerialized: true, minStockThreshold: 2, basePrice: 2350, isSecondHand: false, active: true, createdAt: '' };
-beforeEach(() => { vi.resetAllMocks(); useAuthStore.setState({ status: 'authenticated', user: account }); vi.mocked(listCategories).mockResolvedValue([category]); vi.mocked(service.listCatalog).mockResolvedValue({ items: [item], total: 80, page: 1, limit: 50 }); });
+beforeEach(() => { vi.resetAllMocks(); useLocationStore.getState().reset(); vi.mocked(service.getCatalogDetail).mockResolvedValue({ item, categoryName: 'Laptops', stockSummary: [], totalStockOverall: 0 }); useAuthStore.setState({ status: 'authenticated', user: account }); vi.mocked(listCategories).mockResolvedValue([category]); vi.mocked(service.listCatalog).mockResolvedValue({ items: [item], total: 80, page: 1, limit: 50 }); });
 it.each(['ADMIN', 'VENDEDOR', 'TECNICO'] as const)('allows %s to read with creation restricted to ADMIN', async (role) => {
   useAuthStore.setState({ user: { ...account, role } }); render(<CatalogPage />);
   expect(await screen.findByText('Acer Aspire')).toBeInTheDocument();
   if (role === 'ADMIN') expect(await screen.findByRole('button', { name: 'Registrar producto' })).toBeInTheDocument();
   else expect(screen.queryByRole('button', { name: 'Registrar producto' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Editar' }) !== null).toBe(role === 'ADMIN');
 });
 it('filters through backend and uses its pagination', async () => {
   const user = userEvent.setup(); render(<CatalogPage />); await screen.findByText('Acer Aspire');
@@ -124,4 +126,35 @@ it('requires confirmation before deactivating a product', async () => {
   expect(service.setCatalogActive).toHaveBeenCalledWith(item.id, false);
   expect(await screen.findByText('Producto desactivado correctamente.')).toBeInTheDocument();
   expect(await screen.findByText('Inactivo')).toBeInTheDocument();
+});
+
+it('prioritizes the selected location quantity and keeps the code in the detail', async () => {
+  const place = { id: 'central', name: 'Central', type: 'ALMACEN_CENTRAL' as const, active: true, createdAt: '' };
+  useLocationStore.setState({ activeLocation: place });
+  vi.mocked(service.getCatalogDetail).mockResolvedValue({ item, categoryName: category.name, totalStockOverall: 12, stockSummary: [{ locationId: place.id, locationName: place.name, locationType: place.type, serializedCount: 5, quantityCount: 0, totalAvailable: 5 }] });
+  const user = userEvent.setup();
+  render(<CatalogPage />);
+  expect(screen.getByText('Cantidades en Central')).toBeInTheDocument();
+  const row = (await screen.findByRole('cell', { name: 'Acer Aspire' })).closest('tr')!;
+  expect(await within(row).findByRole('cell', { name: '5' })).toBeInTheDocument();
+  expect(screen.queryByRole('columnheader', { name: 'Código de producto' })).not.toBeInTheDocument();
+  await user.click(within(row).getByRole('button', { name: 'Ver ficha' }));
+  expect(await screen.findByText('Código de producto: NB')).toBeInTheDocument();
+});
+
+it('edits a product with a changed-fields PATCH and refreshes its list', async () => {
+  vi.mocked(service.updateCatalogItem).mockResolvedValue({ ...item, name: 'Acer actualizado' });
+  const user = userEvent.setup();
+  render(<CatalogPage />);
+  await user.click(await screen.findByRole('button', { name: 'Editar' }));
+  expect(screen.getByRole('button', { name: 'Desactivar' })).toBeDisabled();
+  expect(screen.getByLabelText('Código de producto *')).toHaveAttribute('readonly');
+  expect(screen.getByLabelText('Cómo registrar las unidades')).toBeDisabled();
+  await user.clear(screen.getByLabelText('Nombre *'));
+  await user.type(screen.getByLabelText('Nombre *'), 'Acer actualizado');
+  vi.mocked(service.listCatalog).mockResolvedValue({ items: [{ ...item, name: 'Acer actualizado' }], total: 1, page: 1, limit: 50 });
+  await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  expect(await screen.findByText('Producto actualizado correctamente.')).toBeInTheDocument();
+  expect(service.updateCatalogItem).toHaveBeenCalledWith(item.id, { name: 'Acer actualizado' });
+  expect(await screen.findByRole('cell', { name: 'Acer actualizado' })).toBeInTheDocument();
 });
