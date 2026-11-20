@@ -284,7 +284,7 @@ export function CatalogPage() {
                           </InventoryBadge>
                         </td>
                         <td className="px-3 py-2">
-                          <div className="flex flex-wrap gap-2">
+                          <div className="inline-flex flex-nowrap items-center gap-2 whitespace-nowrap">
                             <button
                               className={SECONDARY_BUTTON_CLASS}
                               onClick={() => setSelectedId(item.id)}

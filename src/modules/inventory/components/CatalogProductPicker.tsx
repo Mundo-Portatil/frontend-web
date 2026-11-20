@@ -214,6 +214,7 @@ export function CatalogProductPicker({
             if (selected) { setSelected(null); onChange(''); onSelect?.(null); }
           }}
           onFocus={() => { if (!selected) setOpen(true); }}
+          onClick={() => { if (!selected) setOpen(true); }}
           onKeyDown={handleKey}
           className={`${TEXT_INPUT_CLASS} min-w-0 flex-1`}
           disabled={disabled}
@@ -225,6 +226,11 @@ export function CatalogProductPicker({
       </div>
       {expanded && (
         <div className="space-y-2">
+          {serialized !== undefined && (
+            <p className="text-xs text-slate-500">
+              {activeOnly ? 'Productos activos' : 'Productos activos e inactivos'} {serialized ? 'por serie o código' : 'por cantidad'}
+            </p>
+          )}
           <ul id={`${id}-options`} role="listbox" aria-label={`Resultados de ${inputLabel.toLowerCase()}`} className={visibleOptions.length ? 'max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1' : undefined}>
             {visibleOptions.map((item, index) => (
               <li key={item.id} role="none">

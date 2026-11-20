@@ -129,3 +129,30 @@ it('does not offer old matches or their next page when a new search fails', asyn
   expect(screen.queryByRole('button', { name: 'Más productos' })).not.toBeInTheDocument();
   expect(onChange).not.toHaveBeenCalled();
 });
+
+it.each([true, false])('offers every eligible product from the five-product catalogue (serialized=%s)', async (serialized) => {
+  const items = [
+    { ...product, id: 'asus', name: 'asus tuf', sku: '874598', isSerialized: true },
+    { ...product, id: 'lenovo', name: 'lenovo v15', sku: '1346789', isSerialized: true },
+    { ...product, id: 'other-series', name: 'Otro equipo', sku: 'OFF', isSerialized: true },
+    product,
+    { ...product, id: 'inactive', name: 'Equipo inactivo', sku: 'SER', isSerialized: true, active: false },
+  ];
+  vi.mocked(listCatalog).mockResolvedValue({ items, total: 5, page: 1, limit: 50 });
+  const user = userEvent.setup();
+  render(<CatalogProductPicker id="product" serialized={serialized} onChange={vi.fn()} />);
+  const input = screen.getByRole('combobox');
+  await user.click(input);
+  await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(serialized ? 3 : 1));
+  if (serialized) {
+    expect(screen.getByRole('option', { name: 'asus tuf · 874598' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'lenovo v15 · 1346789' })).toBeInTheDocument();
+  } else {
+    expect(screen.getByRole('option', { name: 'Mouse Logitech · M170' })).toBeInTheDocument();
+  }
+  expect(screen.queryByRole('option', { name: /Equipo inactivo/ })).not.toBeInTheDocument();
+  await user.keyboard('{Escape}');
+  expect(screen.queryByRole('option')).not.toBeInTheDocument();
+  await user.click(input);
+  expect(screen.getAllByRole('option')).toHaveLength(serialized ? 3 : 1);
+});
