@@ -8,13 +8,14 @@ import type { CatalogItem } from '../catalogModels';
 import { listCatalog } from '../services/catalogService';
 import { adjustQuantityStock, inboundQuantityStock } from '../services/quantityStockService';
 import type { QuantityStock } from '../quantityModels';
+import { selectCatalogProduct } from '../../../test/selectCatalogProduct';
 import { QuantityStockForm } from './QuantityStockForm';
 
 vi.mock('../services/catalogService', () => ({ listCatalog: vi.fn() }));
 vi.mock('../services/quantityStockService', () => ({ inboundQuantityStock: vi.fn(), adjustQuantityStock: vi.fn() }));
 
 const place: Location = { id: 'place', name: 'Almacén central', active: true, type: 'ALMACEN_CENTRAL', createdAt: '' };
-const product = { id: 'product', name: 'Mouse Logitech', sku: 'M170', isSerialized: false } as CatalogItem;
+const product = { id: 'product', name: 'Mouse Logitech', sku: 'M170', isSerialized: false, active: true } as CatalogItem;
 const stock = { id: 'stock', catalogId: product.id, locationId: place.id, quantity: 7 } as QuantityStock;
 
 beforeEach(() => {
@@ -25,7 +26,7 @@ beforeEach(() => {
 });
 
 async function selectProduct() {
-  await userEvent.selectOptions(await screen.findByLabelText('Producto por cantidad'), product.id);
+  await selectCatalogProduct(userEvent.setup(), 'Producto por cantidad', 'Mouse Logitech · M170');
 }
 
 describe('QuantityStockForm review', () => {
@@ -37,10 +38,11 @@ describe('QuantityStockForm review', () => {
     render(<QuantityStockForm locations={[place]} onSaved={onSaved} />);
     await selectProduct();
     await user.type(screen.getByLabelText('Cantidad que ingresa'), '5');
+    await user.click(screen.getByText('Precios (opcional)'));
     await user.type(screen.getByLabelText('Costo unitario (opcional)'), '10');
     await user.type(screen.getByLabelText('Precio de venta (opcional)'), '20');
-    await user.click(screen.getByRole('button', { name: 'Revisar operación' }));
-    const review = screen.getByRole('region', { name: 'Revisar operación' });
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+    const review = screen.getByRole('region', { name: 'Confirmar registro' });
     expect(within(review).getByText('Mouse Logitech')).toBeInTheDocument();
     expect(within(review).getByText('M170')).toBeInTheDocument();
     expect(within(review).getByText('Almacén central')).toBeInTheDocument();
@@ -66,13 +68,13 @@ describe('QuantityStockForm review', () => {
     await selectProduct();
     await user.selectOptions(screen.getByLabelText('Operación'), 'adjust');
     await user.type(screen.getByLabelText('Nueva cantidad total'), '0');
-    await user.click(screen.getByRole('button', { name: 'Revisar operación' }));
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
     expect(screen.getByLabelText('Motivo del ajuste')).toHaveFocus();
     expect(screen.getByRole('alert')).toHaveTextContent('motivo');
     await user.type(screen.getByLabelText('Motivo del ajuste'), 'Conteo físico');
-    await user.click(screen.getByRole('button', { name: 'Revisar operación' }));
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
     expect(screen.getByText('Dejar 0 unidades en total')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Revisar operación' })).getByText('Conteo físico')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Confirmar registro' })).getByText('Conteo físico')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Confirmar operación' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo guardar el conteo.');
     expect(adjustQuantityStock).toHaveBeenCalledWith({ catalogId: product.id, locationId: place.id, newQuantity: 0, reason: 'Conteo físico' });
@@ -80,7 +82,7 @@ describe('QuantityStockForm review', () => {
     await user.click(screen.getByRole('button', { name: 'Volver a editar' }));
     expect(screen.getByLabelText('Motivo del ajuste')).toHaveValue('Conteo físico');
     expect(screen.getByLabelText('Nueva cantidad total')).toHaveValue(0);
-    expect(screen.getByRole('button', { name: 'Revisar operación' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Continuar' })).toHaveFocus();
   });
 
   it('rejects confirmation when the account loses administrative permission', async () => {
@@ -88,7 +90,7 @@ describe('QuantityStockForm review', () => {
     render(<QuantityStockForm locations={[place]} onSaved={vi.fn()} />);
     await selectProduct();
     await user.type(screen.getByLabelText('Cantidad que ingresa'), '1');
-    await user.click(screen.getByRole('button', { name: 'Revisar operación' }));
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
     useAuthStore.setState((state) => ({ user: state.user ? { ...state.user, role: 'VENDEDOR' } : null }));
     await user.click(screen.getByRole('button', { name: 'Confirmar operación' }));
     expect(inboundQuantityStock).not.toHaveBeenCalled();

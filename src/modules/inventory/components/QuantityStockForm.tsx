@@ -47,7 +47,9 @@ export function QuantityStockForm({ locations, onSaved, onBusyChange }: { locati
 
   function reject(message: string, fieldId: string) {
     setError(message);
-    formRef.current?.querySelector<HTMLElement>(`#${fieldId}`)?.focus();
+    const field = formRef.current?.querySelector<HTMLElement>(`#${fieldId}`);
+    field?.closest('details')?.setAttribute('open', '');
+    field?.focus();
   }
 
   function prepare(event: FormEvent<HTMLFormElement>) {
@@ -120,34 +122,39 @@ export function QuantityStockForm({ locations, onSaved, onBusyChange }: { locati
       )}
       <form ref={formRef} onSubmit={prepare} noValidate hidden={review} className="mt-4">
         <fieldset disabled={busy || review} className="min-w-0 space-y-5">
-          <div className="grid min-w-0 items-start gap-5 lg:grid-cols-2">
-            <div className="min-w-0 space-y-4">
-              <div>
-                <label htmlFor="stock-mode" className={LABEL_CLASS}>Operación</label>
-                <select id="stock-mode" name="operation" value={mode} onChange={(event) => { setMode(event.target.value); setError(null); }} className={TEXT_INPUT_CLASS}>
-                  <option value="inbound">Agregar unidades</option>
-                  <option value="adjust">Corregir conteo</option>
-                </select>
-              </div>
-              <CatalogProductPicker id="stock-catalog" serialized={false} onChange={setCatalogId} onSelect={setProduct} disabled={busy || review} />
+          <CatalogProductPicker id="stock-catalog" serialized={false} onChange={setCatalogId} onSelect={setProduct} disabled={busy || review} />
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="stock-mode" className={LABEL_CLASS}>Operación</label>
+              <select id="stock-mode" name="operation" value={mode} onChange={(event) => { setMode(event.target.value); setError(null); }} className={TEXT_INPUT_CLASS}>
+                <option value="inbound">Agregar unidades</option>
+                <option value="adjust">Corregir conteo</option>
+              </select>
             </div>
-            <div className="min-w-0 space-y-4 border-t border-slate-100 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+            <div>
+              <label htmlFor="stock-location" className={LABEL_CLASS}>Ubicación de ingreso o ajuste</label>
+              <select id="stock-location" name="location" value={locationId} onChange={(event) => setLocationId(event.target.value)} className={TEXT_INPUT_CLASS} required>
+                <option value="">Selecciona ubicación</option>
+                {activeLocations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="stock-quantity" className={LABEL_CLASS}>{mode === 'inbound' ? 'Cantidad que ingresa' : 'Nueva cantidad total'}</label>
+              <input id="stock-quantity" name="quantity" type="number" inputMode="numeric" min={mode === 'inbound' ? 1 : 0} step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} className={TEXT_INPUT_CLASS} aria-describedby="stock-quantity-help" required />
+              <p id="stock-quantity-help" className="mt-1 text-sm text-slate-500">
+                {mode === 'inbound' ? 'Se suma a las unidades de esta ubicación.' : 'Reemplaza el saldo por el total contado en esta ubicación.'}
+              </p>
+            </div>
+            {mode === 'adjust' && (
               <div>
-                <label htmlFor="stock-location" className={LABEL_CLASS}>Ubicación de ingreso o ajuste</label>
-                <select id="stock-location" name="location" value={locationId} onChange={(event) => setLocationId(event.target.value)} className={TEXT_INPUT_CLASS} required>
-                  <option value="">Selecciona ubicación</option>
-                  {activeLocations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
-                </select>
+                <label htmlFor="stock-reason" className={LABEL_CLASS}>Motivo del ajuste</label>
+                <textarea id="stock-reason" name="reason" value={reason} onChange={(event) => setReason(event.target.value)} required rows={3} className={`${TEXT_INPUT_CLASS} h-24 max-h-24 resize-none overflow-y-auto`} />
               </div>
-              <div>
-                <label htmlFor="stock-quantity" className={LABEL_CLASS}>{mode === 'inbound' ? 'Cantidad que ingresa' : 'Nueva cantidad total'}</label>
-                <input id="stock-quantity" name="quantity" type="number" inputMode="numeric" min={mode === 'inbound' ? 1 : 0} step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} className={TEXT_INPUT_CLASS} aria-describedby="stock-quantity-help" required />
-                <p id="stock-quantity-help" className="mt-1 text-sm text-slate-500">
-                  {mode === 'inbound' ? 'Se suma a las unidades de esta ubicación.' : 'Reemplaza el saldo por el total contado en esta ubicación.'}
-                </p>
-              </div>
-              {mode === 'inbound' ? (
-                <div className="grid gap-4 sm:grid-cols-2">
+            )}
+            {mode === 'inbound' && (
+              <details className="sm:col-span-2">
+                <summary className="w-fit cursor-pointer rounded text-sm font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Precios (opcional)</summary>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
                   <div>
                     <label htmlFor="stock-cost" className={LABEL_CLASS}>Costo unitario (opcional)</label>
                     <input id="stock-cost" name="costPrice" type="number" inputMode="decimal" min="0" step="any" value={costPrice} onChange={(event) => setCostPrice(event.target.value)} className={TEXT_INPUT_CLASS} />
@@ -157,20 +164,15 @@ export function QuantityStockForm({ locations, onSaved, onBusyChange }: { locati
                     <input id="stock-price" name="salePrice" type="number" inputMode="decimal" min="0" step="any" value={salePrice} onChange={(event) => setSalePrice(event.target.value)} className={TEXT_INPUT_CLASS} />
                   </div>
                 </div>
-              ) : (
-                <div>
-                  <label htmlFor="stock-reason" className={LABEL_CLASS}>Motivo del ajuste</label>
-                  <textarea id="stock-reason" name="reason" value={reason} onChange={(event) => setReason(event.target.value)} required rows={3} className={`${TEXT_INPUT_CLASS} h-24 max-h-24 resize-none overflow-y-auto`} />
-                </div>
-              )}
-            </div>
+              </details>
+            )}
           </div>
-          <button ref={reviewButtonRef} className={`${PRIMARY_BUTTON_CLASS} w-full sm:w-auto`}>Revisar operación</button>
+          <button ref={reviewButtonRef} className={`${PRIMARY_BUTTON_CLASS} w-full sm:w-auto`}>Continuar</button>
         </fieldset>
       </form>
       {review && (
         <section aria-labelledby="stock-review-heading" className="mt-4 space-y-4 rounded-lg border border-brand-200 bg-brand-50/40 p-4">
-          <h3 ref={reviewHeadingRef} id="stock-review-heading" tabIndex={-1} className="rounded font-semibold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Revisar operación</h3>
+          <h3 ref={reviewHeadingRef} id="stock-review-heading" tabIndex={-1} className="rounded font-semibold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Confirmar registro</h3>
           <dl className="grid min-w-0 gap-3 text-sm sm:grid-cols-2">
             <div className="min-w-0"><dt className="text-slate-500">Producto</dt><dd className="break-words font-medium text-slate-900">{product?.name ?? 'Producto seleccionado'}{product?.sku && <span className="block font-normal text-slate-600">{product.sku}</span>}</dd></div>
             <div className="min-w-0"><dt className="text-slate-500">Ubicación</dt><dd className="break-words font-medium text-slate-900">{placeName}</dd></div>

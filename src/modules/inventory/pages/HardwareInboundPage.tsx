@@ -99,10 +99,10 @@ function InboundForm() {
       ) : null}
 
       {created.length > 0 && (
-        <section className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-          <Notification kind="success">Ingreso registrado correctamente.</Notification>
-          <div>
-            <h3 className="font-semibold text-slate-900">Equipos y piezas registrados</h3>
+        <section className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
+          <p role="status" className="text-sm font-medium text-emerald-700">Ingreso registrado correctamente.</p>
+          <details open={created.length <= 3}>
+            <summary className="w-fit cursor-pointer rounded text-sm font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Ver {created.length} equipos y piezas registrados</summary>
             <ul className="mt-2 list-inside list-disc text-sm text-slate-700">
               {created.map((item) => (
                 <li key={item.id}>
@@ -111,7 +111,7 @@ function InboundForm() {
                 </li>
               ))}
             </ul>
-          </div>
+          </details>
         </section>
       )}
 

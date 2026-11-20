@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { selectCatalogProduct } from '../../../test/selectCatalogProduct';
 import { MemoryRouter } from 'react-router-dom';
 import { useAuthStore } from '../../../stores/authStore';
 import { HardwareInboundPage } from './HardwareInboundPage';
@@ -16,7 +17,7 @@ const item = { id, serialNumber: 'SN-1', catalogId: id, locationId: id, location
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(listCatalog).mockResolvedValue({ items: [{ id, name: 'Laptop', sku: 'NB', isSerialized: true, active: true }], total: 1, page: 1, limit: 50 } as Awaited<ReturnType<typeof listCatalog>>); useAuthStore.setState({ status: 'authenticated', user: { id: 'self', email: 'a@b.pe', name: 'Admin', role: 'ADMIN', active: true } }); vi.mocked(listActiveLocations).mockResolvedValue([{ id, name: 'Central', type: 'ALMACEN_CENTRAL', active: true, createdAt: '' }]); vi.mocked(hardware.validateSerials).mockResolvedValue({ allValid: true, existingSerials: [] }); vi.mocked(hardware.batchInbound).mockResolvedValue([item]); });
 function renderInbound() { return render(<MemoryRouter><HardwareInboundPage /></MemoryRouter>); }
 describe('hardware pages', () => {
-  it('reviews then creates the exact nested inbound DTO', async () => { const user = userEvent.setup(); renderInbound(); await screen.findByRole('option', { name: 'Central' }); await user.selectOptions(screen.getByLabelText('Ubicación inicial'), id); await screen.findByRole('option', { name: 'Laptop · NB' }); await user.selectOptions(screen.getByLabelText('Producto con serie'), id); await user.type(screen.getByLabelText('Equipo 1: serie'), 'SN-1'); await user.click(screen.getByRole('button', { name: 'Revisar ingreso' })); expect(await screen.findByRole('button', { name: 'Confirmar ingreso' })).toBeInTheDocument(); expect(hardware.batchInbound).not.toHaveBeenCalled(); await user.click(screen.getByRole('button', { name: 'Confirmar ingreso' })); expect(await screen.findByText('Ingreso registrado correctamente.')).toBeInTheDocument(); expect(hardware.batchInbound).toHaveBeenCalledWith({ locationId: id, items: [{ catalogId: id, serialNumber: 'SN-1' }] }); });
+  it('reviews then creates the exact nested inbound DTO', async () => { const user = userEvent.setup(); renderInbound(); await screen.findByRole('option', { name: 'Central' }); await user.selectOptions(screen.getByLabelText('Ubicación inicial'), id); await selectCatalogProduct(user, 'Producto con serie', 'Laptop · NB'); await user.type(screen.getByLabelText('Equipo 1: serie'), 'SN-1'); await user.click(screen.getByRole('button', { name: 'Revisar ingreso' })); expect(await screen.findByRole('button', { name: 'Confirmar ingreso' })).toBeInTheDocument(); expect(hardware.batchInbound).not.toHaveBeenCalled(); await user.click(screen.getByRole('button', { name: 'Confirmar ingreso' })); expect(await screen.findByText('Ingreso registrado correctamente.')).toBeInTheDocument(); expect(hardware.batchInbound).toHaveBeenCalledWith({ locationId: id, items: [{ catalogId: id, serialNumber: 'SN-1' }] }); });
   it.each(['VENDEDOR', 'TECNICO'] as const)('does not expose inbound for %s', (role) => { useAuthStore.setState({ user: { ...useAuthStore.getState().user!, role } }); renderInbound(); expect(screen.queryByRole('heading', { name: 'Ingresar equipos y piezas' })).not.toBeInTheDocument(); });
   it('renders scan relationship and allows ADMIN attachment with validated IDs', async () => { vi.mocked(hardware.scanHardware).mockResolvedValue(item); vi.mocked(hardware.attachChildren).mockResolvedValue({ ...item, components: [{ ...item, id: 'child', serialNumber: 'PART' }] }); const user = userEvent.setup(); render(<InventoryPage />); await user.type(screen.getByLabelText('Serie o código'), 'SN-1'); await user.click(screen.getByRole('button', { name: 'Buscar equipo o pieza' })); expect(await screen.findByText('Central')).toBeInTheDocument(); fireEvent.change(screen.getByLabelText('Series de los componentes'), { target: { value: id } }); await user.click(screen.getByRole('button', { name: 'Acoplar componentes' })); expect(await screen.findByText('Componentes acoplados correctamente.')).toBeInTheDocument(); expect(hardware.attachChildren).toHaveBeenCalledWith(id, [id]); });
   it('shows scan rejection and no admin controls to seller', async () => { useAuthStore.setState({ user: { ...useAuthStore.getState().user!, role: 'VENDEDOR' } }); vi.mocked(hardware.scanHardware).mockRejectedValue(new Error('No encontrado')); const user = userEvent.setup(); render(<InventoryPage />); await user.type(screen.getByLabelText('Serie o código'), 'missing'); await user.click(screen.getByRole('button', { name: 'Buscar equipo o pieza' })); expect(await screen.findByRole('alert')).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Acoplar componentes' })).not.toBeInTheDocument(); });
@@ -24,12 +25,11 @@ describe('hardware pages', () => {
     const second = '223e4567-e89b-42d3-a456-426614174000';
     vi.mocked(listCatalog).mockResolvedValue({ items: [{ id, name: 'Laptop A', sku: 'A', isSerialized: true, active: true }, { id: second, name: 'Laptop B', sku: 'B', isSerialized: true, active: true }], total: 2, page: 1, limit: 50 } as Awaited<ReturnType<typeof listCatalog>>);
     const user = userEvent.setup(); renderInbound();
-    await screen.findByRole('option', { name: 'Laptop A · A' });
-    await user.selectOptions(screen.getByLabelText('Producto con serie'), id);
+    await selectCatalogProduct(user, 'Producto con serie', 'Laptop A · A');
     await user.click(screen.getByRole('button', { name: 'Añadir equipo o pieza' }));
-    await user.selectOptions(screen.getAllByLabelText('Producto con serie')[1], second);
+    await selectCatalogProduct(user, 'Producto con serie', 'Laptop B · B', 1);
     await user.click(screen.getAllByRole('button', { name: 'Quitar' })[0]);
-    expect(screen.getByLabelText('Producto con serie')).toHaveValue(second);
+    expect(screen.getByLabelText('Producto con serie')).toHaveValue('Laptop B · B');
     await user.selectOptions(screen.getByLabelText('Ubicación inicial'), id);
     await user.click(screen.getByRole('button', { name: 'Revisar ingreso' }));
     expect(await screen.findByText('Equipo o pieza 1 — Sin serie: se asignará un código')).toBeInTheDocument();
@@ -42,13 +42,12 @@ describe('hardware pages', () => {
     renderInbound();
     await screen.findByRole('option', { name: 'Central' });
     await user.selectOptions(screen.getByLabelText('Ubicación inicial'), id);
-    await screen.findByRole('option', { name: 'Laptop · NB' });
-    await user.selectOptions(screen.getByLabelText('Producto con serie'), id);
+    await selectCatalogProduct(user, 'Producto con serie', 'Laptop · NB');
     await user.type(screen.getByLabelText('Equipo 1: serie'), 'PARENT');
     await user.type(screen.getByLabelText('Equipo 1: costo'), '100');
     await user.type(screen.getByLabelText('Equipo 1: precio'), '150');
     await user.click(screen.getByRole('button', { name: 'Añadir componente al equipo 1' }));
-    await user.selectOptions(screen.getAllByLabelText('Producto con serie')[1], id);
+    await selectCatalogProduct(user, 'Producto con serie', 'Laptop · NB', 1);
     await user.type(screen.getByLabelText('Equipo 1 componente 1: serie'), 'CHILD');
     await user.type(screen.getByLabelText('Equipo 1 componente 1: costo'), '20');
     await user.click(screen.getByRole('button', { name: 'Revisar ingreso' }));
@@ -61,7 +60,7 @@ describe('hardware pages', () => {
     expect(screen.getByText('Costo: 100 · Venta: 150')).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Volver a editar' }));
     expect(screen.getByLabelText('Ubicación inicial')).toHaveFocus();
-    expect(screen.getAllByRole('combobox', { name: 'Producto con serie' }).map((select) => (select as HTMLSelectElement).value)).toEqual([id, id]);
+    expect(screen.getAllByRole('combobox', { name: 'Producto con serie' }).map((select) => (select as HTMLInputElement).value)).toEqual(['Laptop · NB', 'Laptop · NB']);
     await user.click(screen.getByRole('button', { name: 'Revisar ingreso' }));
     await user.click(await screen.findByRole('button', { name: 'Confirmar ingreso' }));
     expect(await screen.findByText('Ingreso registrado correctamente.')).toBeInTheDocument();
@@ -74,8 +73,7 @@ describe('hardware pages', () => {
     renderInbound();
     await screen.findByRole('option', { name: 'Central' });
     await user.selectOptions(screen.getByLabelText('Ubicación inicial'), id);
-    await screen.findByRole('option', { name: 'Laptop · NB' });
-    await user.selectOptions(screen.getByLabelText('Producto con serie'), id);
+    await selectCatalogProduct(user, 'Producto con serie', 'Laptop · NB');
     await user.click(screen.getByRole('button', { name: 'Revisar ingreso' }));
     const confirm = await screen.findByRole('button', { name: 'Confirmar ingreso' });
     await user.dblClick(confirm);

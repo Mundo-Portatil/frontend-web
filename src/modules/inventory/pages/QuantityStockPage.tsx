@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useRestoreFocus } from '../../../hooks/useRestoreFocus';
 import { Can } from '../../../components/guards/Can';
@@ -18,7 +18,7 @@ import { listLocations } from '../../foundation/locations/services/locationServi
 import type { Location } from '../../foundation/locations/models';
 import { listCategories } from '../services/categoryService';
 import type { Category } from '../models';
-import type { QuantityStock } from '../quantityModels';
+import type { QuantityStockQuery, QuantityStock } from '../quantityModels';
 import { useQuantityStock } from '../hooks/useQuantityStock';
 import { CatalogProductPicker } from '../components/CatalogProductPicker';
 import { QuantityStockForm } from '../components/QuantityStockForm';
@@ -32,15 +32,11 @@ export function QuantityStockPage() {
   const [referenceError, setReferenceError] = useState<AppError | null>(null);
   const [referenceRevision, setReferenceRevision] = useState(0);
   const [referenceLoading, setReferenceLoading] = useState(true);
-  const [locationId, setLocationId] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [catalogItemId, setCatalogItemId] = useState('');
-  const [lowStock, setLowStock] = useState(false);
   const [limit, setLimit] = useState('50');
   const [filterError, setFilterError] = useState<string | null>(null);
+  const [filterKey, setFilterKey] = useState(0);
   const [saved, setSaved] = useState<QuantityStock | null>(null);
   const showMovement = searchParams.get('operation') === 'inbound';
-  const [movementKey, setMovementKey] = useState(0);
   const [movementBusy, setMovementBusy] = useState(false);
   const movementPending = useRef(false);
   const movementTriggerRef = useRef<HTMLButtonElement>(null);
@@ -52,7 +48,6 @@ export function QuantityStockPage() {
       nextParams.delete('operation');
       setSearchParams(nextParams, { replace: true });
     }
-    setMovementKey((value) => value + 1);
     restoreMovementFocus();
   }
 
@@ -79,31 +74,19 @@ export function QuantityStockPage() {
     };
   }, [referenceRevision]);
 
-  function applyFilters(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setFilterError(null);
-    if (
-      catalogItemId.trim() &&
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-        catalogItemId.trim(),
-      )
-    ) {
-      setFilterError('Selecciona un producto válido para filtrar.');
-      return;
-    }
-    if (!limit.trim() || !Number.isSafeInteger(Number(limit)) || Number(limit) < 1) {
-      setFilterError('Indica cuántos resultados mostrar: usa un número entero mayor que cero.');
-      return;
-    }
-    setQuery({
-      page: 1,
-      limit: Number(limit),
-      ...(locationId ? { locationId } : {}),
-      ...(categoryId ? { categoryId } : {}),
-      ...(catalogItemId.trim() ? { catalogItemId: catalogItemId.trim() } : {}),
-      ...(lowStock ? { lowStock: true } : {}),
-    });
+  function updateFilters(updates: Partial<QuantityStockQuery>) {
+    setQuery((current) => ({ ...current, ...updates, page: 1 }));
   }
+
+  function clearFilters() {
+    setLimit('50');
+    setFilterError(null);
+    setFilterKey((value) => value + 1);
+    setQuery({ page: 1, limit: 50 });
+  }
+
+  const secondaryFilterCount = Number(Boolean(query.categoryId)) + Number(Boolean(query.lowStock)) + Number(query.limit !== 50);
+  const hasFilters = Boolean(query.locationId || query.categoryId || query.catalogItemId || query.lowStock || query.limit !== 50);
 
   return (
     <section className="space-y-6">
@@ -111,7 +94,7 @@ export function QuantityStockPage() {
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Stock por cantidad</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Unidades disponibles por ubicación.
+            Cantidades registradas por ubicación.
           </p>
         </div>
         <Can roles={['ADMIN']}>
@@ -151,9 +134,8 @@ export function QuantityStockPage() {
           id="stock-movement-panel"
           hidden={!showMovement || referenceLoading || Boolean(referenceError)}
         >
-          {!referenceLoading && !referenceError && (
+          {showMovement && !referenceLoading && !referenceError && (
             <QuantityStockForm
-              key={movementKey}
               locations={locations}
               onBusyChange={(value) => {
                 movementPending.current = value;
@@ -162,7 +144,7 @@ export function QuantityStockPage() {
               onSaved={(result) => {
                 setSaved(result);
                 closeMovement();
-                reload();
+                setQuery((current) => ({ ...current, page: 1 }));
               }}
             />
           )}
@@ -176,106 +158,64 @@ export function QuantityStockPage() {
         </Notification>
       )}
 
-      <form
-        onSubmit={applyFilters}
-        noValidate
-        className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5"
-      >
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-semibold text-slate-900">Filtros</h3>
-          <button
-            type="button"
-            className={SECONDARY_BUTTON_CLASS}
-            onClick={reload}
-            disabled={loading}
-          >
-            Recargar
-          </button>
+      <section aria-label="Filtros de cantidades" className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold text-slate-900">Buscar cantidades disponibles</h3>
+          <div className="flex flex-wrap gap-2">
+            {hasFilters && <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={clearFilters}>Limpiar filtros</button>}
+            <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={reload} disabled={loading}>Actualizar</button>
+          </div>
         </div>
-        <div className="grid min-w-0 items-start gap-4 lg:grid-cols-2">
-          <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:col-start-1 lg:row-start-1">
-            <div>
-              <label htmlFor="quantity-location-filter" className={LABEL_CLASS}>
-                Filtrar por ubicación
-              </label>
-              <select
-                id="quantity-location-filter"
-                value={locationId}
-                onChange={(event) => setLocationId(event.target.value)}
-                className={TEXT_INPUT_CLASS}
-              >
-                <option value="">Todas las ubicaciones</option>
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.name}
-                    {location.active ? '' : ' (inactiva)'}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="quantity-category-filter" className={LABEL_CLASS}>
-                Filtrar por categoría
-              </label>
-              <select
-                id="quantity-category-filter"
-                value={categoryId}
-                onChange={(event) => setCategoryId(event.target.value)}
-                className={TEXT_INPUT_CLASS}
-              >
+        <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <CatalogProductPicker
+            key={filterKey}
+            id="quantity-product-filter"
+            serialized={false}
+            activeOnly={false}
+            label="Filtrar por producto"
+            onChange={(catalogItemId) => updateFilters({ catalogItemId: catalogItemId || undefined })}
+          />
+          <div className="min-w-0">
+            <label htmlFor="quantity-location-filter" className={LABEL_CLASS}>Filtrar por ubicación</label>
+            <select id="quantity-location-filter" value={query.locationId ?? ''} onChange={(event) => updateFilters({ locationId: event.target.value || undefined })} className={TEXT_INPUT_CLASS}>
+              <option value="">Todas las ubicaciones</option>
+              {locations.map((location) => <option key={location.id} value={location.id}>{location.name}{location.active ? '' : ' (inactiva)'}</option>)}
+            </select>
+          </div>
+        </div>
+        <details className="mt-3 border-t border-slate-100 pt-3">
+          <summary className="w-fit cursor-pointer rounded text-sm font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+            Más filtros{secondaryFilterCount ? ` (${secondaryFilterCount})` : ''}
+          </summary>
+          <div className="mt-3 grid min-w-0 items-end gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="min-w-0">
+              <label htmlFor="quantity-category-filter" className={LABEL_CLASS}>Filtrar por categoría</label>
+              <select id="quantity-category-filter" value={query.categoryId ?? ''} onChange={(event) => updateFilters({ categoryId: event.target.value || undefined })} className={TEXT_INPUT_CLASS}>
                 <option value="">Todas las categorías</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
+                {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
             </div>
-          </div>
-          <div className="min-w-0 border-t border-slate-100 pt-4 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
-            <CatalogProductPicker
-              id="quantity-product-filter"
-              serialized={false}
-              label="Filtrar por producto"
-              searchLabel="Buscar producto para filtrar"
-              onChange={setCatalogItemId}
-            />
-          </div>
-          <div className="flex min-w-0 flex-wrap items-end gap-3 border-t border-slate-100 pt-4 lg:col-start-1 lg:row-start-2">
-            <div className="w-full min-w-0 sm:w-28">
-              <label htmlFor="quantity-limit" className={LABEL_CLASS}>
-                Registros por página
-              </label>
-              <input
-                id="quantity-limit"
-                type="number"
-                min="1"
-                step="1"
-                value={limit}
-                onChange={(event) => setLimit(event.target.value)}
-                className={TEXT_INPUT_CLASS}
-              />
+            <div className="min-w-0">
+              <label htmlFor="quantity-limit" className={LABEL_CLASS}>Registros por página</label>
+              <input id="quantity-limit" type="number" min="1" step="1" value={limit} className={TEXT_INPUT_CLASS} onChange={(event) => {
+                const next = event.target.value;
+                setLimit(next);
+                if (!next.trim() || !Number.isSafeInteger(Number(next)) || Number(next) < 1) {
+                  setFilterError('Indica un número entero mayor que cero.');
+                  return;
+                }
+                setFilterError(null);
+                updateFilters({ limit: Number(next) });
+              }} />
             </div>
-            <label className="flex items-center gap-2 min-h-10 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={lowStock}
-                onChange={(event) => setLowStock(event.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-              />
+            <label className="flex min-h-10 items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={query.lowStock ?? false} onChange={(event) => updateFilters({ lowStock: event.target.checked || undefined })} className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
               Solo stock bajo
             </label>
-            <div className="w-full sm:ml-auto sm:w-auto">
-              <button className={`${PRIMARY_BUTTON_CLASS} w-full sm:w-auto`}>Aplicar filtros</button>
-            </div>
           </div>
-          {filterError && (
-            <div className="lg:col-span-2">
-              <Notification kind="error">{filterError}</Notification>
-            </div>
-          )}
-        </div>
-      </form>
+          {filterError && <div className="mt-3"><Notification kind="error">{filterError}</Notification></div>}
+        </details>
+      </section>
 
       {error ? (
         <ErrorState error={error} onRetry={reload} />
@@ -284,7 +224,10 @@ export function QuantityStockPage() {
       ) : (
         <>
           {!data.items.length ? (
-            <EmptyState message="No hay existencias para estos filtros." />
+            <div className="space-y-2">
+              <EmptyState message="No hay existencias para estos filtros." />
+              <p className="text-sm text-slate-600">{hasFilters ? 'Prueba otra ubicación o limpia los filtros.' : 'Los productos del catálogo aparecen aquí después de registrar cantidades.'}</p>
+            </div>
           ) : (
             <div
               className="overflow-x-auto rounded-xl border border-slate-200 bg-white"
