@@ -19,6 +19,7 @@ import { listCategories } from '../services/categoryService';
 import type { Category } from '../models';
 import type { QuantityStock } from '../quantityModels';
 import { useQuantityStock } from '../hooks/useQuantityStock';
+import { CatalogProductPicker } from '../components/CatalogProductPicker';
 import { QuantityStockForm } from '../components/QuantityStockForm';
 import { InventoryBadge } from '../components/InventoryBadge';
 
@@ -79,7 +80,7 @@ export function QuantityStockPage() {
         catalogItemId.trim(),
       )
     ) {
-      setFilterError('Introduce un ID de producto válido (UUID v4).');
+      setFilterError('Selecciona un producto válido para filtrar.');
       return;
     }
     if (!limit.trim() || !Number.isSafeInteger(Number(limit)) || Number(limit) < 1) {
@@ -102,7 +103,7 @@ export function QuantityStockPage() {
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Stock por cantidad</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Consulta existencias de productos no serializados por ubicación.
+            Unidades disponibles por ubicación.
           </p>
         </div>
         <Can roles={['ADMIN']}>
@@ -155,7 +156,7 @@ export function QuantityStockPage() {
       {saved && (
         <Notification kind="success">
           Operación registrada. Saldo confirmado: {saved.quantity} unidades de{' '}
-          {saved.catalogName ?? saved.catalogId} en {saved.locationName ?? saved.locationId}.
+          {saved.catalogName ?? 'producto seleccionado'} en {saved.locationName ?? 'ubicación seleccionada'}.
         </Notification>
       )}
 
@@ -213,18 +214,13 @@ export function QuantityStockPage() {
               ))}
             </select>
           </div>
-          <div>
-            <label htmlFor="quantity-product-filter" className={LABEL_CLASS}>
-              Filtrar por ID de producto
-            </label>
-            <input
-              id="quantity-product-filter"
-              value={catalogItemId}
-              onChange={(event) => setCatalogItemId(event.target.value)}
-              className={TEXT_INPUT_CLASS}
-              placeholder="UUID del producto"
-            />
-          </div>
+          <CatalogProductPicker
+            id="quantity-product-filter"
+            serialized={false}
+            label="Filtrar por producto"
+            searchLabel="Buscar producto para filtrar"
+            onChange={setCatalogItemId}
+          />
           <div>
             <label htmlFor="quantity-limit" className={LABEL_CLASS}>
               Registros por página
@@ -298,11 +294,11 @@ export function QuantityStockPage() {
                   {data.items.map((item) => (
                     <tr key={item.id}>
                       <td className="px-3 py-2 text-slate-900">
-                        {item.catalogName ?? item.catalogId}
+                        {item.catalogName ?? 'Producto sin nombre'}
                       </td>
                       <td className="px-3 py-2 text-slate-700">{item.catalogSku ?? '—'}</td>
                       <td className="px-3 py-2 text-slate-700">
-                        {item.locationName ?? item.locationId}
+                        {item.locationName ?? 'Ubicación no disponible'}
                       </td>
                       <td className="px-3 py-2 text-slate-900">{item.quantity}</td>
                       <td className="px-3 py-2 text-slate-700">{item.minStockThreshold ?? '—'}</td>

@@ -34,7 +34,7 @@ export function CatalogDetailPanel({ id, onClose }: { id: string; onClose: () =>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-slate-900">Ficha de producto</h3>
-          <p className="mt-1 text-sm text-slate-500">Datos maestros y stock por ubicación.</p>
+          <p className="mt-1 text-sm text-slate-500">Características y existencias por ubicación.</p>
         </div>
         <button className={SECONDARY_BUTTON_CLASS} onClick={onClose}>
           Cerrar ficha
@@ -69,7 +69,7 @@ export function CatalogDetailPanel({ id, onClose }: { id: string; onClose: () =>
               Pantalla: detail.item.screenSize,
               'Precio base (PEN)': detail.item.basePrice,
               'Umbral mínimo': detail.item.minStockThreshold,
-              Seguimiento: detail.item.isSerialized ? 'Serializado' : 'Por cantidad',
+              Seguimiento: detail.item.isSerialized ? 'Por serie' : 'Por cantidad',
               Condición: detail.item.isSecondHand ? 'Usado' : 'Nuevo',
               Estado: detail.item.active ? 'Activo' : 'Inactivo',
             }).map(([label, value]) => (
@@ -96,7 +96,7 @@ export function CatalogDetailPanel({ id, onClose }: { id: string; onClose: () =>
                 </caption>
                 <thead className="bg-slate-50">
                   <tr>
-                    {['Ubicación', 'Tipo', 'Serializados', 'Cantidad', 'Disponible'].map((label) => (
+                    {['Ubicación', 'Tipo', 'Con serie', 'Cantidad', 'Disponible'].map((label) => (
                       <th key={label} scope="col" className="px-3 py-2 text-left font-medium text-slate-600">
                         {label}
                       </th>

@@ -103,10 +103,10 @@ describe('AppRouter', () => {
     useAuthStore.setState({ status: 'authenticated', user });
     renderAt('/inventory');
     expect(await screen.findByRole('heading', { name: 'Inventario' })).toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: 'Consulta de inventario' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Consulta' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'Stock' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Catálogo' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Buscar equipo o pieza' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Por serie o código' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Por cantidad' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Productos y modelos' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Categorías' })).toBeInTheDocument();
   });
 
@@ -114,15 +114,15 @@ describe('AppRouter', () => {
     useAuthStore.setState({ status: 'authenticated', user });
     renderAt('/inventory/inbound');
     expect(await screen.findByRole('heading', { name: 'Acceso denegado' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Ingreso' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ingresar equipos y piezas' })).not.toBeInTheDocument();
   });
 
   it('allows an ADMIN to open hardware intake', async () => {
     useAuthStore.setState({ status: 'authenticated', user: ADMIN });
     renderAt('/inventory/inbound');
-    expect(await screen.findByRole('heading', { name: 'Ingreso de hardware' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Ingresar equipos y piezas' })).toBeInTheDocument();
     expect(await screen.findByLabelText('Ubicación inicial')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Ingreso' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Ingresar equipos y piezas' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('protects inventory for unauthenticated users', async () => {
@@ -267,6 +267,6 @@ it.each([ADMIN, VENDEDOR, TECNICO])('allows $role to consult the catalog route',
   vi.mocked(categoryService.listCategories).mockResolvedValue([]);
   useAuthStore.setState({ status: 'authenticated', user });
   renderAt('/inventory/catalog');
-  expect(await screen.findByRole('heading', { name: 'Catálogo maestro' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Productos y modelos' })).toBeInTheDocument();
   expect(await screen.findByText('No hay productos disponibles.')).toBeInTheDocument();
 });

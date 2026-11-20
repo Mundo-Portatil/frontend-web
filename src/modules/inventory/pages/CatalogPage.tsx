@@ -37,9 +37,9 @@ export function CatalogPage() {
     <section className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Catálogo maestro</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Productos y modelos</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Consulta productos, su tipo de seguimiento y las existencias por ubicación.
+            Modelos, características y precios.
           </p>
         </div>
         <Can roles={['ADMIN']}>
@@ -219,7 +219,7 @@ export function CatalogPage() {
                             ?.name ?? '—'}
                         </td>
                         <td className="px-3 py-2 text-slate-700">
-                          {item.isSerialized ? 'Serializado' : 'Por cantidad'}
+                          {item.isSerialized ? 'Por serie' : 'Por cantidad'}
                         </td>
                         <td className="px-3 py-2 text-slate-700">{item.basePrice}</td>
                         <td className="px-3 py-2">

@@ -8,7 +8,7 @@ import { batchInbound, validateSerials } from '../services/hardwareItemService';
 import { isUuidV4 } from '../hardwareValidation';
 
 function toItem(draft: DraftHardware): InboundItem {
-  if (!isUuidV4(draft.catalogId.trim())) throw new Error('Selecciona un ID de catálogo UUIDv4 válido para cada equipo y componente.');
+  if (!isUuidV4(draft.catalogId.trim())) throw new Error('Selecciona un producto válido para cada equipo y componente.');
   for (const price of [draft.costPrice, draft.salePrice]) if (price !== '' && (!Number.isFinite(Number(price)) || Number(price) < 0)) throw new Error('Los precios deben ser números mayores o iguales a cero.');
   return { catalogId: draft.catalogId.trim(), ...(draft.serialNumber.trim() ? { serialNumber: draft.serialNumber.trim() } : {}), ...(draft.costPrice !== '' ? { costPrice: Number(draft.costPrice) } : {}), ...(draft.salePrice !== '' ? { salePrice: Number(draft.salePrice) } : {}), ...(draft.children.length ? { children: draft.children.map(toItem) } : {}) };
 }

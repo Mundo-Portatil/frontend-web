@@ -24,7 +24,7 @@ export function BarcodeLabelsPanel({ hardwareItem }: { hardwareItem?: HardwareIt
     setLabels(null);
     const values = [...new Set(ids.split(/[\s,]+/).filter(Boolean))];
     if (!values.length || values.some((id) => !isUuidV4(id))) {
-      setError('Introduce IDs UUIDv4 válidos separados por coma o espacio.');
+      setError('Añade un equipo desde la búsqueda o revisa las referencias ingresadas.');
       return;
     }
     setBusy(true);
@@ -40,11 +40,8 @@ export function BarcodeLabelsPanel({ hardwareItem }: { hardwareItem?: HardwareIt
   return (
     <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
       <header>
-        <h3 className="text-lg font-semibold text-slate-900">Datos de etiquetas</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          Consulta los datos contratados para etiquetas individuales o masivas. La impresión
-          física se habilitará cuando exista el ADR correspondiente.
-        </p>
+        <h3 className="text-lg font-semibold text-slate-900">Etiquetas de equipos y piezas</h3>
+        <p className="mt-1 text-sm text-slate-500">Vista previa; impresión aún no disponible.</p>
       </header>
 
       {error && <Notification kind="error">{error}</Notification>}
@@ -65,19 +62,29 @@ export function BarcodeLabelsPanel({ hardwareItem }: { hardwareItem?: HardwareIt
       )}
 
       <form onSubmit={(event) => void submit(event)}>
+        <p role="status" className="mb-3 text-sm text-slate-600">
+          Equipos y piezas seleccionados: {new Set(ids.split(/[\s,]+/).filter(Boolean)).size}
+        </p>
+        <details className="rounded-lg border border-slate-200 p-3">
+          <summary className="cursor-pointer rounded text-sm text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+            Agregar referencias manualmente
+          </summary>
         <label className="block">
-          <span className={LABEL_CLASS}>IDs de hardware</span>
+          <span className={`${LABEL_CLASS} mt-3`}>Referencias para etiquetas</span>
           <textarea
-            aria-label="IDs de hardware para etiquetas"
+            aria-label="Referencias para etiquetas"
+            rows={3}
             value={ids}
             onChange={(event) => setIds(event.target.value)}
             disabled={busy}
-            className={`${TEXT_INPUT_CLASS} min-h-24`}
-            placeholder="Un ID por línea o separados por coma"
+            className={`${TEXT_INPUT_CLASS} h-24 max-h-24 max-w-full resize-none overflow-y-auto`}
+            placeholder="Una referencia por línea…"
+            spellCheck={false}
           />
         </label>
+        </details>
         <button disabled={busy} className={`${PRIMARY_BUTTON_CLASS} mt-3`}>
-          {busy ? 'Consultando...' : 'Consultar etiquetas'}
+          {busy ? 'Cargando…' : 'Ver etiquetas'}
         </button>
       </form>
 

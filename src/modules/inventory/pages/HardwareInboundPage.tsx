@@ -43,10 +43,9 @@ function InboundForm() {
   return (
     <section className="space-y-6">
       <header>
-        <h2 className="text-lg font-semibold text-slate-900">Ingreso de hardware</h2>
+        <h2 className="text-lg font-semibold text-slate-900">Ingresar equipos y piezas</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Registra equipos serializados y sus componentes en una sola operación atómica. Las series
-          omitidas se generan en el servidor.
+          Registra equipos, piezas y sus componentes.
         </p>
       </header>
 
@@ -91,7 +90,7 @@ function InboundForm() {
           <div>
             <h3 className="text-lg font-semibold text-slate-900">Confirmar ingreso</h3>
             <p className="mt-1 text-sm text-slate-500">
-              Revisa el resumen antes de enviar la operación atómica.
+              Revisa los equipos antes de confirmar.
             </p>
           </div>
           <dl className="grid gap-3 rounded-lg bg-slate-50 p-3 text-sm sm:grid-cols-3">
@@ -115,7 +114,7 @@ function InboundForm() {
           <ul className="divide-y divide-slate-100">
             {review.items.map((item, index) => (
               <li key={index} className="py-2 text-sm text-slate-700">
-                {item.catalogId} — {item.serialNumber ?? 'Serie automática'}
+                Equipo {index + 1} — {item.serialNumber ?? 'Sin serie: se asignará un código'}
               </li>
             ))}
           </ul>
@@ -171,7 +170,7 @@ function InboundForm() {
                     <div>
                       <h3 className="font-semibold text-slate-900">Equipo {index + 1}</h3>
                       <p className="text-sm text-slate-500">
-                        Producto serializado, serie y precios opcionales.
+                        Producto con serie, serie y precios opcionales.
                       </p>
                     </div>
                     <RemoveDraftButton

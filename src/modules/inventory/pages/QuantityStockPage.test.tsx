@@ -38,7 +38,7 @@ describe('QuantityStockPage', () => {
     await waitFor(() => expect(service.listQuantityStock).toHaveBeenLastCalledWith({ page: 2, limit: 50 }, expect.any(AbortSignal)));
     await user.selectOptions(screen.getByLabelText('Filtrar por ubicación'), placeId);
     await user.selectOptions(screen.getByLabelText('Filtrar por categoría'), categoryId);
-    await user.type(screen.getByLabelText('Filtrar por ID de producto'), productId);
+    await user.selectOptions(await screen.findByLabelText('Filtrar por producto'), productId);
     await user.click(screen.getByLabelText('Solo stock bajo'));
     await user.click(screen.getByRole('button', { name: 'Aplicar filtros' }));
     await waitFor(() => expect(service.listQuantityStock).toHaveBeenLastCalledWith({ page: 1, limit: 50, locationId: placeId, categoryId, catalogItemId: productId, lowStock: true }, expect.any(AbortSignal)));
@@ -47,7 +47,7 @@ describe('QuantityStockPage', () => {
     vi.mocked(service.inboundQuantityStock).mockResolvedValue({ ...stock, quantity: 7 });
     const user = userEvent.setup(); render(<QuantityStockPage />);
     await user.click(screen.getByRole('button', { name: 'Registrar movimiento' }));
-    await user.selectOptions(await screen.findByLabelText('Producto no serializado'), productId);
+    await user.selectOptions(await screen.findByLabelText('Producto por cantidad'), productId);
     await user.selectOptions(screen.getByLabelText('Ubicación de ingreso o ajuste'), placeId);
     await user.type(screen.getByLabelText('Cantidad que ingresa'), '5');
     await user.click(screen.getByRole('button', { name: 'Revisar operación' }));
@@ -60,12 +60,13 @@ describe('QuantityStockPage', () => {
     vi.mocked(service.adjustQuantityStock).mockResolvedValue({ ...stock, quantity: 0 });
     const user = userEvent.setup(); render(<QuantityStockPage />);
     await user.click(screen.getByRole('button', { name: 'Registrar movimiento' }));
-    await user.selectOptions(await screen.findByLabelText('Producto no serializado'), productId);
+    await user.selectOptions(await screen.findByLabelText('Producto por cantidad'), productId);
     await user.selectOptions(screen.getByLabelText('Operación'), 'adjust');
     await user.selectOptions(screen.getByLabelText('Ubicación de ingreso o ajuste'), placeId);
     await user.type(screen.getByLabelText('Nueva cantidad total'), '0');
     await user.click(screen.getByRole('button', { name: 'Revisar operación' }));
     expect(screen.getByRole('alert')).toHaveTextContent('motivo');
+    expect(screen.getByLabelText('Motivo del ajuste')).toHaveClass('resize-none', 'max-h-24');
     await user.type(screen.getByLabelText('Motivo del ajuste'), 'Conteo físico');
     await user.click(screen.getByRole('button', { name: 'Revisar operación' }));
     await user.click(screen.getByRole('button', { name: 'Confirmar operación' }));
@@ -84,7 +85,7 @@ it('keeps backend validation failure visible and does not claim success', async 
   vi.mocked(service.inboundQuantityStock).mockRejectedValue({ kind: 'validation', message: 'El producto no admite stock por cantidad.' });
   const user = userEvent.setup(); render(<QuantityStockPage />);
   await user.click(screen.getByRole('button', { name: 'Registrar movimiento' }));
-  await user.selectOptions(await screen.findByLabelText('Producto no serializado'), productId);
+  await user.selectOptions(await screen.findByLabelText('Producto por cantidad'), productId);
   await user.selectOptions(screen.getByLabelText('Ubicación de ingreso o ajuste'), placeId);
   await user.type(screen.getByLabelText('Cantidad que ingresa'), '3');
   await user.click(screen.getByRole('button', { name: 'Revisar operación' }));

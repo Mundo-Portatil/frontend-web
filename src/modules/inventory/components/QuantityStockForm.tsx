@@ -27,7 +27,7 @@ export function QuantityStockForm({ locations, onSaved }: { locations: Location[
   function prepare(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    if (!catalogId) { setError('Selecciona un producto no serializado.'); return; }
+    if (!catalogId) { setError('Selecciona un producto por cantidad.'); return; }
     if (!activeLocations.some((location) => location.id === locationId)) { setError('Selecciona una ubicación activa.'); return; }
     const count = Number(quantity);
     if (!quantity.trim() || !Number.isSafeInteger(count) || count < (mode === 'inbound' ? 1 : 0)) { setError(mode === 'inbound' ? 'La entrada debe ser un entero mayor que cero.' : 'La nueva cantidad debe ser un entero igual o mayor que cero.'); return; }
@@ -50,7 +50,7 @@ export function QuantityStockForm({ locations, onSaved }: { locations: Location[
   }
   return <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
     <h2 className="text-lg font-semibold text-slate-900">Registrar movimiento de stock</h2>
-    <p className="mt-1 mb-4 text-sm text-slate-500">Registra una entrada de mercadería o ajusta el saldo total de un producto no serializado.</p>
+    <p className="mt-1 mb-4 text-sm text-slate-500">Registra una entrada o corrige el conteo.</p>
     {error && <Notification kind="error">{error}</Notification>}
     <form onSubmit={prepare} noValidate>
       <fieldset disabled={busy || review} className="grid gap-4 sm:grid-cols-2">
@@ -58,10 +58,10 @@ export function QuantityStockForm({ locations, onSaved }: { locations: Location[
         <CatalogProductPicker id="stock-catalog" serialized={false} onChange={setCatalogId} disabled={busy || review} />
         <div><label htmlFor="stock-location" className={LABEL_CLASS}>Ubicación de ingreso o ajuste</label><select id="stock-location" value={locationId} onChange={(event) => setLocationId(event.target.value)} className={TEXT_INPUT_CLASS} required><option value="">Selecciona ubicación</option>{activeLocations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select></div>
         <div><label htmlFor="stock-quantity" className={LABEL_CLASS}>{mode === 'inbound' ? 'Cantidad que ingresa' : 'Nueva cantidad total'}</label><input id="stock-quantity" type="number" min={mode === 'inbound' ? 1 : 0} step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} className={TEXT_INPUT_CLASS} required /></div>
-        {mode === 'inbound' ? <><div><label htmlFor="stock-cost" className={LABEL_CLASS}>Costo unitario (opcional)</label><input id="stock-cost" type="number" min="0" step="any" value={costPrice} onChange={(event) => setCostPrice(event.target.value)} className={TEXT_INPUT_CLASS} /></div><div><label htmlFor="stock-price" className={LABEL_CLASS}>Precio de venta (opcional)</label><input id="stock-price" type="number" min="0" step="any" value={salePrice} onChange={(event) => setSalePrice(event.target.value)} className={TEXT_INPUT_CLASS} /></div></> : <div className="sm:col-span-2"><label htmlFor="stock-reason" className={LABEL_CLASS}>Motivo del ajuste</label><textarea id="stock-reason" value={reason} onChange={(event) => setReason(event.target.value)} required className={TEXT_INPUT_CLASS} /></div>}
+        {mode === 'inbound' ? <><div><label htmlFor="stock-cost" className={LABEL_CLASS}>Costo unitario (opcional)</label><input id="stock-cost" type="number" min="0" step="any" value={costPrice} onChange={(event) => setCostPrice(event.target.value)} className={TEXT_INPUT_CLASS} /></div><div><label htmlFor="stock-price" className={LABEL_CLASS}>Precio de venta (opcional)</label><input id="stock-price" type="number" min="0" step="any" value={salePrice} onChange={(event) => setSalePrice(event.target.value)} className={TEXT_INPUT_CLASS} /></div></> : <div className="sm:col-span-2"><label htmlFor="stock-reason" className={LABEL_CLASS}>Motivo del ajuste</label><textarea id="stock-reason" value={reason} onChange={(event) => setReason(event.target.value)} required rows={3} className={`${TEXT_INPUT_CLASS} h-24 max-h-24 resize-none overflow-y-auto`} /></div>}
         <div className="sm:col-span-2"><button className={PRIMARY_BUTTON_CLASS}>Revisar operación</button></div>
       </fieldset>
     </form>
-    {review && <div className="mt-4 space-y-3 rounded-lg border border-brand-200 p-4"><p>{mode === 'inbound' ? `Ingresar ${quantity} unidades` : `Establecer saldo total en ${quantity} unidades`} en {activeLocations.find((location) => location.id === locationId)?.name}.</p><p className="break-all text-sm text-slate-600">Producto: {catalogId.trim()}</p>{mode === 'adjust' && <p className="text-sm">Motivo: {reason}</p>}<div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className={PRIMARY_BUTTON_CLASS} onClick={() => void confirm()}>{busy ? 'Guardando…' : 'Confirmar operación'}</button><button type="button" disabled={busy} className={SECONDARY_BUTTON_CLASS} onClick={() => setReview(false)}>Volver a editar</button></div></div>}
+    {review && <div className="mt-4 space-y-3 rounded-lg border border-brand-200 p-4"><p>{mode === 'inbound' ? `Ingresar ${quantity} unidades` : `Establecer saldo total en ${quantity} unidades`} en {activeLocations.find((location) => location.id === locationId)?.name}.</p>{mode === 'adjust' && <p className="text-sm">Motivo: {reason}</p>}<div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className={PRIMARY_BUTTON_CLASS} onClick={() => void confirm()}>{busy ? 'Guardando…' : 'Confirmar operación'}</button><button type="button" disabled={busy} className={SECONDARY_BUTTON_CLASS} onClick={() => setReview(false)}>Volver a editar</button></div></div>}
   </section>;
 }

@@ -46,10 +46,9 @@ export function InventoryPage() {
   return (
     <section className="space-y-6">
       <header>
-        <h2 className="text-lg font-semibold text-slate-900">Consulta de inventario</h2>
+        <h2 className="text-lg font-semibold text-slate-900">Buscar equipo o pieza</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Escanea un código 1D o introduce la serie para consultar la ubicación, el estado y los
-          componentes del equipo.
+          Escanea o escribe la serie para localizar un equipo o pieza.
         </p>
       </header>
 
@@ -77,13 +76,9 @@ export function InventoryPage() {
             disabled={busy || mutating}
             className={`${PRIMARY_BUTTON_CLASS} w-full sm:w-auto`}
           >
-            {busy ? 'Buscando...' : 'Buscar hardware'}
+            {busy ? 'Buscando...' : 'Buscar equipo o pieza'}
           </button>
         </div>
-        <p className="mt-2 text-xs text-slate-500">
-          Compatible con lector HID o entrada manual. El código se envía al backend para localizar
-          la unidad.
-        </p>
       </form>
 
       {error && <Notification kind="error">{error}</Notification>}
@@ -94,7 +89,7 @@ export function InventoryPage() {
           <header className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <h3 className="text-lg font-semibold text-slate-900">
-                {item.catalogName ?? 'Hardware'}
+                {item.catalogName ?? 'Equipo o pieza'}
               </h3>
               <p className="mt-1 break-all text-sm text-slate-600">Serie: {item.serialNumber}</p>
             </div>
@@ -107,18 +102,14 @@ export function InventoryPage() {
             <div>
               <dt className="text-slate-500">Ubicación</dt>
               <dd className="mt-0.5 font-medium text-slate-900">
-                {item.locationName ?? item.locationId}
+                {item.locationName ?? 'Ubicación no disponible'}
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500">Equipo padre</dt>
+              <dt className="text-slate-500">Equipo al que pertenece</dt>
               <dd className="mt-0.5 font-medium text-slate-900">
-                {item.parentChassis?.serialNumber ?? item.parentChassisId ?? 'Sin equipo padre'}
+                {item.parentChassis?.serialNumber ?? (item.parentChassisId ? 'Equipo asociado' : 'Sin equipo asociado')}
               </dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-slate-500">ID de hardware</dt>
-              <dd className="mt-0.5 break-all font-mono text-xs text-slate-700">{item.id}</dd>
             </div>
           </dl>
 
@@ -162,19 +153,20 @@ export function InventoryPage() {
               <div>
                 <h4 className="font-semibold text-slate-900">Acoplar componentes</h4>
                 <p className="mt-1 text-sm text-slate-600">
-                  El equipo y sus componentes deben compartir ubicación y estar en stock. No se
-                  permiten ciclos ni autoacoplamiento.
+                  El equipo y las piezas deben estar disponibles en la misma ubicación.
                 </p>
               </div>
               <label className="block">
-                <span className={LABEL_CLASS}>Series o IDs de componentes a acoplar</span>
+                <span className={LABEL_CLASS}>Series de los componentes</span>
                 <input
-                  aria-label="Series o IDs de componentes a acoplar"
+                  aria-label="Series de los componentes"
                   value={childIds}
                   onChange={(event) => setChildIds(event.target.value)}
                   disabled={mutating || busy}
                   className={TEXT_INPUT_CLASS}
                   autoComplete="off"
+                  placeholder="Series separadas por comas…"
+                  spellCheck={false}
                 />
               </label>
               <button

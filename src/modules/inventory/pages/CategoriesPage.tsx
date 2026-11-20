@@ -58,7 +58,7 @@ export function CategoriesPage() {
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Categorías</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Organiza los productos del inventario en categorías dinámicas.
+            Agrupa los productos por tipo.
           </p>
         </div>
         <Can roles={['ADMIN']}>
