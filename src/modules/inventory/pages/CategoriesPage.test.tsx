@@ -37,6 +37,7 @@ describe('CategoriesPage', () => {
   it('validates required name then creates and reloads authoritative counts', async () => {
     vi.mocked(service.createCategory).mockResolvedValue(category);
     const user = userEvent.setup(); render(<CategoriesPage />); await screen.findByText('RAM');
+    await user.click(screen.getByRole('button', { name: 'Registrar categoría' }));
     await user.click(screen.getByRole('button', { name: 'Crear categoría' }));
     expect(screen.getByRole('alert')).toHaveTextContent('El nombre es obligatorio.'); expect(service.createCategory).not.toHaveBeenCalled();
     await user.type(screen.getByLabelText('Nombre'), 'SSD');

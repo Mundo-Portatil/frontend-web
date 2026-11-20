@@ -82,7 +82,8 @@ No duplicar ni reemplazar estos servicios transversales dentro de Inventario.
   - Implementar `POST /catalog` con el DTO confirmado.
   - Usar la instancia Axios centralizada.
 
-- [x] **T1.3.2: Listado y búsqueda de catálogo**
+- [ ] **T1.3.2: Listado y búsqueda de catálogo**
+  - **Parcial:** interfaz y pruebas frontend listas; filtro de inactivos bloqueado por DTO backend que transforma `active="false"` en `true`. No marcar completo hasta corregir backend y validar el filtro real.
   - Crear la vista del catálogo con búsqueda y filtros contratados.
   - Consumir paginación del backend (`page`, `limit`, `total`), con defaults documentados 1 y 50.
   - Mostrar tipo de seguimiento (`isSerialized`), categoría, precio y estado cuando esos campos estén incluidos en la respuesta.
@@ -184,15 +185,15 @@ No duplicar ni reemplazar estos servicios transversales dentro de Inventario.
 
 ## Fase 1.8: Integración de interfaz y navegación
 
-- [ ] **T1.8.1: Rutas del módulo**
+- [x] **T1.8.1: Rutas del módulo**
   - Registrar `/inventory`, `/inventory/inbound`, `/inventory/stock`, `/inventory/catalog` y `/inventory/categories`.
   - Usar `ProtectedRoute` y guards existentes.
 
-- [ ] **T1.8.2: Navegación**
+- [x] **T1.8.2: Navegación**
   - Añadir la entrada de Inventario al menú definido por el plan.
   - Restringir solo las acciones administrativas; las consultas deben respetar los tres roles autorizados.
 
-- [ ] **T1.8.3: Estados y feedback compartidos**
+- [x] **T1.8.3: Estados y feedback compartidos**
   - Reutilizar estados de carga, vacío, error y notificación de Fase 0 en las vistas de Inventario.
   - Presentar errores `message` string o arreglo sin exponer información sensible.
   - Permitir reintentar consultas cuando corresponda.
@@ -201,16 +202,17 @@ No duplicar ni reemplazar estos servicios transversales dentro de Inventario.
 
 ## Fase 1.9: Validación de la entrega
 
-- [ ] **T1.9.1: Revisión de contratos utilizados**
+- [x] **T1.9.1: Revisión de contratos utilizados**
   - Confirmar cada método, ruta, query param, body y respuesta utilizados contra `API_CONTRACTS.md` y los DTO confirmados.
   - Confirmar que no se incluyan propiedades no contratadas.
 
-- [ ] **T1.9.2: Revisión de autorización y dependencias**
+- [x] **T1.9.2: Revisión de autorización y dependencias**
   - Confirmar las acciones administrativas restringidas a `ADMIN` y las consultas/etiquetas disponibles para los tres roles autorizados.
   - Confirmar la reutilización de Axios, auth, ubicación y feedback de Fase 0.
   - Confirmar que no se haya añadido persistencia offline ni lógica de M2–M8 fuera de alcance.
 
 - [ ] **T1.9.3: Revisión de criterios de aceptación**
+  - **Parcial:** validación automatizada y consultas autenticadas correctas. Falta cerrar el filtro inactivo del backend y comprobar escrituras válidas con datos de prueba autorizados; no se crearon registros de Inventario en esta revisión.
   - Verificar los criterios de aceptación de `specs/fase_1_core/spec.md` que corresponden a los alcances incluidos en estas tareas.
   - Verificar que las capacidades pendientes no se reporten como implementadas.
   - Actualizar las tareas a `[x]` solo después de completar y verificar su resultado.
@@ -265,3 +267,15 @@ La implementación deberá respetar `constitution.md`, `spec.md`, `plan.md` y el
 - Consultas por HID o teclado, acople por serie/ID resuelto y desacople; etiquetas masivas con datos del backend, sin impresión física.
 - Se conservó el diseño existente y se corrigió el regreso del resumen de ingreso: el formulario permanece montado y conserva selecciones de equipos e hijos.
 - Pruebas dirigidas: 14 aprobadas en 4 archivos. Suite final única: 32 archivos/241 pruebas aprobadas. ESLint, TypeScript/build y diff-check correctos. No se ejecutó la suite completa después de cada cambio.
+
+## Registro de cierre técnico — integración y diseño (2026-11-19)
+
+- T1.8.1–T1.8.3: cinco rutas implementadas bajo `/inventory`, navegación por secciones, ingreso restringido a ADMIN, consultas y datos de etiquetas para los tres roles. Se preservaron las mejoras visuales existentes, modales y retorno de foco.
+- T1.9.1–T1.9.2: contraste de solicitudes/modelos contra contrato `origin/develop`, DTO y Swagger local; guardas JWT/RBAC y reutilización de Axios/feedback verificadas mediante código y pruebas de rutas/componentes.
+- Backend iniciado temporalmente desde `dist/main.js`, sin recompilar ni modificar archivos del backend. Swagger respondió 200. La lectura Prisma con `active:true` confirmó resuelto el error P2022 anterior.
+- Inicio de sesión con la cuenta ADMIN facilitada por el usuario: satisfactorio. Perfil, categorías, catálogo con/sin active, stock paginado y ubicaciones devolvieron 200. Sin JWT, categorías/catálogo/stock devolvieron 401. No se guardaron credenciales ni tokens en el repositorio.
+- Payload vacío autenticado rechazado con 400 en creación de categoría/catálogo, ingreso de hardware, entrada/ajuste de cantidad y etiquetas masivas. No se enviaron altas válidas de Inventario ni se ejecutaron migraciones.
+- Discrepancia de estado HTTP observada: login y validate-serials devuelven 201 aunque el contrato describe 200; el cliente acepta 2xx y no depende de la distinción. No se modificó backend para ocultarla.
+- Bloqueo confirmado en backend: `plainToInstance(QueryCatalogHttpDto, {active: 'false'})` produce `active: true` por `@Type(() => Boolean)`. El frontend envía el booleano contractual; no se inventa un workaround. T1.3.2 y T1.9.3 permanecen parciales hasta corrección por backend/validación final.
+- Suite completa ejecutada una vez al cerrar: 241 pruebas aprobadas en 32 archivos. TypeScript, ESLint, build de producción y `git diff --check` correctos. Las altas válidas y transiciones persistidas en vivo no se consideran comprobadas: requieren datos de prueba autorizados.
+- Capacidades expresamente diferidas continúan excluidas; este cierre no implica CRUD de lotes, pases, M6, aprobación usada ni impresión física.

@@ -29,7 +29,7 @@ describe('QuantityStockPage', () => {
     useAuthStore.setState({ user: { ...session, role } }); render(<QuantityStockPage />);
     expect(await screen.findByText('Mouse Logitech')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText('Cargando ubicaciones y categorías…')).not.toBeInTheDocument());
-    expect(screen.queryByText('Registrar movimiento de stock') !== null).toBe(role === 'ADMIN');
+    expect(screen.queryByRole('button', { name: 'Registrar movimiento' }) !== null).toBe(role === 'ADMIN');
     expect(screen.getByRole('cell', { name: 'Sí' })).toBeInTheDocument();
   });
   it('applies real filters with page reset and paginates', async () => {
@@ -46,6 +46,7 @@ describe('QuantityStockPage', () => {
   it('creates inbound only after confirmation and displays server balance', async () => {
     vi.mocked(service.inboundQuantityStock).mockResolvedValue({ ...stock, quantity: 7 });
     const user = userEvent.setup(); render(<QuantityStockPage />);
+    await user.click(screen.getByRole('button', { name: 'Registrar movimiento' }));
     await user.selectOptions(await screen.findByLabelText('Producto no serializado'), productId);
     await user.selectOptions(screen.getByLabelText('Ubicación de ingreso o ajuste'), placeId);
     await user.type(screen.getByLabelText('Cantidad que ingresa'), '5');
@@ -58,6 +59,7 @@ describe('QuantityStockPage', () => {
   it('requires reason and sends an absolute zero adjustment', async () => {
     vi.mocked(service.adjustQuantityStock).mockResolvedValue({ ...stock, quantity: 0 });
     const user = userEvent.setup(); render(<QuantityStockPage />);
+    await user.click(screen.getByRole('button', { name: 'Registrar movimiento' }));
     await user.selectOptions(await screen.findByLabelText('Producto no serializado'), productId);
     await user.selectOptions(screen.getByLabelText('Operación'), 'adjust');
     await user.selectOptions(screen.getByLabelText('Ubicación de ingreso o ajuste'), placeId);
@@ -81,6 +83,7 @@ describe('QuantityStockPage', () => {
 it('keeps backend validation failure visible and does not claim success', async () => {
   vi.mocked(service.inboundQuantityStock).mockRejectedValue({ kind: 'validation', message: 'El producto no admite stock por cantidad.' });
   const user = userEvent.setup(); render(<QuantityStockPage />);
+  await user.click(screen.getByRole('button', { name: 'Registrar movimiento' }));
   await user.selectOptions(await screen.findByLabelText('Producto no serializado'), productId);
   await user.selectOptions(screen.getByLabelText('Ubicación de ingreso o ajuste'), placeId);
   await user.type(screen.getByLabelText('Cantidad que ingresa'), '3');

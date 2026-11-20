@@ -48,8 +48,9 @@ export function QuantityStockForm({ locations, onSaved }: { locations: Location[
     } catch (failure) { setError(asAppError(failure).message); }
     finally { setBusy(false); }
   }
-  return <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-    <h2 className="mb-4 text-lg font-semibold">Registrar movimiento de stock</h2>
+  return <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+    <h2 className="text-lg font-semibold text-slate-900">Registrar movimiento de stock</h2>
+    <p className="mt-1 mb-4 text-sm text-slate-500">Registra una entrada de mercadería o ajusta el saldo total de un producto no serializado.</p>
     {error && <Notification kind="error">{error}</Notification>}
     <form onSubmit={prepare} noValidate>
       <fieldset disabled={busy || review} className="grid gap-4 sm:grid-cols-2">

@@ -8,6 +8,10 @@ import { LocationsPage } from '../modules/foundation/locations/pages/LocationsPa
 import { ProfilePage } from '../modules/foundation/users/pages/ProfilePage';
 import { UsersPage } from '../modules/foundation/users/pages/UsersPage';
 import { CatalogPage } from '../modules/inventory/pages/CatalogPage';
+import { InventoryPage } from '../modules/inventory/pages/InventoryPage';
+import { HardwareInboundPage } from '../modules/inventory/pages/HardwareInboundPage';
+import { QuantityStockPage } from '../modules/inventory/pages/QuantityStockPage';
+import { InventoryLayout } from '../modules/inventory/components/InventoryLayout';
 import { CategoriesPage } from '../modules/inventory';
 import { useAuthStore } from '../stores/authStore';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -61,8 +65,20 @@ export function AppRouter() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route path={ROUTES.inventoryCatalog} element={<CatalogPage />} />
-          <Route path={ROUTES.inventoryCategories} element={<CategoriesPage />} />
+          <Route path={ROUTES.inventory} element={<InventoryLayout />}>
+            <Route index element={<InventoryPage />} />
+            <Route path="stock" element={<QuantityStockPage />} />
+            <Route
+              path="inbound"
+              element={
+                <RoleGuard allowedRoles={['ADMIN']}>
+                  <HardwareInboundPage />
+                </RoleGuard>
+              }
+            />
+            <Route path="catalog" element={<CatalogPage />} />
+            <Route path="categories" element={<CategoriesPage />} />
+          </Route>
           <Route path={ROUTES.profile} element={<ProfilePage />} />
           <Route path={ROUTES.locations} element={<LocationsPage />} />
           <Route path={ROUTES.unauthorized} element={<UnauthorizedPage />} />

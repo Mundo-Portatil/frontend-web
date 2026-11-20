@@ -14,8 +14,8 @@ beforeEach(() => { vi.resetAllMocks(); useAuthStore.setState({ status: 'authenti
 it.each(['ADMIN', 'VENDEDOR', 'TECNICO'] as const)('allows %s to read with creation restricted to ADMIN', async (role) => {
   useAuthStore.setState({ user: { ...account, role } }); render(<CatalogPage />);
   expect(await screen.findByText('Acer Aspire')).toBeInTheDocument();
-  if (role === 'ADMIN') expect(await screen.findByRole('button', { name: 'Crear producto' })).toBeInTheDocument();
-  else expect(screen.queryByRole('button', { name: 'Crear producto' })).not.toBeInTheDocument();
+  if (role === 'ADMIN') expect(await screen.findByRole('button', { name: 'Registrar producto' })).toBeInTheDocument();
+  else expect(screen.queryByRole('button', { name: 'Registrar producto' })).not.toBeInTheDocument();
 });
 it('filters through backend and uses its pagination', async () => {
   const user = userEvent.setup(); render(<CatalogPage />); await screen.findByText('Acer Aspire');
@@ -35,6 +35,7 @@ it('shows stock breakdown and server total in product detail', async () => {
 it('validates required fields and creates the contracted payload only', async () => {
   vi.mocked(service.createCatalogItem).mockResolvedValue(item);
   const user = userEvent.setup(); render(<CatalogPage />);
+  await user.click(await screen.findByRole('button', { name: 'Registrar producto' }));
   await user.click(await screen.findByRole('button', { name: 'Crear producto' })); expect(screen.getByRole('alert')).toHaveTextContent('Completa SKU');
   for (const [label, value] of [['SKU *', 'NB'], ['Nombre *', 'Laptop'], ['Marca *', 'Acer'], ['Modelo *', 'A5'], ['Precio base (PEN) *', '2350']]) await user.type(screen.getByLabelText(label), value);
   await user.selectOptions(screen.getByLabelText('Categoría *'), category.id);
@@ -47,4 +48,21 @@ it('shows listing errors with retry and empty results', async () => {
   render(<CatalogPage />); await screen.findByText('Sin conexión');
   await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
   expect(await screen.findByText('No hay productos disponibles.')).toBeInTheDocument();
+});
+
+it('rejects negative pricing and displays create conflicts without clearing entered data', async () => {
+  vi.mocked(service.createCatalogItem).mockRejectedValue({ kind: 'unknown', status: 409, message: 'SKU duplicado.' });
+  const user = userEvent.setup(); render(<CatalogPage />);
+  await user.click(await screen.findByRole('button', { name: 'Registrar producto' }));
+  await screen.findByRole('button', { name: 'Crear producto' });
+  for (const [label, value] of [['SKU *', 'NB'], ['Nombre *', 'Laptop'], ['Marca *', 'Acer'], ['Modelo *', 'A5'], ['Precio base (PEN) *', '-10']]) await user.type(screen.getByLabelText(label), value);
+  await user.selectOptions(screen.getByLabelText('Categoría *'), category.id);
+  await user.click(screen.getByRole('button', { name: 'Crear producto' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('mayores o iguales a cero');
+  expect(service.createCatalogItem).not.toHaveBeenCalled();
+  await user.clear(screen.getByLabelText('Precio base (PEN) *'));
+  await user.type(screen.getByLabelText('Precio base (PEN) *'), '10');
+  await user.click(screen.getByRole('button', { name: 'Crear producto' }));
+  expect(await screen.findByText('SKU duplicado.')).toBeInTheDocument();
+  expect(screen.getByLabelText('SKU *')).toHaveValue('NB');
 });

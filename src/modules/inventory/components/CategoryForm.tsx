@@ -26,8 +26,9 @@ export function CategoryForm({ category, onSaved, onCancel, onBusyChange }: { ca
     } catch (reason) { setError(asAppError(reason).message); }
     finally { setBusy(false); onBusyChange(false); }
   }
-  return <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-    <h2 className="text-lg font-semibold">{category ? 'Editar categoría' : 'Registrar categoría'}</h2>
+  return <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+    <h2 className="text-lg font-semibold text-slate-900">{category ? 'Editar categoría' : 'Registrar categoría'}</h2>
+    <p className="mt-1 text-sm text-slate-500">{category ? 'Actualiza el nombre, la descripción o el estado de la categoría.' : 'Crea una categoría para clasificar los productos del catálogo.'}</p>
     {error && <div className="mt-3"><Notification kind="error">{error}</Notification></div>}
     <form onSubmit={(event) => void submit(event)} noValidate className="mt-4">
       <fieldset disabled={busy} className="grid min-w-0 gap-4 sm:grid-cols-2">

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppRouter } from './index';
 import { useAuthStore } from '../stores/authStore';
 import * as catalogService from '../modules/inventory/services/catalogService';
+import * as stockService from '../modules/inventory/services/quantityStockService';
 import * as categoryService from '../modules/inventory/services/categoryService';
 import * as userService from '../modules/foundation/users/services/userService';
 import * as locationService from '../modules/foundation/locations/services/locationService';
@@ -32,6 +33,7 @@ vi.mock('../modules/foundation/audit-logs/services/auditLogService', () => ({
 }));
 
 vi.mock('../modules/inventory/services/catalogService', () => ({ listCatalog: vi.fn() }));
+vi.mock('../modules/inventory/services/quantityStockService', () => ({ listQuantityStock: vi.fn() }));
 vi.mock('../modules/inventory/services/categoryService', () => ({ listCategories: vi.fn() }));
 
 const ADMIN = {
@@ -73,6 +75,9 @@ describe('AppRouter', () => {
     useAuthStore.setState({ status: 'unauthenticated', user: null });
     vi.mocked(userService.listUsers).mockResolvedValue([]);
     vi.mocked(locationService.listLocations).mockResolvedValue([]);
+    vi.mocked(locationService.listActiveLocations).mockResolvedValue([]);
+    vi.mocked(catalogService.listCatalog).mockResolvedValue({ items: [], total: 0, page: 1, limit: 50 });
+    vi.mocked(stockService.listQuantityStock).mockResolvedValue({ items: [], total: 0, page: 1, limit: 50 });
     vi.mocked(auditLogService.listAuditLogs).mockResolvedValue({
       items: [],
       total: 0,
@@ -84,6 +89,44 @@ describe('AppRouter', () => {
   it('redirects unauthenticated users from protected routes to /login', async () => {
     renderAt('/users');
 
+    expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
+  });
+
+  it.each([ADMIN, VENDEDOR, TECNICO])('allows $role to consult inventory and quantity stock', async (user) => {
+    useAuthStore.setState({ status: 'authenticated', user });
+    renderAt('/inventory/stock');
+    expect(await screen.findByRole('heading', { name: 'Stock por cantidad' })).toBeInTheDocument();
+    expect(await screen.findByText('No hay existencias para estos filtros.')).toBeInTheDocument();
+  });
+
+  it.each([ADMIN, VENDEDOR, TECNICO])('allows $role to open hardware lookup', async (user) => {
+    useAuthStore.setState({ status: 'authenticated', user });
+    renderAt('/inventory');
+    expect(await screen.findByRole('heading', { name: 'Inventario' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Consulta de inventario' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Consulta' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Stock' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Catálogo' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Categorías' })).toBeInTheDocument();
+  });
+
+  it.each([VENDEDOR, TECNICO])('denies $role access to hardware intake', async (user) => {
+    useAuthStore.setState({ status: 'authenticated', user });
+    renderAt('/inventory/inbound');
+    expect(await screen.findByRole('heading', { name: 'Acceso denegado' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ingreso' })).not.toBeInTheDocument();
+  });
+
+  it('allows an ADMIN to open hardware intake', async () => {
+    useAuthStore.setState({ status: 'authenticated', user: ADMIN });
+    renderAt('/inventory/inbound');
+    expect(await screen.findByRole('heading', { name: 'Ingreso de hardware' })).toBeInTheDocument();
+    expect(await screen.findByLabelText('Ubicación inicial')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ingreso' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('protects inventory for unauthenticated users', async () => {
+    renderAt('/inventory');
     expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
   });
 

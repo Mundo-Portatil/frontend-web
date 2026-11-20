@@ -113,7 +113,6 @@ describe('AppLayout', () => {
       'Inicio',
       'Ventas',
       'POS',
-      'Inventario',
       'Traslados',
       'Servicio técnico',
       'Caja',

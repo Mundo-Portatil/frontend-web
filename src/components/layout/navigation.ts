@@ -56,27 +56,12 @@ export const NAV_GROUPS: readonly NavGroupDefinition[] = [
 
 /**
  * Navigation for implemented and available modules.
- * Future modules (Ventas/POS, Catálogo, Traslados, Servicio técnico, Caja,
- * Auditoría Express, Aprobaciones, Trazabilidad) must not be added until their
- * phase is implemented, integrated and enabled.
+ * Future modules (Ventas/POS, Traslados, Servicio técnico, Caja, Auditoría
+ * Express, Aprobaciones, Trazabilidad) must not be added until their phase is
+ * implemented, integrated and enabled.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
-  {
-    id: 'inventory-catalog',
-    label: 'Catálogo',
-    icon: CategoriesIcon,
-    to: ROUTES.inventoryCatalog,
-    group: 'operations',
-    roles: ['ADMIN', 'VENDEDOR', 'TECNICO'],
-  },
-  {
-    id: 'inventory-categories',
-    label: 'Categorías',
-    icon: CategoriesIcon,
-    to: ROUTES.inventoryCategories,
-    group: 'operations',
-    roles: ['ADMIN', 'VENDEDOR', 'TECNICO'],
-  },
+  { id: 'inventory', label: 'Inventario', icon: CategoriesIcon, to: ROUTES.inventory, group: 'operations', roles: ['ADMIN', 'VENDEDOR', 'TECNICO'] },
   {
     id: 'locations',
     label: 'Ubicaciones',

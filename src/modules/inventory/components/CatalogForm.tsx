@@ -33,7 +33,7 @@ export function CatalogForm({ categories, onSaved }: { categories: Category[]; o
     finally { setBusy(false); }
   }
   function field(key: string, value: string) { setFields((current) => ({ ...current, [key]: value })); }
-  return <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4"><h2 className="text-lg font-semibold">Registrar producto</h2>
+  return <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5"><h2 className="text-lg font-semibold text-slate-900">Registrar producto</h2><p className="mt-1 text-sm text-slate-500">Completa los datos del producto maestro. La categoría debe estar activa.</p>
     {error && <Notification kind="error">{error}</Notification>}
     <form onSubmit={(event) => void submit(event)} noValidate className="mt-4"><fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {TEXT_FIELDS.map(([key, label], index) => <div key={key}><label htmlFor={`catalog-${key}`} className={LABEL_CLASS}>{label}{index < 4 ? ' *' : ''}</label><input id={`catalog-${key}`} value={fields[key] ?? ''} onChange={(event) => field(key, event.target.value)} className={TEXT_INPUT_CLASS} required={index < 4} /></div>)}
