@@ -82,8 +82,8 @@ No duplicar ni reemplazar estos servicios transversales dentro de Inventario.
   - Implementar `POST /catalog` con el DTO confirmado.
   - Usar la instancia Axios centralizada.
 
-- [ ] **T1.3.2: Listado y búsqueda de catálogo**
-  - **Parcial:** interfaz y pruebas frontend listas; filtro de inactivos bloqueado por DTO backend que transforma `active="false"` en `true`. No marcar completo hasta corregir backend y validar el filtro real.
+- [x] **T1.3.2: Listado y búsqueda de catálogo**
+  - **Validado:** corrección del DTO de backend comprobada por API autenticada con productos activos e inactivos de prueba; el frontend conserva el parámetro booleano contractual.
   - Crear la vista del catálogo con búsqueda y filtros contratados.
   - Consumir paginación del backend (`page`, `limit`, `total`), con defaults documentados 1 y 50.
   - Mostrar tipo de seguimiento (`isSerialized`), categoría, precio y estado cuando esos campos estén incluidos en la respuesta.
@@ -279,3 +279,10 @@ La implementación deberá respetar `constitution.md`, `spec.md`, `plan.md` y el
 - Bloqueo confirmado en backend: `plainToInstance(QueryCatalogHttpDto, {active: 'false'})` produce `active: true` por `@Type(() => Boolean)`. El frontend envía el booleano contractual; no se inventa un workaround. T1.3.2 y T1.9.3 permanecen parciales hasta corrección por backend/validación final.
 - Suite completa ejecutada una vez al cerrar: 241 pruebas aprobadas en 32 archivos. TypeScript, ESLint, build de producción y `git diff --check` correctos. Las altas válidas y transiciones persistidas en vivo no se consideran comprobadas: requieren datos de prueba autorizados.
 - Capacidades expresamente diferidas continúan excluidas; este cierre no implica CRUD de lotes, pases, M6, aprobación usada ni impresión física.
+
+## Cierre de T1.3.2 — filtro real de catálogo (2026-11-19)
+
+- Corrección del DTO de backend confirmada en el código disponible y mediante API local autenticada. No se modificó código ni esquema del backend.
+- Con los registros aislados `SDD-CLOSE-1795144709524`: `active=true` devolvió los dos productos activos; `active=false` devolvió únicamente el producto inactivo. La búsqueda encontró los tres productos y páginas 1/2 con límite 1 devolvieron elementos distintos y total 3.
+- Pruebas frontend dirigidas: `npm test -- src/modules/inventory/services/catalogService.test.ts src/modules/inventory/pages/CatalogPage.test.tsx`: 11 pruebas aprobadas en 2 archivos. El envío de `false` y la paginación ya estaban implementados correctamente; no requirieron cambios de interfaz.
+- La incidencia histórica del filtro descrita en registros anteriores queda resuelta por la corrección de backend y esta verificación real.
