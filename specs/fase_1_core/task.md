@@ -211,8 +211,8 @@ No duplicar ni reemplazar estos servicios transversales dentro de Inventario.
   - Confirmar la reutilización de Axios, auth, ubicación y feedback de Fase 0.
   - Confirmar que no se haya añadido persistencia offline ni lógica de M2–M8 fuera de alcance.
 
-- [ ] **T1.9.3: Revisión de criterios de aceptación**
-  - **Parcial:** validación automatizada y consultas autenticadas correctas. Falta cerrar el filtro inactivo del backend y comprobar escrituras válidas con datos de prueba autorizados; no se crearon registros de Inventario en esta revisión.
+- [x] **T1.9.3: Revisión de criterios de aceptación**
+  - **Validado:** filtro corregido y aceptación real con escrituras de prueba por API; las capacidades diferidas continúan excluidas del cierre de las tareas aprobadas.
   - Verificar los criterios de aceptación de `specs/fase_1_core/spec.md` que corresponden a los alcances incluidos en estas tareas.
   - Verificar que las capacidades pendientes no se reporten como implementadas.
   - Actualizar las tareas a `[x]` solo después de completar y verificar su resultado.
@@ -286,3 +286,14 @@ La implementación deberá respetar `constitution.md`, `spec.md`, `plan.md` y el
 - Con los registros aislados `SDD-CLOSE-1795144709524`: `active=true` devolvió los dos productos activos; `active=false` devolvió únicamente el producto inactivo. La búsqueda encontró los tres productos y páginas 1/2 con límite 1 devolvieron elementos distintos y total 3.
 - Pruebas frontend dirigidas: `npm test -- src/modules/inventory/services/catalogService.test.ts src/modules/inventory/pages/CatalogPage.test.tsx`: 11 pruebas aprobadas en 2 archivos. El envío de `false` y la paginación ya estaban implementados correctamente; no requirieron cambios de interfaz.
 - La incidencia histórica del filtro descrita en registros anteriores queda resuelta por la corrección de backend y esta verificación real.
+
+## Cierre de T1.9.3 — aceptación del alcance implementable (2026-11-19)
+
+- Backend de referencia: `9b73214`; se inició temporalmente su distribución compilada para las pruebas, sin editar backend, ejecutar migraciones ni modificar su esquema.
+- Una ejecución de aceptación autenticada como ADMIN completó 16 comprobaciones: ubicación activa, creación/actualización de categoría, filtros activos/inactivos, búsqueda/paginación de catálogo, series nuevas/duplicadas, ingreso masivo con hijo, lectura por serie, desacople/acople, etiquetas masivas, entrada cuantitativa, ajuste absoluto, saldo/stock bajo persistidos y resumen de stock por ubicación.
+- Fixtures identificados como `SDD-CLOSE-1795144709524`: una categoría, tres productos y dos unidades de hardware. Al terminar, las siete operaciones de limpieza lógica fueron aceptadas: stock a cero, dos unidades DE_BAJA, tres productos inactivos y categoría inactiva. Se conserva la trazabilidad de las pruebas; no se borraron registros ni se alteraron datos ajenos a los fixtures.
+- Pruebas dirigidas frontend: 11/11 aprobadas; revisión selectiva `frontend-reviewer` y Skill `vercel-react-best-practices` sin bloqueo adicional. La suite completa anterior (241 pruebas), TypeScript, ESLint y build siguen como evidencia de la entrega de código; en este cierre solo cambió documentación, por lo que no se repitieron verificaciones generales redundantes.
+- La aceptación real utilizó la cuenta ADMIN proporcionada. Permisos de VENDEDOR/TECNICO, estados de error, captura HID y carreras de solicitudes conservan las pruebas automatizadas de la entrega anterior; no se afirma haber usado cuentas operativas ni un lector físico en esta ejecución.
+- Las discrepancias HTTP 200/201 previamente documentadas no impiden la integración: el cliente acepta las respuestas exitosas 2xx observadas.
+- Resultado: las 30 tareas aprobadas de este archivo están implementadas y validadas. No quedan tareas pendientes de ese alcance. Las capacidades expresamente diferidas (CRUD de lotes, pases, M6, aprobación de usados, parches/detalles generales pendientes e impresión física) no se consideran implementadas por este cierre.
+- No se guardaron credenciales ni tokens en el repositorio; no se realizó push, merge ni PR.
