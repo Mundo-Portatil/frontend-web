@@ -11,15 +11,15 @@ import { ErrorState } from '../../../../components/feedback/ErrorState';
 import { InlineSpinner } from '../../../../components/feedback/InlineSpinner';
 import { LoadingState } from '../../../../components/feedback/LoadingState';
 import {
-  DANGER_BUTTON_CLASS,
   LABEL_CLASS,
   PRIMARY_BUTTON_CLASS,
   SECONDARY_BUTTON_CLASS,
   TEXT_INPUT_CLASS,
   TEXT_INPUT_INVALID_CLASS,
 } from '../../../../utils/formStyles';
-import { createUser, deactivateUser, listUsers, reactivateUser, updateUser } from '../services/userService';
-import type { User } from '../models';
+import { createUser, listUsers, updateUser } from '../services/userService';
+import { getAccessToken } from '../../../../config/authToken';
+import type { UpdateUserInput, User } from '../models';
 import { isValidEmail, isValidPassword, MIN_PASSWORD_LENGTH } from '../../../../utils/validation';
 import { Notification } from '../../../../components/notifications/Notification';
 import type { NotificationKind } from '../../../../components/notifications/Notification';
@@ -36,6 +36,7 @@ interface UserFormState {
   name: string;
   role: Role;
   password: string;
+  active: boolean;
 }
 
 interface UserFormErrors {
@@ -50,6 +51,7 @@ const EMPTY_FORM: UserFormState = {
   name: '',
   role: 'VENDEDOR',
   password: '',
+  active: true,
 };
 
 function inputClass(hasError: boolean): string {
@@ -106,6 +108,7 @@ function userFormFromEntity(user: User): UserFormState {
     name: user.name,
     role: user.role,
     password: '',
+    active: user.active,
   };
 }
 
@@ -119,7 +122,9 @@ export function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUpdatingStatusId, setIsUpdatingStatusId] = useState<string | null>(null);
+  const [pendingSave, setPendingSave] = useState<{ user: User; payload: UpdateUserInput } | null>(null);
+  const savingRef = useRef(false);
+  const confirmationHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [form, setForm] = useState<UserFormState>(EMPTY_FORM);
@@ -133,6 +138,12 @@ export function UsersPage() {
   const [operationFeedback, setOperationFeedback] = useState<Feedback | null>(null);
 
   const isEditing = selectedUser !== null;
+  const formDisabled = isSubmitting || pendingSave !== null;
+
+  useEffect(() => {
+    if (pendingSave) confirmationHeadingRef.current?.focus();
+    else if (selectedUser) document.getElementById('user-name')?.focus();
+  }, [pendingSave, selectedUser]);
 
   async function loadUsers() {
     setIsLoading(true);
@@ -156,6 +167,7 @@ export function UsersPage() {
   const activeUsersCount = useMemo(() => users.filter((user) => user.active).length, [users]);
 
   function resetForm() {
+    setPendingSave(null);
     setSelectedUser(null);
     setForm({ ...EMPTY_FORM });
     setFormErrors({});
@@ -167,6 +179,7 @@ export function UsersPage() {
   }
 
   function startEdit(user: User) {
+    if (savingRef.current || pendingSave) return;
     setSelectedUser(user);
     setForm(userFormFromEntity(user));
     setFormErrors({});
@@ -175,89 +188,74 @@ export function UsersPage() {
     setOperationFeedback(null);
   }
 
+  async function saveEditedUser(user: User, payload: UpdateUserInput) {
+    if (savingRef.current || useAuthStore.getState().user?.role !== 'ADMIN') return;
+    savingRef.current = true;
+    const accountId = useAuthStore.getState().user?.id;
+    const token = getAccessToken();
+    setIsSubmitting(true);
+    setFormError(null);
+    try {
+      const updated = await updateUser(user.id, payload);
+      if (getAccessToken() !== token || useAuthStore.getState().user?.id !== accountId) return;
+      setUsers((previous) => previous.map((item) => (item.id === updated.id ? updated : item)));
+      if (updated.id === currentUserId) {
+        await refreshProfile();
+        // A confirmed own-account deactivation also ends the session if the profile refresh cannot reach the server.
+        if (!updated.active && getAccessToken() === token && useAuthStore.getState().user?.id === accountId) {
+          useAuthStore.getState().handleSessionExpired();
+        }
+      }
+      setOperationFeedback({
+        kind: 'success',
+        message: updated.active !== user.active
+          ? updated.active ? 'Usuario reactivado correctamente.' : 'Usuario desactivado correctamente.'
+          : 'Usuario actualizado correctamente.',
+      });
+      resetForm();
+    } catch (error) {
+      if (getAccessToken() === token && useAuthStore.getState().user?.id === accountId) setFormError(asAppError(error));
+    } finally {
+      savingRef.current = false;
+      setIsSubmitting(false);
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (isSubmitting) {
-      return;
-    }
-
+    if (savingRef.current || pendingSave || useAuthStore.getState().user?.role !== 'ADMIN') return;
     const errors = isEditing ? validateEditForm(form) : validateCreateForm(form);
     setFormErrors(errors);
     setFormError(null);
     setFormSuccessMessage(null);
     setOperationFeedback(null);
-
-    if (Object.keys(errors).length > 0) {
+    if (Object.keys(errors).length > 0) return;
+    if (selectedUser) {
+      const payload: UpdateUserInput = { name: form.name.trim(), role: form.role };
+      if (form.active !== selectedUser.active) payload.active = form.active;
+      if (form.password.trim() !== '') payload.password = form.password;
+      if (payload.active !== undefined || form.role !== selectedUser.role || payload.password !== undefined) {
+        setPendingSave({ user: selectedUser, payload });
+      } else {
+        await saveEditedUser(selectedUser, payload);
+      }
       return;
     }
-
+    savingRef.current = true;
+    const accountId = useAuthStore.getState().user?.id;
+    const token = getAccessToken();
     setIsSubmitting(true);
     try {
-      if (selectedUser) {
-        const payload: Parameters<typeof updateUser>[1] = {
-          name: form.name.trim(),
-          role: form.role,
-        };
-        if (form.password.trim() !== '') {
-          payload.password = form.password;
-        }
-
-        const updated = await updateUser(selectedUser.id, payload);
-        setUsers((previous) => previous.map((item) => (item.id === updated.id ? updated : item)));
-        if (updated.id === currentUserId) {
-          // Editing the current account can change its role or name. Refresh
-          // the session profile before continuing so navigation, route guards
-          // and visible actions never keep the previous role.
-          await refreshProfile();
-        }
-        setOperationFeedback({ kind: 'success', message: 'Usuario actualizado correctamente.' });
-      } else {
-        const created = await createUser({
-          email: form.email.trim(),
-          name: form.name.trim(),
-          password: form.password,
-          role: form.role,
-        });
-        setUsers((previous) => [created, ...previous]);
-        setFormSuccessMessage('Usuario creado correctamente.');
-      }
+      const created = await createUser({ email: form.email.trim(), name: form.name.trim(), password: form.password, role: form.role });
+      if (getAccessToken() !== token || useAuthStore.getState().user?.id !== accountId) return;
+      setUsers((previous) => [created, ...previous]);
+      setFormSuccessMessage('Usuario creado correctamente.');
       resetForm();
     } catch (error) {
-      setFormError(asAppError(error));
+      if (getAccessToken() === token && useAuthStore.getState().user?.id === accountId) setFormError(asAppError(error));
     } finally {
+      savingRef.current = false;
       setIsSubmitting(false);
-    }
-  }
-
-  async function handleStatusChange(user: User, nextActive: boolean) {
-    if (isUpdatingStatusId || user.active === nextActive) {
-      return;
-    }
-    setFormSuccessMessage(null);
-    setOperationFeedback(null);
-    setIsUpdatingStatusId(user.id);
-
-    try {
-      const updated = nextActive ? await reactivateUser(user.id) : await deactivateUser(user.id);
-      setUsers((previous) => previous.map((item) => (item.id === updated.id ? updated : item)));
-      if (updated.id === currentUserId) {
-        // Deactivating the current account must invalidate the active session
-        // immediately (GET /auth/profile returns 401 for inactive users).
-        await refreshProfile();
-      }
-      if (selectedUser?.id === updated.id) {
-        resetForm();
-      }
-      setOperationFeedback({
-        kind: 'success',
-        message: nextActive
-          ? 'Usuario reactivado correctamente.'
-          : 'Usuario desactivado correctamente.',
-      });
-    } catch (error) {
-      setOperationFeedback({ kind: 'error', message: asAppError(error).message });
-    } finally {
-      setIsUpdatingStatusId(null);
     }
   }
 
@@ -292,7 +290,7 @@ export function UsersPage() {
           </h2>
           <p className="mt-1 text-sm text-slate-500">
             {isEditing
-              ? 'Actualiza nombre, rol o contraseña del usuario seleccionado.'
+              ? 'Actualiza los datos y el estado de acceso del usuario.'
               : 'Crea una nueva cuenta de acceso para el sistema.'}
           </p>
 
@@ -319,7 +317,7 @@ export function UsersPage() {
                 id="user-email"
                 type="email"
                 value={form.email}
-                disabled={isEditing || isSubmitting}
+                disabled={isEditing || formDisabled}
                 onChange={(event) => setForm((previous) => ({ ...previous, email: event.target.value }))}
                 className={inputClass(Boolean(formErrors.email))}
                 aria-invalid={Boolean(formErrors.email)}
@@ -340,7 +338,7 @@ export function UsersPage() {
                 id="user-name"
                 type="text"
                 value={form.name}
-                disabled={isSubmitting}
+                disabled={formDisabled}
                 onChange={(event) => setForm((previous) => ({ ...previous, name: event.target.value }))}
                 className={inputClass(Boolean(formErrors.name))}
                 aria-invalid={Boolean(formErrors.name)}
@@ -359,7 +357,7 @@ export function UsersPage() {
               <select
                 id="user-role"
                 value={form.role}
-                disabled={isSubmitting}
+                disabled={formDisabled}
                 onChange={(event) => setForm((previous) => ({ ...previous, role: event.target.value as Role }))}
                 className={inputClass(Boolean(formErrors.role))}
                 aria-invalid={Boolean(formErrors.role)}
@@ -384,7 +382,7 @@ export function UsersPage() {
                 id="user-password"
                 type="password"
                 value={form.password}
-                disabled={isSubmitting}
+                disabled={formDisabled}
                 onChange={(event) => setForm((previous) => ({ ...previous, password: event.target.value }))}
                 className={inputClass(Boolean(formErrors.password))}
                 aria-invalid={Boolean(formErrors.password)}
@@ -396,8 +394,18 @@ export function UsersPage() {
               )}
             </div>
 
+            {isEditing && (
+              <div>
+                <label className={LABEL_CLASS} htmlFor="user-active">Estado de acceso</label>
+                <select id="user-active" value={String(form.active)} disabled={formDisabled} onChange={(event) => setForm((previous) => ({ ...previous, active: event.target.value === 'true' }))} className={TEXT_INPUT_CLASS}>
+                  <option value="true">Activo</option>
+                  <option value="false">Inactivo</option>
+                </select>
+              </div>
+            )}
+
             <div className="md:col-span-2 flex flex-wrap items-center gap-3">
-              <button type="submit" disabled={isSubmitting} className={`${PRIMARY_BUTTON_CLASS} inline-flex items-center gap-2`}>
+              <button type="submit" disabled={formDisabled} className={`${PRIMARY_BUTTON_CLASS} inline-flex items-center gap-2`}>
                 {isSubmitting && <InlineSpinner className="border-white" />}
                 {isSubmitting
                   ? isEditing
@@ -408,19 +416,35 @@ export function UsersPage() {
                     : 'Crear usuario'}
               </button>
               {isEditing && (
-                <button type="button" disabled={isSubmitting} onClick={resetForm} className={SECONDARY_BUTTON_CLASS}>
+                <button type="button" disabled={formDisabled} onClick={resetForm} className={SECONDARY_BUTTON_CLASS}>
                   Cancelar edición
                 </button>
               )}
             </div>
           </form>
+          {pendingSave && (
+            <section aria-labelledby="user-confirmation-heading" className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <h3 ref={confirmationHeadingRef} id="user-confirmation-heading" tabIndex={-1} className="rounded font-semibold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Confirmar cambios del usuario</h3>
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                <div><dt className="text-slate-500">Usuario</dt><dd className="break-words font-medium">{pendingSave.payload.name} · {pendingSave.user.email}</dd></div>
+                <div><dt className="text-slate-500">Rol</dt><dd className="font-medium">{ROLE_LABELS[pendingSave.payload.role ?? pendingSave.user.role]}</dd></div>
+                <div><dt className="text-slate-500">Estado de acceso</dt><dd className="font-medium">{(pendingSave.payload.active ?? pendingSave.user.active) ? 'Activo' : 'Inactivo'}</dd></div>
+                {pendingSave.payload.password !== undefined && <div><dt className="text-slate-500">Contraseña</dt><dd>Se actualizará la contraseña.</dd></div>}
+              </dl>
+              {pendingSave.payload.active === false && <p className="text-sm text-slate-700">Este usuario dejará de tener acceso al sistema.{pendingSave.user.id === currentUserId ? ' Tu sesión se cerrará.' : ''}</p>}
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={PRIMARY_BUTTON_CLASS} disabled={isSubmitting} onClick={() => void saveEditedUser(pendingSave.user, pendingSave.payload)}>{isSubmitting ? 'Guardando cambios…' : 'Confirmar cambios'}</button>
+                <button type="button" className={SECONDARY_BUTTON_CLASS} disabled={isSubmitting} onClick={() => { setPendingSave(null); setFormError(null); }}>Volver a editar</button>
+              </div>
+            </section>
+          )}
         </section>
       </Can>
 
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="mb-4 flex items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-slate-900">Listado de usuarios</h2>
-          <button type="button" onClick={() => void loadUsers()} disabled={isLoading} className={SECONDARY_BUTTON_CLASS}>
+          <button type="button" onClick={() => void loadUsers()} disabled={isLoading || formDisabled} className={SECONDARY_BUTTON_CLASS}>
             Recargar
           </button>
         </div>
@@ -484,29 +508,11 @@ export function UsersPage() {
                             type="button"
                             onClick={() => startEdit(user)}
                             className={SECONDARY_BUTTON_CLASS}
-                            disabled={isSubmitting || isUpdatingStatusId === user.id}
+                            disabled={formDisabled}
                           >
                             Editar
                           </button>
-                          {user.active ? (
-                            <button
-                              type="button"
-                              onClick={() => void handleStatusChange(user, false)}
-                              className={DANGER_BUTTON_CLASS}
-                              disabled={isSubmitting || isUpdatingStatusId === user.id}
-                            >
-                              {isUpdatingStatusId === user.id ? 'Desactivando...' : 'Dar de baja'}
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => void handleStatusChange(user, true)}
-                              className={PRIMARY_BUTTON_CLASS}
-                              disabled={isSubmitting || isUpdatingStatusId === user.id}
-                            >
-                              {isUpdatingStatusId === user.id ? 'Reactivando...' : 'Reactivar'}
-                            </button>
-                          )}
+
                         </div>
                       </Can>
                     </td>
