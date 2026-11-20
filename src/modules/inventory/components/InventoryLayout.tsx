@@ -1,22 +1,18 @@
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Can } from '../../../components/guards/Can';
 import { ROUTES } from '../../../router/routes';
 import { PRIMARY_BUTTON_CLASS } from '../../../utils/formStyles';
 
 const AREAS = [
   {
-    id: 'stock',
     label: 'Existencias',
-    to: ROUTES.inventory,
     links: [
       { to: ROUTES.inventory, label: 'Por serie o código', end: true },
       { to: ROUTES.inventoryStock, label: 'Por cantidad', end: false },
     ],
   },
   {
-    id: 'products',
     label: 'Productos',
-    to: ROUTES.inventoryCatalog,
     links: [
       { to: ROUTES.inventoryCatalog, label: 'Productos y modelos', end: false },
       { to: ROUTES.inventoryCategories, label: 'Categorías', end: false },
@@ -35,7 +31,7 @@ export function InventoryLayout() {
     <section className="mx-auto w-full max-w-6xl">
       <header className="mb-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold text-slate-900">Inventario</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">{selectedArea.label}</h1>
           {!isProducts && (
             <Can roles={['ADMIN']}>
               <NavLink
@@ -51,25 +47,6 @@ export function InventoryLayout() {
         </div>
 
         <div className="min-w-0 rounded-xl border border-slate-200 bg-white">
-          <nav aria-label="Áreas de inventario" className="border-b border-slate-200 px-3 pt-2 sm:px-4">
-            <ul className="flex gap-2">
-              {AREAS.map((area) => {
-                const active = area.id === selectedArea.id;
-                return (
-                  <li key={area.id} className="min-w-0 flex-1 sm:flex-none">
-                    <Link
-                      to={area.to}
-                      aria-current={active ? 'location' : undefined}
-                      className={`flex min-h-11 items-center justify-center border-b-2 px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 sm:px-5 ${active ? 'border-brand-600 text-brand-800' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-900'}`}
-                    >
-                      {area.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-
           <nav aria-label="Secciones de inventario" className="p-3 sm:px-4">
             <ul className="flex flex-wrap gap-1.5">
               {selectedArea.links.map((link) => (

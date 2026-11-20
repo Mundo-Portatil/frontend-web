@@ -25,6 +25,15 @@ export interface NavGroupDefinition {
   label: string;
 }
 
+export interface NavChild {
+  id: string;
+  label: string;
+  to: string;
+  roles: Role[];
+  /** Exact routes represented by this section, including its secondary screens. */
+  activePaths: readonly string[];
+}
+
 export interface NavItem {
   /** Unique identifier for the navigation entry. */
   id: string;
@@ -44,6 +53,7 @@ export interface NavItem {
    * duplicating links across components.
    */
   isAvailable?: () => boolean;
+  children?: readonly NavChild[];
 }
 
 /** Ordered groups. Empty groups are never rendered. */
@@ -61,7 +71,30 @@ export const NAV_GROUPS: readonly NavGroupDefinition[] = [
  * implemented, integrated and enabled.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
-  { id: 'inventory', label: 'Inventario', icon: CategoriesIcon, to: ROUTES.inventory, group: 'operations', roles: ['ADMIN', 'VENDEDOR', 'TECNICO'] },
+  {
+    id: 'inventory',
+    label: 'Inventario',
+    icon: CategoriesIcon,
+    to: ROUTES.inventory,
+    group: 'operations',
+    roles: ['ADMIN', 'VENDEDOR', 'TECNICO'],
+    children: [
+      {
+        id: 'inventory-stock',
+        label: 'Existencias',
+        to: ROUTES.inventory,
+        roles: ['ADMIN', 'VENDEDOR', 'TECNICO'],
+        activePaths: [ROUTES.inventory, ROUTES.inventoryStock, ROUTES.inventoryInbound],
+      },
+      {
+        id: 'inventory-products',
+        label: 'Productos',
+        to: ROUTES.inventoryCatalog,
+        roles: ['ADMIN', 'VENDEDOR', 'TECNICO'],
+        activePaths: [ROUTES.inventoryCatalog, ROUTES.inventoryCategories],
+      },
+    ],
+  },
   {
     id: 'locations',
     label: 'Ubicaciones',

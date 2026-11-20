@@ -17,6 +17,11 @@ describe('getNavigationGroups', () => {
 
     for (const item of NAV_ITEMS) {
       expect(registeredPaths.has(item.to)).toBe(true);
+      for (const child of item.children ?? []) {
+        expect(registeredPaths.has(child.to)).toBe(true);
+        expect(child.activePaths.every((path) => registeredPaths.has(path))).toBe(true);
+        expect(child.roles.every((role) => item.roles.includes(role))).toBe(true);
+      }
     }
   });
 

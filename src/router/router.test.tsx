@@ -102,7 +102,7 @@ describe('AppRouter', () => {
   it.each([ADMIN, VENDEDOR, TECNICO])('allows $role to open hardware lookup', async (user) => {
     useAuthStore.setState({ status: 'authenticated', user });
     renderAt('/inventory');
-    expect(await screen.findByRole('heading', { name: 'Inventario' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Existencias' })).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: 'Buscar equipo o pieza' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Por serie o código' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Por cantidad' })).toBeInTheDocument();
