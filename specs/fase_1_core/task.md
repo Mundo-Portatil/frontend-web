@@ -40,7 +40,7 @@ No duplicar ni reemplazar estos servicios transversales dentro de Inventario.
   - Reutilizar `src/services/api/axiosInstance.ts` y los componentes transversales de Fase 0.
   - No crear persistencia local, sincronización offline ni una instancia HTTP propia.
 
-- [ ] **T1.1.3: Modelos TypeScript contratados**
+- [x] **T1.1.3: Modelos TypeScript contratados**
   - Definir modelos para Category, CatalogItem, HardwareItem, QuantityStock y respuestas paginadas con los campos confirmados por el contrato.
   - Representar los enums `ItemStatus` y los roles usando los valores exactos documentados.
   - No añadir propiedades inferidas en los DTO.
@@ -105,12 +105,12 @@ No duplicar ni reemplazar estos servicios transversales dentro de Inventario.
 
 ## Fase 1.4: Ingreso de hardware serializado
 
-- [ ] **T1.4.1: Servicio de validación de series**
+- [x] **T1.4.1: Servicio de validación de series**
   - Implementar `POST /hardware-items/validate-serials` con `{ serialNumbers }`.
   - Presentar `existingSerials` y `allValid` asociados a las series ingresadas.
   - Tratar esta consulta como asistencia de formulario; el resultado final del ingreso corresponde al backend.
 
-- [ ] **T1.4.2: Formulario de ingreso serializado masivo**
+- [x] **T1.4.2: Formulario de ingreso serializado masivo**
   - Implementar `POST /hardware-items/batch-inbound` con `{ locationId, items }`.
   - Permitir agregar ítems con `catalogId`, serie y precios según DTO.
   - Permitir agregar `children` anidados con los campos contractuales.
@@ -118,12 +118,12 @@ No duplicar ni reemplazar estos servicios transversales dentro de Inventario.
   - Mostrar el arreglo de HardwareItems y componentes devuelto por el backend.
   - No crear entidad ni interfaz de consulta/edición/anulación de lote.
 
-- [ ] **T1.4.3: Ubicación y contexto operativo**
+- [x] **T1.4.3: Ubicación y contexto operativo**
   - Cargar ubicaciones activas mediante las capacidades de Fase 0.
   - Enviar el `locationId` seleccionado requerido por el endpoint.
   - No inferir restricciones de ubicación por rol o usuario no establecidas en el contrato.
 
-- [ ] **T1.4.4: Autorización de ingreso**
+- [x] **T1.4.4: Autorización de ingreso**
   - Restringir alta masiva y validación de series a `ADMIN`.
   - Mantener la validación definitiva en el backend.
 
@@ -131,18 +131,18 @@ No duplicar ni reemplazar estos servicios transversales dentro de Inventario.
 
 ## Fase 1.5: Búsqueda y relación de hardware
 
-- [ ] **T1.5.1: Búsqueda scanner-first**
+- [x] **T1.5.1: Búsqueda scanner-first**
   - Integrar la captura HID reutilizable de `src/hooks/useBarcodeScanner.ts` y `src/services/scanner/`.
   - Permitir ingreso manual del código como alternativa.
   - Consultar `GET /hardware-items/scan/:code` y presentar la respuesta documentada: serie/código, ubicación y relación padre/hijos cuando estén incluidas.
   - Manejar código no encontrado, carga y error de conexión.
 
-- [ ] **T1.5.2: Acople de componentes**
+- [x] **T1.5.2: Acople de componentes**
   - Implementar `POST /hardware-items/:id/children` con `{ childIds }` para `ADMIN`.
   - Presentar restricciones backend de mismo sitio, estado `EN_STOCK`, no autoacople y ausencia de ciclos.
   - Refrescar la relación después de éxito mediante la respuesta confirmada o una consulta disponible.
 
-- [ ] **T1.5.3: Desacople de componentes**
+- [x] **T1.5.3: Desacople de componentes**
   - Implementar `DELETE /hardware-items/:id/children/:childId` para `ADMIN`.
   - Actualizar la relación y reflejar que el componente queda sin padre, de acuerdo con la respuesta/consulta disponible.
 
@@ -171,11 +171,11 @@ No duplicar ni reemplazar estos servicios transversales dentro de Inventario.
 
 ## Fase 1.7: Datos de etiquetas
 
-- [ ] **T1.7.1: Servicio de etiquetas masivas**
+- [x] **T1.7.1: Servicio de etiquetas masivas**
   - Implementar `POST /hardware-items/barcode-labels/batch` con `{ hardwareItemIds }` y el arreglo de etiquetas documentado.
   - Mantener acceso a los tres roles conforme al contrato.
 
-- [ ] **T1.7.2: Vista previa de datos de etiqueta**
+- [x] **T1.7.2: Vista previa de datos de etiqueta**
   - Mostrar `barcodeValue`, `title`, `specsSummary`, `locationName` y `price` para etiquetas masivas.
   - Mantener la solicitud de datos separada de la transmisión a una impresora.
   - No implementar protocolo físico, WebSerial/WebSocket ni codificación local pendiente de ADR.
@@ -257,3 +257,11 @@ La implementación deberá respetar `constitution.md`, `spec.md`, `plan.md` y el
 - Selector reutilizable de catálogo por nombre/SKU con paginación real; únicamente se filtra el tipo de seguimiento sobre los productos recibidos, sin inventar un query de API.
 - Validación dirigida: 12 pruebas en 3 archivos aprobadas; ESLint de archivos propios correcto. Revisión de rutas y suite global al finalizar integración.
 - Se conserva pendiente la verificación contra servidor accesible y cuentas de prueba.
+
+## Registro de avance — hardware y etiquetas (2026-11-19)
+
+- T1.1.3, T1.4.1–T1.4.4, T1.5.1–T1.5.3 y T1.7.1–T1.7.2 implementadas y verificadas mediante pruebas de servicios/componentes y contraste de DTO.
+- Ingreso atómico con equipos/componentes, series opcionales, validación de duplicados y resumen; catálogo por nombre/SKU y ubicación activa.
+- Consultas por HID o teclado, acople por serie/ID resuelto y desacople; etiquetas masivas con datos del backend, sin impresión física.
+- Se conservó el diseño existente y se corrigió el regreso del resumen de ingreso: el formulario permanece montado y conserva selecciones de equipos e hijos.
+- Pruebas dirigidas: 14 aprobadas en 4 archivos. Suite final única: 32 archivos/241 pruebas aprobadas. ESLint, TypeScript/build y diff-check correctos. No se ejecutó la suite completa después de cada cambio.
