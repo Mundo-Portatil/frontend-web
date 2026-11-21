@@ -36,13 +36,20 @@ function LabelSelection({ model, locationId, locationName }: { model: CatalogIte
   const [includeUnavailable, setIncludeUnavailable] = useState(false);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [labels, setLabels] = useState<LabelData[] | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const currentPreview = useRef<string | null>(null);
+  function clearPreview() {
+    if (currentPreview.current) URL.revokeObjectURL(currentPreview.current);
+    currentPreview.current = null;
+    setPreviewUrl(null);
+  }
   const [loading, setLoading] = useState(model.isSerialized);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const sending = useRef(false);
   const mounted = useRef(true);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; if (currentPreview.current) URL.revokeObjectURL(currentPreview.current); }; }, []);
   const query = { catalogItemId: model.id, ...(serialSearch ? { search: serialSearch } : {}), ...(locationId ? { locationId } : {}), ...(!includeUnavailable ? { status: 'EN_STOCK' as const } : {}), limit: 50 };
 
   useEffect(() => {
@@ -61,7 +68,7 @@ function LabelSelection({ model, locationId, locationName }: { model: CatalogIte
 
   function toggle(item: HardwareItem) {
     setSelected((current) => { const next = { ...current }; if (next[item.id]) delete next[item.id]; else next[item.id] = item.serialNumber; return next; });
-    setLabels(null);
+    setLabels(null); clearPreview();
   }
 
   async function selectAll() {
@@ -80,12 +87,12 @@ function LabelSelection({ model, locationId, locationName }: { model: CatalogIte
         if (!data.items.length) throw new LabelSelectionError('No se pudieron cargar todas las unidades. Intenta nuevamente.');
         nextPage += 1;
       }
-      setSelected(all); setLabels(null);
+      setSelected(all); setLabels(null); clearPreview();
     } catch (failure) { if (mounted.current) setError(failure instanceof LabelSelectionError ? failure.message : asAppError(failure).message); }
     finally { sending.current = false; if (mounted.current) setBusy(false); }
   }
 
-  async function generate(open = false) {
+  async function generate() {
     if (sending.current) return;
     setError(null);
     const count = Number(copies);
@@ -105,7 +112,13 @@ function LabelSelection({ model, locationId, locationName }: { model: CatalogIte
       setLabels(data);
       const printer = await import('../../../services/printer/labelPdfService');
       if (!mounted.current) return;
-      try { if (open) printer.openLabelsPdf(data, { layout }); else printer.downloadLabelsPdf(data, undefined, { layout }); }
+      try {
+        const blob = printer.createLabelsPdfBlob(data, { layout });
+        clearPreview();
+        const url = URL.createObjectURL(blob);
+        currentPreview.current = url;
+        setPreviewUrl(url);
+      }
       catch (failure) { throw new LabelSelectionError(failure instanceof Error ? failure.message : 'No se pudo generar el PDF. Intenta nuevamente.'); }
     } catch (failure) { if (mounted.current) setError(failure instanceof LabelSelectionError ? failure.message : asAppError(failure).message); }
     finally { sending.current = false; if (mounted.current) setBusy(false); }
@@ -131,8 +144,8 @@ function LabelSelection({ model, locationId, locationName }: { model: CatalogIte
         {serialSearch && <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => { setSearchDraft(''); setSerialSearch(''); setPage(1); }}>Ver todas las series</button>}
       </form>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <label className="flex min-h-10 items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={includeUnavailable} onChange={(event) => { setIncludeUnavailable(event.target.checked); setPage(1); setSelected({}); setLabels(null); }} />Incluir unidades vendidas y otros estados para reimprimir</label>
-        {!loading && units.length > 0 && <div className="flex flex-wrap gap-2"><button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => void selectAll()}>{serialSearch ? 'Seleccionar resultados' : 'Seleccionar todas'} ({total})</button><button type="button" className={SECONDARY_BUTTON_CLASS} disabled={!Object.keys(selected).length} onClick={() => { setSelected({}); setLabels(null); }}>Limpiar selección</button></div>}
+        <label className="flex min-h-10 items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={includeUnavailable} onChange={(event) => { setIncludeUnavailable(event.target.checked); setPage(1); setSelected({}); setLabels(null); clearPreview(); }} />Incluir unidades vendidas y otros estados para reimprimir</label>
+        {!loading && units.length > 0 && <div className="flex flex-wrap gap-2"><button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => void selectAll()}>{serialSearch ? 'Seleccionar resultados' : 'Seleccionar todas'} ({total})</button><button type="button" className={SECONDARY_BUTTON_CLASS} disabled={!Object.keys(selected).length} onClick={() => { setSelected({}); setLabels(null); clearPreview(); }}>Limpiar selección</button></div>}
       </div>
       {loading ? <p role="status">Cargando unidades…</p> : error && !units.length ? <button className={SECONDARY_BUTTON_CLASS} onClick={() => setRevision((value) => value + 1)}>Reintentar</button> : <>
         {!units.length ? <p role="status" className="text-sm text-slate-600">No hay unidades para estos filtros.</p> : <>
@@ -140,11 +153,14 @@ function LabelSelection({ model, locationId, locationName }: { model: CatalogIte
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500"><span>Página {page} · {total} unidades</span><div className="flex gap-2"><button type="button" className={SECONDARY_BUTTON_CLASS} disabled={page === 1} onClick={() => setPage((value) => value - 1)}>Anterior</button><button type="button" className={SECONDARY_BUTTON_CLASS} disabled={page * 50 >= total} onClick={() => setPage((value) => value + 1)}>Siguiente</button></div></div>
         </>}
       </>}
-    </fieldset> : <div className="max-w-xs"><label htmlFor="label-copies" className={LABEL_CLASS}>Número de copias</label><input id="label-copies" type="number" min="1" max="100" step="1" inputMode="numeric" disabled={busy} value={copies} onChange={(event) => { setCopies(event.target.value); setLabels(null); }} className={TEXT_INPUT_CLASS} /></div>}
+    </fieldset> : <div className="max-w-xs"><label htmlFor="label-copies" className={LABEL_CLASS}>Número de copias</label><input id="label-copies" type="number" min="1" max="100" step="1" inputMode="numeric" disabled={busy} value={copies} onChange={(event) => { setCopies(event.target.value); setLabels(null); clearPreview(); }} className={TEXT_INPUT_CLASS} /></div>}
     <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="min-w-0 sm:max-w-sm"><label htmlFor="label-layout" className={LABEL_CLASS}>Formato de etiquetas</label><select id="label-layout" disabled={busy} value={layout} onChange={(event) => setLayout(event.target.value as 'compact' | 'small')} className={TEXT_INPUT_CLASS}><option value="compact">Medianas · 93 × 30 mm (2 columnas)</option><option value="small">Pequeñas · 62 × 30 mm (3 columnas)</option></select></div>
-      <div className="flex flex-wrap gap-2"><button type="button" disabled={busy || loading} onClick={() => void generate()} className={PRIMARY_BUTTON_CLASS}>{busy ? 'Generando…' : labels ? 'Descargar PDF nuevamente' : 'Generar PDF de etiquetas'}</button>{labels && <button type="button" disabled={busy} onClick={() => void generate(true)} className={SECONDARY_BUTTON_CLASS}>Abrir PDF para imprimir</button>}</div>
+      <div className="min-w-0 sm:max-w-sm"><label htmlFor="label-layout" className={LABEL_CLASS}>Formato de etiquetas</label><select id="label-layout" disabled={busy} value={layout} onChange={(event) => { setLayout(event.target.value as 'compact' | 'small'); clearPreview(); setError(null); }} className={TEXT_INPUT_CLASS}><option value="compact">Medianas · 93 × 30 mm (2 columnas)</option><option value="small">Pequeñas · 62 × 30 mm (3 columnas)</option></select></div>
+      <button type="button" disabled={busy || loading} onClick={() => void generate()} className={PRIMARY_BUTTON_CLASS}>{busy ? 'Preparando…' : previewUrl ? 'Actualizar vista previa' : 'Ver vista previa'}</button>
     </div>
-    {labels && !error && <Notification kind="success">PDF preparado: {labels.length} etiquetas sin precio.</Notification>}
+    {previewUrl && !error && <section aria-label="Vista previa de etiquetas" className="min-w-0 space-y-3 border-t border-slate-100 pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-3"><h4 className="font-semibold text-slate-900">Vista previa · {labels?.length} etiquetas</h4><div className="flex flex-wrap gap-2"><a href={previewUrl} download="etiquetas-inventario.pdf" className={PRIMARY_BUTTON_CLASS}>Descargar PDF</a><a href={previewUrl} target="_blank" rel="noopener noreferrer" className={SECONDARY_BUTTON_CLASS}>Abrir para imprimir</a></div></div>
+      <object data={previewUrl} type="application/pdf" aria-label="Documento PDF de etiquetas" className="h-[32rem] min-h-80 w-full rounded-lg border border-slate-200 bg-slate-50"><p className="p-4 text-sm text-slate-600">Tu navegador no muestra PDF incrustados. <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="underline">Abrir vista previa</a></p></object>
+    </section>}
   </section>;
 }

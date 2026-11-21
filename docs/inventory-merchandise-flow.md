@@ -4,9 +4,8 @@ Decisiones solicitadas y autorizadas el 21/11/2026. Referencia vigente por instr
 
 ## Organización y permisos
 
-- **Consultar inventario:** búsqueda de modelos y unidades, disponibilidad y ubicación. Solo lectura.
 - **Ingreso de mercancía:** recibir modelos nuevos o existentes; corrección de conteos como operación separada. La consulta de componentes existentes sigue disponible; su asociación y separación están temporalmente bloqueadas.
-- **Productos y categorías:** fichas maestras y edición descriptiva/estado. Un modelo agrupa sus unidades; no se edita stock desde la ficha.
+- **Productos y existencias:** vista principal única para buscar modelos y series, consultar fichas, cantidades y unidades. Incluye Productos, Categorías y Existencias por ubicación. La edición descriptiva/estado aparece según permisos; no se edita stock desde la ficha.
 - **Etiquetas:** etiquetas por modelo con copias, selección individual/múltiple de unidades y reimpresión de los datos contratados.
 
 Lecturas y etiquetas: ADMIN, ENCARGADO_ALMACEN, VENDEDOR y TECNICO. Escrituras de inventario/catálogo/categorías: ADMIN y ENCARGADO_ALMACEN, conforme a los controladores actuales. La administración de usuarios, ubicaciones y bitácora conserva sus restricciones propias.
@@ -85,3 +84,10 @@ Se verificaron contra el servidor local autenticación, catálogo, ubicaciones, 
 La cantidad se muestra desde el inicio como «Cantidad que ingresa», junto a la selección o los datos del modelo. «Continuar con el ingreso» prepara el modelo nuevo sin guardarlo; las unidades se revisan y se confirman en el mismo flujo. Se conserva la cantidad al cambiar de modo, y las series al reducir/restaurar el conteo.
 
 Etiquetas presenta unidades en una cuadrícula responsive con selección individual, de todas las páginas y contador de etiquetas. El formato PDF se elige sin repetir la solicitud de etiquetas al servidor: A4 compacto de 93 × 30 mm (dos columnas), o pequeño de 62 × 30 mm (tres columnas). Son formatos para hojas imprimibles, no una configuración de impresora térmica. Cada etiqueta contiene producto, código legible y barras CODE128; se omiten precio, ubicación y características extensas. Las barras conservan módulos físicos de 0,254 mm y márgenes de silencio; si un código no cabe, se informa el problema en lugar de comprimirlo o truncarlo. Se mantienen los identificadores originales y no se modifica stock al imprimir.
+
+
+## Navegación única y vista previa real
+
+Se retiró la entrada duplicada «Consultar inventario / Modelos y existencias». `/inventory` redirige a `/inventory/catalog`, que reúne búsqueda por marca/modelo/SKU y consulta exacta de series; una unidad encontrada permite abrir la ficha de su modelo, donde siguen disponibles unidades e historial. Existencias por ubicación conserva `/inventory/stock` como tercera opción junto a Productos y Categorías. No cambian los permisos ni el comportamiento de segunda mano o recepción.
+
+Etiquetas comienza con «Ver vista previa»: crea un Blob del PDF real y lo presenta incrustado, con enlace alternativo cuando el navegador no admite PDF embebido. Descargar y Abrir para imprimir utilizan exactamente ese documento, sin descarga automática. Al cambiar copias, unidades o formato se invalida la vista previa; al sustituirla o desmontar se revoca su URL. La generación conserva los códigos, formatos compactos y ausencia de precios. No hay integración directa con impresoras físicas.

@@ -86,6 +86,11 @@ export function buildLabelsPdf(labels: readonly PrintableBarcodeLabel[], options
   return doc;
 }
 
+/** The same PDF bytes are previewed, downloaded and opened for printing. */
+export function createLabelsPdfBlob(labels: readonly PrintableBarcodeLabel[], options: LabelPdfOptions = {}): Blob {
+  return buildLabelsPdf(labels, options).output('blob');
+}
+
 export function downloadLabelsPdf(labels: readonly PrintableBarcodeLabel[], fileName = 'etiquetas-inventario.pdf', options: LabelPdfOptions = {}): void {
   buildLabelsPdf(labels, options).save(fileName);
 }

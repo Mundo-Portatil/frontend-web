@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { buildLabelsPdf, downloadLabelsPdf, encodeLabelBarcode, openLabelsPdf } from './labelPdfService';
+import { buildLabelsPdf, createLabelsPdfBlob, downloadLabelsPdf, encodeLabelBarcode, openLabelsPdf } from './labelPdfService';
 
 const label = { barcodeValue: 'SN-1234', title: 'Acer Aspire', locationName: 'Almacén Central', price: 9876 };
 afterEach(() => vi.restoreAllMocks());
@@ -28,6 +28,12 @@ describe('printable inventory labels', () => {
     expect(() => buildLabelsPdf([{ ...label, barcodeValue: 'A'.repeat(90) }])).toThrow(/demasiado largo/);
     expect(() => buildLabelsPdf([{ ...label, barcodeValue: 'SDD-CLOSE-1795144709524-QTY' }], { layout: 'small' })).toThrow(/formato compacto/);
     expect(buildLabelsPdf(Array.from({ length: 24 }, () => label), { layout: 'small' }).getNumberOfPages()).toBe(1);
+  });
+  it('creates the same printable PDF as a blob for preview and later download', () => {
+    const blob = createLabelsPdfBlob([label], { layout: 'compact' });
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe('application/pdf');
+    expect(blob.size).toBeGreaterThan(1000);
   });
   it('opens a generated PDF and reports popup blocking instead of silent success', () => {
     vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:labels'), revokeObjectURL: vi.fn() });
