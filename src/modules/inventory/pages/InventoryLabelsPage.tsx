@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Notification } from '../../../components/notifications/Notification';
 import { asAppError } from '../../../services/api/errors';
 import { LABEL_CLASS, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, TEXT_INPUT_CLASS } from '../../../utils/formStyles';
+import { LabelPreviewDialog } from '../components/LabelPreviewDialog';
 import { CatalogProductPicker } from '../components/CatalogProductPicker';
 import { useLocationStore } from '../../../stores/locationStore';
 import { getBatchLabels, getModelLabels } from '../services/barcodeLabelService';
@@ -36,20 +37,17 @@ function LabelSelection({ model, locationId, locationName }: { model: CatalogIte
   const [includeUnavailable, setIncludeUnavailable] = useState(false);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [labels, setLabels] = useState<LabelData[] | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const currentPreview = useRef<string | null>(null);
-  function clearPreview() {
-    if (currentPreview.current) URL.revokeObjectURL(currentPreview.current);
-    currentPreview.current = null;
-    setPreviewUrl(null);
-  }
+  const [previewSheets, setPreviewSheets] = useState<string[] | null>(null);
+  const previewTrigger = useRef<HTMLButtonElement>(null);
+  const printSheets = useRef<((sheets: readonly string[]) => void) | null>(null);
+  const clearPreview = useCallback(() => setPreviewSheets(null), []);
   const [loading, setLoading] = useState(model.isSerialized);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const sending = useRef(false);
   const mounted = useRef(true);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; if (currentPreview.current) URL.revokeObjectURL(currentPreview.current); }; }, []);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const query = { catalogItemId: model.id, ...(serialSearch ? { search: serialSearch } : {}), ...(locationId ? { locationId } : {}), ...(!includeUnavailable ? { status: 'EN_STOCK' as const } : {}), limit: 50 };
 
   useEffect(() => {
@@ -92,7 +90,7 @@ function LabelSelection({ model, locationId, locationName }: { model: CatalogIte
     finally { sending.current = false; if (mounted.current) setBusy(false); }
   }
 
-  async function generate() {
+  async function generate(action: 'preview' | 'download') {
     if (sending.current) return;
     setError(null);
     const count = Number(copies);
@@ -113,11 +111,11 @@ function LabelSelection({ model, locationId, locationName }: { model: CatalogIte
       const printer = await import('../../../services/printer/labelPdfService');
       if (!mounted.current) return;
       try {
-        const blob = printer.createLabelsPdfBlob(data, { layout });
-        clearPreview();
-        const url = URL.createObjectURL(blob);
-        currentPreview.current = url;
-        setPreviewUrl(url);
+        if (action === 'download') printer.downloadLabelsPdf(data, undefined, { layout });
+        else {
+          printSheets.current = printer.printLabelSheets;
+          setPreviewSheets(printer.createLabelsPreviewPages(data, { layout }));
+        }
       }
       catch (failure) { throw new LabelSelectionError(failure instanceof Error ? failure.message : 'No se pudo generar el PDF. Intenta nuevamente.'); }
     } catch (failure) { if (mounted.current) setError(failure instanceof LabelSelectionError ? failure.message : asAppError(failure).message); }
@@ -156,11 +154,8 @@ function LabelSelection({ model, locationId, locationName }: { model: CatalogIte
     </fieldset> : <div className="max-w-xs"><label htmlFor="label-copies" className={LABEL_CLASS}>Número de copias</label><input id="label-copies" type="number" min="1" max="100" step="1" inputMode="numeric" disabled={busy} value={copies} onChange={(event) => { setCopies(event.target.value); setLabels(null); clearPreview(); }} className={TEXT_INPUT_CLASS} /></div>}
     <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0 sm:max-w-sm"><label htmlFor="label-layout" className={LABEL_CLASS}>Formato de etiquetas</label><select id="label-layout" disabled={busy} value={layout} onChange={(event) => { setLayout(event.target.value as 'compact' | 'small'); clearPreview(); setError(null); }} className={TEXT_INPUT_CLASS}><option value="compact">Medianas · 93 × 30 mm (2 columnas)</option><option value="small">Pequeñas · 62 × 30 mm (3 columnas)</option></select></div>
-      <button type="button" disabled={busy || loading} onClick={() => void generate()} className={PRIMARY_BUTTON_CLASS}>{busy ? 'Preparando…' : previewUrl ? 'Actualizar vista previa' : 'Ver vista previa'}</button>
+      <div className="flex flex-wrap gap-2"><button ref={previewTrigger} type="button" disabled={busy || loading} onClick={() => void generate('preview')} className={SECONDARY_BUTTON_CLASS}>Vista previa</button><button type="button" disabled={busy || loading} onClick={() => void generate('download')} className={PRIMARY_BUTTON_CLASS}>{busy ? 'Preparando…' : 'Descargar PDF'}</button></div>
     </div>
-    {previewUrl && !error && <section aria-label="Vista previa de etiquetas" className="min-w-0 space-y-3 border-t border-slate-100 pt-4">
-      <div className="flex flex-wrap items-center justify-between gap-3"><h4 className="font-semibold text-slate-900">Vista previa · {labels?.length} etiquetas</h4><div className="flex flex-wrap gap-2"><a href={previewUrl} download="etiquetas-inventario.pdf" className={PRIMARY_BUTTON_CLASS}>Descargar PDF</a><a href={previewUrl} target="_blank" rel="noopener noreferrer" className={SECONDARY_BUTTON_CLASS}>Abrir para imprimir</a></div></div>
-      <object data={previewUrl} type="application/pdf" aria-label="Documento PDF de etiquetas" className="h-[32rem] min-h-80 w-full rounded-lg border border-slate-200 bg-slate-50"><p className="p-4 text-sm text-slate-600">Tu navegador no muestra PDF incrustados. <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="underline">Abrir vista previa</a></p></object>
-    </section>}
+    {previewSheets && <LabelPreviewDialog sheets={previewSheets} labels={labels ?? []} returnFocus={previewTrigger} onClose={clearPreview} onPrint={() => printSheets.current?.(previewSheets)} />}
   </section>;
 }
