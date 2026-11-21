@@ -29,7 +29,9 @@ it('searches models and exact units from one field without exposing stock editin
   await waitFor(() => expect(listCatalog).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'SN-A', page: 1 }), expect.any(AbortSignal)));
   expect(await screen.findByText('Serie: SN-A')).toBeInTheDocument();
   expect(scanHardware).toHaveBeenCalledWith('SN-A');
-  expect(screen.queryByRole('button', { name: /Acoplar|Desacoplar|Editar/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Acoplar|Desacoplar/ })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Editar Laptop Acer' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Ver ficha del modelo' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Ver etiquetas' })).not.toBeInTheDocument();
 });
 it('keeps matching models when exact series lookup reports not found', async () => {
@@ -40,4 +42,14 @@ it('keeps matching models when exact series lookup reports not found', async () 
   expect(await screen.findByText('Laptop Acer')).toBeInTheDocument();
   await waitFor(() => expect(scanHardware).toHaveBeenCalledWith('Acer'));
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+
+it('keeps the unified product view read-only for sellers', async () => {
+  useAuthStore.setState({ user: { ...useAuthStore.getState().user!, role: 'VENDEDOR' } });
+  render(<MemoryRouter><InventoryPage /></MemoryRouter>);
+  await screen.findByText('Laptop Acer');
+  expect(screen.getByRole('button', { name: 'Ver ficha de Laptop Acer' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Editar Laptop Acer' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Ingresar mercancía' })).not.toBeInTheDocument();
 });

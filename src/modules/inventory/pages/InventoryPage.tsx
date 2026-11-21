@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { CatalogDetailPanel } from '../components/CatalogDetailPanel';
 import { Notification } from '../../../components/notifications/Notification';
 import {
   LABEL_CLASS,
@@ -27,6 +29,7 @@ const STATUS_TONE: Record<ItemStatus, BadgeTone> = {
 };
 
 export function InventoryPage({ allowManagement = false }: { allowManagement?: boolean }) {
+  const [showModel, setShowModel] = useState(false);
   const {
     code,
     setCode,
@@ -96,14 +99,15 @@ export function InventoryPage({ allowManagement = false }: { allowManagement?: b
 
   if (!allowManagement) return (
     <CatalogPage
-      mode="consult"
-      onSearchCode={(value) => void search(value)}
-      onSearchChange={clearLookup}
+      onSearchCode={(value) => { setShowModel(false); void search(value); }}
+      onSearchChange={() => { clearLookup(); setShowModel(false); }}
       hasExactMatch={Boolean(item)}
       lookupResult={<>
         {busy && <LoadingState message="Buscando unidad por serie o código…" />}
         {error && errorStatus !== 404 && <Notification kind="error">{error}</Notification>}
         {detail}
+        {item && <button type="button" className={PRIMARY_BUTTON_CLASS} onClick={() => setShowModel((value) => !value)}>{showModel ? 'Ocultar ficha del modelo' : 'Ver ficha del modelo'}</button>}
+        {item && showModel && <CatalogDetailPanel id={item.catalogId} onClose={() => setShowModel(false)} />}
       </>}
     />
   );

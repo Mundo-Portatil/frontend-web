@@ -43,6 +43,7 @@ interface CatalogPageProps {
 
 export function CatalogPage({ mode = 'manage', onSearchCode, onSearchChange, lookupResult, hasExactMatch = false }: CatalogPageProps) {
   const managing = mode === 'manage';
+  const unifiedSearch = Boolean(onSearchCode);
   const [consultSearch, setConsultSearch] = useState('');
   const categories = useCategories();
   const { query, setQuery, result, loading, error, reload } = useCatalog();
@@ -143,29 +144,29 @@ export function CatalogPage({ mode = 'manage', onSearchCode, onSearchChange, loo
           <div>
             <form onSubmit={(event) => {
               event.preventDefault();
-              if (managing) return;
+              if (!unifiedSearch) return;
               const search = consultSearch.trim();
               setQuery({ ...query, search: search || undefined, page: 1 });
               if (search) onSearchCode?.(search);
               else onSearchChange?.();
             }}>
             <label htmlFor="catalog-search" className={LABEL_CLASS}>
-              {managing ? 'Buscar producto' : 'Marca, modelo, código o serie'}
+              {unifiedSearch ? 'Marca, modelo, código o serie' : 'Buscar producto'}
             </label>
             <div className="flex min-w-0 gap-2">
             <input
               id="catalog-search"
               type="search"
-              value={managing ? query.search ?? '' : consultSearch}
+              value={unifiedSearch ? consultSearch : query.search ?? ''}
               onChange={(event) => {
                 onSearchChange?.();
-                if (managing) setQuery({ ...query, search: event.target.value || undefined, page: 1 });
+                if (!unifiedSearch) setQuery({ ...query, search: event.target.value || undefined, page: 1 });
                 else setConsultSearch(event.target.value);
               }}
-              className={TEXT_INPUT_CLASS}
-              placeholder={managing ? 'Marca, modelo o código…' : 'Marca, modelo, código o serie…'}
+              className={`${TEXT_INPUT_CLASS} min-w-0 flex-1`}
+              placeholder={unifiedSearch ? 'Marca, modelo, código o serie…' : 'Marca, modelo o código…'}
             />
-            {!managing && <button type="submit" className={`${SECONDARY_BUTTON_CLASS} shrink-0`}>Buscar</button>}
+            {unifiedSearch && <button type="submit" className={`${SECONDARY_BUTTON_CLASS} shrink-0`}>Buscar</button>}
             </div>
             </form>
           </div>

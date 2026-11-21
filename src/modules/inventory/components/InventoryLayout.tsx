@@ -6,20 +6,13 @@ import type { Role } from '../../foundation/auth/models';
 interface AreaLink { to: string; label: string; end?: boolean; roles?: Role[] }
 interface InventoryArea { label: string; description: string; links: readonly AreaLink[] }
 
-const CONSULTATION: InventoryArea = {
-  label: 'Consultar inventario',
-  description: 'Busca modelos, series y existencias por ubicación.',
-  links: [
-    { to: ROUTES.inventory, label: 'Modelos y existencias', end: true },
-    { to: ROUTES.inventoryStock, label: 'Cantidades por ubicación' },
-  ],
-};
 const PRODUCTS: InventoryArea = {
-  label: 'Productos y categorías',
+  label: 'Productos y existencias',
   description: 'Modelos, características y clasificación de la mercancía.',
   links: [
-    { to: ROUTES.inventoryCatalog, label: 'Productos y modelos' },
+    { to: ROUTES.inventoryCatalog, label: 'Productos' },
     { to: ROUTES.inventoryCategories, label: 'Categorías' },
+    { to: ROUTES.inventoryStock, label: 'Existencias por ubicación' },
   ],
 };
 const INBOUND: InventoryArea = {
@@ -41,7 +34,7 @@ export function InventoryLayout() {
   const path = useLocation().pathname.replace(/\/+$/, '');
   const area = path === ROUTES.inventoryCatalog || path === ROUTES.inventoryCategories ? PRODUCTS
     : path === ROUTES.inventoryInbound || path === ROUTES.inventoryAdjustments ? INBOUND
-      : path === ROUTES.inventoryLabels ? LABELS : CONSULTATION;
+      : path === ROUTES.inventoryLabels ? LABELS : PRODUCTS;
   return (
     <section className="mx-auto w-full max-w-6xl">
       <header className="mb-6 space-y-4">

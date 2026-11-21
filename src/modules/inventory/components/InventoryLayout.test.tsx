@@ -15,11 +15,11 @@ describe('InventoryLayout', () => {
   it.each(['ADMIN', 'VENDEDOR', 'TECNICO'] as const)('keeps consultation free of entry actions for %s', (role) => {
     useAuthStore.setState({ user: { ...user, role } });
     renderAt();
-    expect(screen.getByRole('heading', { name: 'Consultar inventario' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Productos y existencias' })).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Secciones de inventario' });
-    expect(within(nav).getAllByRole('link')).toHaveLength(2);
-    expect(within(nav).getByRole('link', { name: 'Modelos y existencias' })).toHaveAttribute('href', '/inventory');
-    expect(within(nav).getByRole('link', { name: 'Cantidades por ubicación' })).toHaveAttribute('href', '/inventory/stock');
+    expect(within(nav).getAllByRole('link')).toHaveLength(3);
+    expect(within(nav).getByRole('link', { name: 'Productos' })).toHaveAttribute('href', '/inventory/catalog');
+    expect(within(nav).getByRole('link', { name: 'Existencias por ubicación' })).toHaveAttribute('href', '/inventory/stock');
     expect(screen.queryByRole('link', { name: 'Ingresar mercancía' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Agregar cantidades' })).not.toBeInTheDocument();
   });
@@ -47,9 +47,8 @@ describe('InventoryLayout', () => {
   });
 
   it.each([
-    ['/inventory', 'Modelos y existencias'],
-    ['/inventory/stock', 'Cantidades por ubicación'],
-    ['/inventory/catalog', 'Productos y modelos'],
+    ['/inventory/stock', 'Existencias por ubicación'],
+    ['/inventory/catalog', 'Productos'],
     ['/inventory/categories/', 'Categorías'],
     ['/inventory/inbound', 'Ingresar mercancía'],
     ['/inventory/adjustments', 'Corregir existencias'],

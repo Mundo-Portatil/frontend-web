@@ -102,12 +102,12 @@ describe('AppRouter', () => {
   it.each([ADMIN, VENDEDOR, TECNICO])('allows $role to open hardware lookup', async (user) => {
     useAuthStore.setState({ status: 'authenticated', user });
     renderAt('/inventory');
-    expect(await screen.findByRole('heading', { name: 'Consultar inventario' })).toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: 'Buscar mercancía' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Modelos y existencias' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'Cantidades por ubicación' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Productos y categorías' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Categorías' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Productos y existencias' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Productos y modelos' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Productos' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Existencias por ubicación' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Productos y existencias' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Categorías' })).toBeInTheDocument();
   });
 
   it.each([VENDEDOR, TECNICO])('denies $role access to hardware intake', async (user) => {

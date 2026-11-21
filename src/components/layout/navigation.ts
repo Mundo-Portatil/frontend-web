@@ -80,11 +80,11 @@ export const NAV_ITEMS: readonly NavItem[] = [
     roles: ['ADMIN', 'ENCARGADO_ALMACEN', 'VENDEDOR', 'TECNICO'],
     children: [
       {
-        id: 'inventory-stock',
-        label: 'Consultar inventario',
-        to: ROUTES.inventory,
+        id: 'inventory-products',
+        label: 'Productos y existencias',
+        to: ROUTES.inventoryCatalog,
         roles: ['ADMIN', 'ENCARGADO_ALMACEN', 'VENDEDOR', 'TECNICO'],
-        activePaths: [ROUTES.inventory, ROUTES.inventoryStock, ROUTES.inventoryComponents],
+        activePaths: [ROUTES.inventory, ROUTES.inventoryCatalog, ROUTES.inventoryCategories, ROUTES.inventoryStock, ROUTES.inventoryComponents],
       },
       {
         id: 'inventory-inbound',
@@ -92,13 +92,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
         to: ROUTES.inventoryInbound,
         roles: ['ADMIN', 'ENCARGADO_ALMACEN'],
         activePaths: [ROUTES.inventoryInbound, ROUTES.inventoryAdjustments],
-      },
-      {
-        id: 'inventory-products',
-        label: 'Productos y categorías',
-        to: ROUTES.inventoryCatalog,
-        roles: ['ADMIN', 'ENCARGADO_ALMACEN', 'VENDEDOR', 'TECNICO'],
-        activePaths: [ROUTES.inventoryCatalog, ROUTES.inventoryCategories],
       },
       {
         id: 'inventory-labels',

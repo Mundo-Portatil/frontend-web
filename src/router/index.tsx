@@ -7,7 +7,6 @@ import { AuditLogsPage } from '../modules/foundation/audit-logs/pages/AuditLogsP
 import { LocationsPage } from '../modules/foundation/locations/pages/LocationsPage';
 import { ProfilePage } from '../modules/foundation/users/pages/ProfilePage';
 import { UsersPage } from '../modules/foundation/users/pages/UsersPage';
-import { CatalogPage } from '../modules/inventory/pages/CatalogPage';
 import { InventoryPage } from '../modules/inventory/pages/InventoryPage';
 import { MerchandiseInboundPage } from '../modules/inventory/pages/MerchandiseInboundPage';
 import { InventoryLabelsPage } from '../modules/inventory/pages/InventoryLabelsPage';
@@ -68,7 +67,7 @@ export function AppRouter() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path={ROUTES.inventory} element={<InventoryLayout />}>
-            <Route index element={<InventoryPage />} />
+            <Route index element={<Navigate to={ROUTES.inventoryCatalog} replace />} />
             <Route path="stock" element={<QuantityStockPage />} />
             <Route
               path="inbound"
@@ -81,7 +80,7 @@ export function AppRouter() {
             <Route path="components" element={<InventoryPage allowManagement />} />
             <Route path="adjustments" element={<RoleGuard allowedRoles={['ADMIN', 'ENCARGADO_ALMACEN']}><QuantityAdjustmentPage /></RoleGuard>} />
             <Route path="labels" element={<InventoryLabelsPage />} />
-            <Route path="catalog" element={<CatalogPage />} />
+            <Route path="catalog" element={<InventoryPage />} />
             <Route path="categories" element={<CategoriesPage />} />
           </Route>
           <Route path={ROUTES.profile} element={<ProfilePage />} />
