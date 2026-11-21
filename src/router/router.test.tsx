@@ -282,7 +282,7 @@ it.each([ADMIN, VENDEDOR, TECNICO])('allows $role to open the labels section', a
   useAuthStore.setState({ status: 'authenticated', user });
   renderAt('/inventory/labels');
   expect(await screen.findByRole('heading', { name: 'Etiquetas', level: 1 })).toBeInTheDocument();
-  expect(screen.getByLabelText('Serie o código del equipo o pieza')).toBeInTheDocument();
+  expect(screen.getByRole('combobox', { name: 'Buscar producto para etiquetas' })).toBeInTheDocument();
 });
 
 

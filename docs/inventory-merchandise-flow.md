@@ -46,7 +46,7 @@ La ficha ofrece consulta paginada de unidades con `GET /hardware-items` e histor
 
 `POST /inventory/barcode-labels/by-model` acepta `catalogId`, `copies` (1–100) y `locationId` opcional; sin ubicación el servidor resuelve Central. Se presenta el código devuelto (SKU), título, características pertinentes, ubicación y número de copia. No se modifica el formato ni se incluye el precio en la vista.
 
-Para unidades se conserva `POST /hardware-items/barcode-labels/batch`, selección múltiple y reimpresión. La generación de datos no se presenta como impresión física realizada. El dispositivo/protocolo requiere su ADR previo.
+Para unidades se conserva `POST /hardware-items/barcode-labels/batch`, selección múltiple y reimpresión. La generación de datos alimenta un documento PDF con códigos CODE128 vectoriales, sin precio, descargable y abrible para imprimir mediante el visor del usuario. La comunicación directa con impresoras físicas sigue requiriendo su ADR previo.
 
 ## Dependencias y límites explícitos
 
@@ -69,3 +69,12 @@ Se revisó `origin/refact/inventario` del frontend exclusivamente mediante lectu
 El flujo antiguo de ingreso por lote y sus servicios sin endpoint vigente se retiraron; sus verificaciones se sustituyen por pruebas del ingreso unificado (modelo nuevo, reposición, varias series, errores y doble envío). La consulta conserva las relaciones existentes, pero no ofrece crear ni separar componentes mientras falta contrato. No se presentan formularios que aparenten poder guardar esas asociaciones.
 
 Se añadieron límites de tiempo a las consultas auxiliares de contexto para que una consulta de ubicación no deje una serie encontrada cargando indefinidamente. La administración de usuarios reconoce el rol de almacén que ya define el backend; sus rutas continúan restringidas a ADMIN.
+
+
+## Etiquetas PDF y series individuales
+
+Por solicitud posterior del usuario, Etiquetas permite buscar el modelo y generar un PDF sin referencias internas manuales. Para modelos por cantidad, las copias comparten el SKU devuelto por el backend. Para modelos serializados, se seleccionan unidades individualmente o todas mediante consultas paginadas; la reimpresión permite incluir otros estados. Los identificadores existentes no se cambian. El documento utiliza CODE128, barras vectoriales y zonas blancas laterales, sin precio. jsbarcode y jspdf son dependencias específicas de esta generación, cargadas bajo demanda para no aumentar la carga inicial del inventario.
+
+El ingreso serializado presenta un campo numerado por unidad. Enter avanza entre campos; la revisión comprueba vacíos y duplicados normalizados. Reducir temporalmente la cantidad no borra los valores para cuando se restaure. Solo se envían las series de la cantidad confirmada.
+
+Se verificaron contra el servidor local autenticación, catálogo, ubicaciones, stock, generación de copias por modelo y correspondencia serie-etiqueta de unidad existente, sin registrar mercancía adicional. La conexión de navegador de la sesión no estaba disponible; esa revisión visual de la aplicación no se considera realizada.
