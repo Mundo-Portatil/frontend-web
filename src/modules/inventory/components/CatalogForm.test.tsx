@@ -125,7 +125,7 @@ it('prepares a model without name or SKU, leaving its code generation to the bac
   render(<CatalogForm categories={[category]} onSaved={vi.fn()} onPrepare={onPrepare} />);
   for (const [label, value] of [['Marca *', 'Acer'], ['Modelo *', 'Aspire 5'], ['Precio base (PEN) *', '1500']]) await user.type(screen.getByLabelText(label), value);
   await user.selectOptions(screen.getByLabelText('Categoría *'), category.id);
-  await user.click(screen.getByRole('button', { name: 'Usar este modelo' }));
+  await user.click(screen.getByRole('button', { name: 'Continuar con el ingreso' }));
   expect(onPrepare).toHaveBeenCalledWith({ brand: 'Acer', model: 'Aspire 5', categoryId: category.id, basePrice: 1500, minStockThreshold: 2, isSerialized: true, isSecondHand: false, active: true });
   expect(createCatalogItem).not.toHaveBeenCalled();
 });

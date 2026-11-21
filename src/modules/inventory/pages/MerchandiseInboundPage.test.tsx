@@ -37,8 +37,8 @@ it('selects an existing model, reviews quantity and saves to the resolved centra
   mount();
   await screen.findByText(/Destino: Principal/);
   await selectCatalogProduct(user, 'Buscar modelo', 'Mouse · M170');
-  await user.clear(screen.getByLabelText('Cantidad recibida'));
-  await user.type(screen.getByLabelText('Cantidad recibida'), '30');
+  await user.clear(screen.getByLabelText('Cantidad que ingresa'));
+  await user.type(screen.getByLabelText('Cantidad que ingresa'), '30');
   expect(screen.queryByLabelText('Series de las unidades')).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Revisar ingreso' }));
   const confirm = await screen.findByRole('button', { name: 'Confirmar ingreso' });
@@ -56,20 +56,22 @@ it('prepares a new model without writing until the complete serialized intake is
   mount();
   await screen.findByText(/Destino: Principal/);
   await user.click(screen.getByLabelText('Modelo nuevo'));
+  await user.clear(screen.getByLabelText('Cantidad que ingresa'));
+  await user.type(screen.getByLabelText('Cantidad que ingresa'), '2');
+  expect(screen.queryByLabelText('Unidad 1: serie')).not.toBeInTheDocument();
   for (const [label, value] of [['Marca *', 'Marca'], ['Modelo *', 'X1'], ['Precio base (PEN) *', '1000']]) await user.type(screen.getByLabelText(label), value);
   await user.selectOptions(screen.getByLabelText('Categoría *'), 'category');
   expect(screen.queryByLabelText('Segunda mano')).not.toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: 'Usar este modelo' }));
+  await user.click(screen.getByRole('button', { name: 'Continuar con el ingreso' }));
   expect(createCatalogItem).not.toHaveBeenCalled();
-  await user.clear(screen.getByLabelText('Cantidad recibida'));
-  await user.type(screen.getByLabelText('Cantidad recibida'), '2');
+  expect(screen.getByLabelText('Cantidad que ingresa')).toHaveValue(2);
   await user.type(screen.getByLabelText('Unidad 1: serie'), 'SN1{Enter}');
   expect(screen.getByLabelText('Unidad 2: serie')).toHaveFocus();
   await user.keyboard('SN2');
   await user.click(screen.getByRole('button', { name: 'Cambiar datos del modelo' }));
   await user.clear(screen.getByLabelText('Modelo *'));
   await user.type(screen.getByLabelText('Modelo *'), 'X2');
-  await user.click(screen.getByRole('button', { name: 'Usar este modelo' }));
+  await user.click(screen.getByRole('button', { name: 'Continuar con el ingreso' }));
   expect(screen.getByLabelText('Unidad 1: serie')).toHaveValue('SN1');
   expect(screen.getByLabelText('Unidad 2: serie')).toHaveValue('SN2');
   await user.click(screen.getByRole('button', { name: 'Revisar ingreso' }));
@@ -95,7 +97,7 @@ it('preserves hidden series after reducing quantity and rejects missing or repea
   const user = userEvent.setup(); mount();
   await screen.findByText(/Destino: Principal/);
   await selectCatalogProduct(user, 'Buscar modelo', 'Mouse · M170');
-  const quantity = screen.getByLabelText('Cantidad recibida');
+  const quantity = screen.getByLabelText('Cantidad que ingresa');
   await user.clear(quantity); await user.type(quantity, '2');
   await user.type(screen.getByLabelText('Unidad 1: serie'), 'SN1');
   await user.click(screen.getByRole('button', { name: 'Revisar ingreso' }));
@@ -112,4 +114,27 @@ it('preserves hidden series after reducing quantity and rejects missing or repea
   await screen.findByRole('button', { name: 'Confirmar ingreso' });
   expect(validateSerials).toHaveBeenLastCalledWith(['SN1', 'SN2']);
   expect(receiveInventory).not.toHaveBeenCalled();
+});
+
+
+it('registers a new quantity model with the quantity entered before preparing its details', async () => {
+  vi.mocked(createCatalogItem).mockResolvedValue(product);
+  const user = userEvent.setup();
+  mount();
+  await screen.findByText(/Destino: Principal/);
+  await user.click(screen.getByLabelText('Modelo nuevo'));
+  const quantity = screen.getByLabelText('Cantidad que ingresa');
+  await user.clear(quantity);
+  await user.type(quantity, '20');
+  for (const [label, value] of [['Marca *', 'Logitech'], ['Modelo *', 'M170'], ['Precio base (PEN) *', '10']]) await user.type(screen.getByLabelText(label), value);
+  await user.selectOptions(screen.getByLabelText('Categoría *'), 'category');
+  await user.selectOptions(screen.getByLabelText('Cómo registrar las unidades'), 'false');
+  await user.click(screen.getByRole('button', { name: 'Continuar con el ingreso' }));
+  expect(quantity).toHaveValue(20);
+  expect(screen.queryByLabelText('Unidad 1: serie')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Revisar ingreso' }));
+  expect(createCatalogItem).not.toHaveBeenCalled();
+  await user.click(await screen.findByRole('button', { name: 'Confirmar ingreso' }));
+  await screen.findByText('Ingreso registrado correctamente.');
+  expect(receiveInventory).toHaveBeenCalledWith({ items: [{ catalogId: id, quantity: 20, hasSerialNumbers: false }] });
 });

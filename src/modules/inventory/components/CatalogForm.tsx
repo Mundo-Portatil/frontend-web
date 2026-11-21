@@ -193,7 +193,7 @@ export function CatalogForm({ categories, initialItem, onSaved, onPrepare, onCan
             </details>
           )}
           <div className="flex flex-wrap gap-2">
-            <button className={PRIMARY_BUTTON_CLASS} disabled={busy}>{busy ? 'Guardando…' : editing ? 'Guardar cambios' : onPrepare ? 'Usar este modelo' : 'Crear producto'}</button>
+            <button className={PRIMARY_BUTTON_CLASS} disabled={busy}>{busy ? 'Guardando…' : editing ? 'Guardar cambios' : onPrepare ? 'Continuar con el ingreso' : 'Crear producto'}</button>
             {onCancel && <button type="button" disabled={busy} className={SECONDARY_BUTTON_CLASS} onClick={onCancel}>Cancelar</button>}
           </div>
         </fieldset>

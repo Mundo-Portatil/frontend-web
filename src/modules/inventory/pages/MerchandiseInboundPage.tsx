@@ -120,7 +120,13 @@ function MerchandiseInboundForm() {
       ) : (
         <>
           <div hidden={Boolean(intake.review)} className="space-y-5">
-            <fieldset disabled={intake.busy || intake.loading || Boolean(intake.referenceError) || Boolean(intake.createdModel) || intake.uncertain} className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
+            <section className="min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+            <fieldset disabled={intake.busy || intake.loading || Boolean(intake.referenceError) || intake.uncertain || Boolean(modelData?.isSecondHand)} className="min-w-0">
+              <legend className="px-1 font-medium text-slate-900">Mercancía recibida</legend>
+              <div className="max-w-xs"><label htmlFor="intake-quantity" className={LABEL_CLASS}>Cantidad que ingresa</label><input id="intake-quantity" name="quantity" type="number" min="1" step="1" inputMode="numeric" value={intake.quantity} onChange={(event) => changeQuantity(event.target.value)} className={TEXT_INPUT_CLASS} required /></div>
+            </fieldset>
+
+            <fieldset disabled={intake.busy || intake.loading || Boolean(intake.referenceError) || Boolean(intake.createdModel) || intake.uncertain} className="min-w-0 border-t border-slate-100 pt-4">
               <legend className="px-1 font-medium text-slate-900">Modelo del producto</legend>
               <div className="mb-4 flex flex-wrap gap-4">
                 <label className="flex min-h-10 items-center gap-2 text-sm"><input type="radio" name="intake-model-mode" checked={mode === 'existing'} onChange={() => changeMode('existing')} />Modelo existente</label>
@@ -136,16 +142,13 @@ function MerchandiseInboundForm() {
                 </>
               )}
             </fieldset>
+            </section>
 
             {modelData?.isSecondHand && <Notification kind="warning">Las piezas usadas requieren aprobación administrativa antes de ingresar al stock.</Notification>}
             {modelData && (mode === 'existing' || !editingNew) && (
               <form onSubmit={(event) => { event.preventDefault(); reviewIntake(); }} noValidate className="rounded-xl border border-slate-200 bg-white p-4">
                 <fieldset disabled={intake.busy || intake.loading || Boolean(intake.referenceError) || intake.uncertain || Boolean(modelData.isSecondHand)} className="min-w-0 space-y-4">
                   <legend className="mb-3 font-medium text-slate-900">Unidades recibidas</legend>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div><label htmlFor="intake-quantity" className={LABEL_CLASS}>Cantidad recibida</label><input id="intake-quantity" name="quantity" type="number" min="1" step="1" inputMode="numeric" value={intake.quantity} onChange={(event) => changeQuantity(event.target.value)} className={TEXT_INPUT_CLASS} required /></div>
-                    <p className="self-center text-sm text-slate-600">{modelData.isSerialized === false ? 'Se agregan unidades por cantidad, sin series individuales.' : 'Cada unidad se registra con su propio número de serie.'}</p>
-                  </div>
                   {modelData.isSerialized !== false && (
                     <fieldset className="min-w-0 space-y-3">
                       <legend className="mb-2 font-medium text-slate-900">Series de las unidades</legend>
@@ -186,7 +189,7 @@ function MerchandiseInboundForm() {
                 <div><dt className="text-slate-500">Categoría</dt><dd className="font-medium">{intake.categories.find((category) => category.id === intakeModelData(intake.review!.model).categoryId)?.name ?? 'Categoría del modelo'}</dd></div>
                 <div><dt className="text-slate-500">Precio base</dt><dd className="font-medium">{intakeModelData(intake.review.model).basePrice}</dd></div>
                 <div><dt className="text-slate-500">Destino</dt><dd className="font-medium">{intake.review.warehouse.name} · Almacén Central</dd></div>
-                <div><dt className="text-slate-500">Cantidad recibida</dt><dd className="font-medium">{intake.review.quantity}</dd></div>
+                <div><dt className="text-slate-500">Cantidad que ingresa</dt><dd className="font-medium">{intake.review.quantity}</dd></div>
                 <div><dt className="text-slate-500">Control</dt><dd className="font-medium">{intakeModelData(intake.review.model).isSerialized === false ? 'Por cantidad' : 'Una serie por unidad'}</dd></div>
                 {intake.review.costPrice !== undefined && <div><dt className="text-slate-500">Costo unitario</dt><dd>{intake.review.costPrice}</dd></div>}
                 {intake.review.salePrice !== undefined && <div><dt className="text-slate-500">Precio de venta por unidad</dt><dd>{intake.review.salePrice}</dd></div>}
