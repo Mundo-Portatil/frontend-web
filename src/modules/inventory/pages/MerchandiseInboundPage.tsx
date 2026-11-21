@@ -19,6 +19,42 @@ function MerchandiseInboundForm() {
   const [mode, setMode] = useState<'existing' | 'new'>('existing');
   const [editingNew, setEditingNew] = useState(true);
   const [formKey, setFormKey] = useState(0);
+  const [serialValues, setSerialValues] = useState<string[]>([]);
+  const [serialError, setSerialError] = useState<string | null>(null);
+  const seriesInputs = useRef<(HTMLInputElement | null)[]>([]);
+  const serialCount = Number.isSafeInteger(Number(intake.quantity)) && Number(intake.quantity) > 0 ? Number(intake.quantity) : 0;
+
+  function changeQuantity(value: string) {
+    intake.setQuantity(value);
+    const count = Number(value);
+    if (Number.isSafeInteger(count) && count > 0) intake.setSerialText(serialValues.slice(0, count).join('\n'));
+    setSerialError(null);
+  }
+
+  function changeSerial(index: number, value: string) {
+    const next = [...serialValues];
+    next[index] = value;
+    setSerialValues(next);
+    intake.setSerialText(Array.from({ length: serialCount }, (_, i) => next[i] ?? '').join('\n'));
+    setSerialError(null);
+  }
+
+  function reviewIntake() {
+    if (modelData?.isSerialized !== false && serialCount > 0) {
+      const seen = new Set<string>();
+      for (let index = 0; index < serialCount; index += 1) {
+        const serial = (serialValues[index] ?? '').trim().toUpperCase();
+        if (!serial || seen.has(serial)) {
+          setSerialError(!serial ? `Completa la serie de la unidad ${index + 1}.` : `La serie de la unidad ${index + 1} está repetida.`);
+          seriesInputs.current[index]?.focus();
+          return;
+        }
+        seen.add(serial);
+      }
+    }
+    setSerialError(null);
+    void intake.prepare();
+  }
   const reviewHeading = useRef<HTMLHeadingElement>(null);
   const errorNotice = useRef<HTMLDivElement>(null);
   const continueButton = useRef<HTMLButtonElement>(null);
@@ -33,11 +69,15 @@ function MerchandiseInboundForm() {
 
   function changeMode(next: 'existing' | 'new') {
     intake.setModel(null);
+    setSerialValues([]);
+    setSerialError(null);
     setMode(next);
     setEditingNew(true);
   }
   function startAnother() {
     intake.reset();
+    setSerialValues([]);
+    setSerialError(null);
     setMode('existing');
     setEditingNew(true);
     setFormKey((value) => value + 1);
@@ -86,11 +126,11 @@ function MerchandiseInboundForm() {
                 <label className="flex min-h-10 items-center gap-2 text-sm"><input type="radio" name="intake-model-mode" checked={mode === 'existing'} onChange={() => changeMode('existing')} />Modelo existente</label>
                 <label className="flex min-h-10 items-center gap-2 text-sm"><input type="radio" name="intake-model-mode" checked={mode === 'new'} onChange={() => changeMode('new')} />Modelo nuevo</label>
               </div>
-              {mode === 'existing' && <CatalogProductPicker key={formKey} id="intake-model" label="Buscar modelo" onChange={() => undefined} onSelect={(item) => intake.setModel(item ? { kind: 'existing', item } : null)} disabled={intake.busy || Boolean(intake.createdModel) || intake.uncertain} />}
+              {mode === 'existing' && <CatalogProductPicker key={formKey} id="intake-model" label="Buscar modelo" onChange={() => undefined} onSelect={(item) => { intake.setModel(item ? { kind: 'existing', item } : null); setSerialValues([]); setSerialError(null); }} disabled={intake.busy || Boolean(intake.createdModel) || intake.uncertain} />}
               {mode === 'new' && (
                 <>
                   <div hidden={!editingNew}>
-                    <CatalogForm key={formKey} categories={intake.categories} onSaved={() => undefined} onPrepare={(input) => { intake.setModel({ kind: 'new', input }); setEditingNew(false); }} />
+                    <CatalogForm key={formKey} categories={intake.categories} onSaved={() => undefined} onPrepare={(input) => { intake.setModel({ kind: 'new', input }); intake.setSerialText(input.isSerialized === false ? '' : serialValues.slice(0, serialCount).join('\n')); setEditingNew(false); }} />
                   </div>
                   {!editingNew && modelData && <div className="flex flex-wrap items-center justify-between gap-3"><p className="break-words text-sm font-medium text-slate-900">{getCatalogDisplayName(modelData)}{modelData.sku ? ` · ${modelData.sku}` : ''}</p><button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => setEditingNew(true)}>Cambiar datos del modelo</button></div>}
                 </>
@@ -99,15 +139,30 @@ function MerchandiseInboundForm() {
 
             {modelData?.isSecondHand && <Notification kind="warning">Las piezas usadas requieren aprobación administrativa antes de ingresar al stock.</Notification>}
             {modelData && (mode === 'existing' || !editingNew) && (
-              <form onSubmit={(event) => { event.preventDefault(); void intake.prepare(); }} noValidate className="rounded-xl border border-slate-200 bg-white p-4">
+              <form onSubmit={(event) => { event.preventDefault(); reviewIntake(); }} noValidate className="rounded-xl border border-slate-200 bg-white p-4">
                 <fieldset disabled={intake.busy || intake.loading || Boolean(intake.referenceError) || intake.uncertain || Boolean(modelData.isSecondHand)} className="min-w-0 space-y-4">
                   <legend className="mb-3 font-medium text-slate-900">Unidades recibidas</legend>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div><label htmlFor="intake-quantity" className={LABEL_CLASS}>Cantidad recibida</label><input id="intake-quantity" name="quantity" type="number" min="1" step="1" inputMode="numeric" value={intake.quantity} onChange={(event) => intake.setQuantity(event.target.value)} className={TEXT_INPUT_CLASS} required /></div>
+                    <div><label htmlFor="intake-quantity" className={LABEL_CLASS}>Cantidad recibida</label><input id="intake-quantity" name="quantity" type="number" min="1" step="1" inputMode="numeric" value={intake.quantity} onChange={(event) => changeQuantity(event.target.value)} className={TEXT_INPUT_CLASS} required /></div>
                     <p className="self-center text-sm text-slate-600">{modelData.isSerialized === false ? 'Se agregan unidades por cantidad, sin series individuales.' : 'Cada unidad se registra con su propio número de serie.'}</p>
                   </div>
                   {modelData.isSerialized !== false && (
-                    <div><label htmlFor="intake-serials" className={LABEL_CLASS}>Series de las unidades</label><textarea id="intake-serials" name="serials" rows={4} value={intake.serialText} onChange={(event) => intake.setSerialText(event.target.value)} placeholder="Una serie por línea…" className={`${TEXT_INPUT_CLASS} h-32 max-h-32 resize-none overflow-y-auto`} spellCheck={false} autoComplete="off" required /></div>
+                    <fieldset className="min-w-0 space-y-3">
+                      <legend className="mb-2 font-medium text-slate-900">Series de las unidades</legend>
+                      {serialError && <Notification kind="error">{serialError}</Notification>}
+                      <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {Array.from({ length: serialCount }, (_, index) => (
+                          <div key={index} className="min-w-0">
+                            <label htmlFor={`intake-serial-${index}`} className={LABEL_CLASS}>Unidad {index + 1}: serie</label>
+                            <input id={`intake-serial-${index}`} ref={(node) => { seriesInputs.current[index] = node; }} value={serialValues[index] ?? ''} onChange={(event) => changeSerial(index, event.target.value)} onKeyDown={(event) => {
+                              if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+                              event.preventDefault();
+                              (seriesInputs.current[index + 1] ?? continueButton.current)?.focus();
+                            }} className={TEXT_INPUT_CLASS} autoComplete="off" spellCheck={false} required />
+                          </div>
+                        ))}
+                      </div>
+                    </fieldset>
                   )}
                   <details className="rounded-lg border border-slate-200 p-3">
                     <summary className="w-fit cursor-pointer rounded text-sm font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Precios por unidad (opcional)</summary>

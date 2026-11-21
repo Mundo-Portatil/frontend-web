@@ -63,12 +63,15 @@ it('prepares a new model without writing until the complete serialized intake is
   expect(createCatalogItem).not.toHaveBeenCalled();
   await user.clear(screen.getByLabelText('Cantidad recibida'));
   await user.type(screen.getByLabelText('Cantidad recibida'), '2');
-  await user.type(screen.getByLabelText('Series de las unidades'), 'SN1{Enter}SN2');
+  await user.type(screen.getByLabelText('Unidad 1: serie'), 'SN1{Enter}');
+  expect(screen.getByLabelText('Unidad 2: serie')).toHaveFocus();
+  await user.keyboard('SN2');
   await user.click(screen.getByRole('button', { name: 'Cambiar datos del modelo' }));
   await user.clear(screen.getByLabelText('Modelo *'));
   await user.type(screen.getByLabelText('Modelo *'), 'X2');
   await user.click(screen.getByRole('button', { name: 'Usar este modelo' }));
-  expect(screen.getByLabelText('Series de las unidades')).toHaveValue('SN1\nSN2');
+  expect(screen.getByLabelText('Unidad 1: serie')).toHaveValue('SN1');
+  expect(screen.getByLabelText('Unidad 2: serie')).toHaveValue('SN2');
   await user.click(screen.getByRole('button', { name: 'Revisar ingreso' }));
   await user.click(await screen.findByRole('button', { name: 'Confirmar ingreso' }));
   await screen.findByText('Ingreso registrado correctamente.');
@@ -84,4 +87,29 @@ it.each(['VENDEDOR', 'TECNICO'] as const)('does not expose or load the admission
   mount();
   expect(screen.queryByRole('heading', { name: 'Registrar mercancía' })).not.toBeInTheDocument();
   expect(listActiveLocations).not.toHaveBeenCalled();
+});
+
+
+it('preserves hidden series after reducing quantity and rejects missing or repeated series', async () => {
+  vi.mocked(listCatalog).mockResolvedValue({ items: [{ ...product, isSerialized: true }], total: 1, page: 1, limit: 50 });
+  const user = userEvent.setup(); mount();
+  await screen.findByText(/Destino: Principal/);
+  await selectCatalogProduct(user, 'Buscar modelo', 'Mouse · M170');
+  const quantity = screen.getByLabelText('Cantidad recibida');
+  await user.clear(quantity); await user.type(quantity, '2');
+  await user.type(screen.getByLabelText('Unidad 1: serie'), 'SN1');
+  await user.click(screen.getByRole('button', { name: 'Revisar ingreso' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('Completa la serie de la unidad 2');
+  await user.type(screen.getByLabelText('Unidad 2: serie'), 'sn1');
+  await user.click(screen.getByRole('button', { name: 'Revisar ingreso' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('unidad 2 está repetida');
+  await user.clear(screen.getByLabelText('Unidad 2: serie')); await user.type(screen.getByLabelText('Unidad 2: serie'), 'SN2');
+  await user.clear(quantity); await user.type(quantity, '1');
+  expect(screen.queryByLabelText('Unidad 2: serie')).not.toBeInTheDocument();
+  await user.clear(quantity); await user.type(quantity, '2');
+  expect(screen.getByLabelText('Unidad 2: serie')).toHaveValue('SN2');
+  await user.click(screen.getByRole('button', { name: 'Revisar ingreso' }));
+  await screen.findByRole('button', { name: 'Confirmar ingreso' });
+  expect(validateSerials).toHaveBeenLastCalledWith(['SN1', 'SN2']);
+  expect(receiveInventory).not.toHaveBeenCalled();
 });
