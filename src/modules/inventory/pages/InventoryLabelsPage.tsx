@@ -27,6 +27,7 @@ export function InventoryLabelsPage() {
 
 function LabelSelection({ model, locationId, locationName }: { model: CatalogItem; locationId?: string; locationName?: string }) {
   const [copies, setCopies] = useState('1');
+  const [layout, setLayout] = useState<'compact' | 'small'>('compact');
   const [units, setUnits] = useState<HardwareItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -97,30 +98,46 @@ function LabelSelection({ model, locationId, locationName }: { model: CatalogIte
       if (!data.length) throw new LabelSelectionError('No se recibieron etiquetas. Intenta nuevamente.');
       if (model.isSerialized && (!data.every((label) => 'hardwareItemId' in label && Object.hasOwn(selected, String(label.hardwareItemId)) && label.barcodeValue === selected[String(label.hardwareItemId)]) || data.length !== Object.keys(selected).length || new Set(data.map((label) => 'hardwareItemId' in label ? String(label.hardwareItemId) : '')).size !== data.length)) throw new LabelSelectionError('Las etiquetas recibidas no coinciden con las unidades seleccionadas.');
       if (!model.isSerialized && (data.length !== count || !data.every((label) => label.barcodeValue === model.sku))) throw new LabelSelectionError('Las etiquetas recibidas no coinciden con el producto y las copias solicitadas.');
+      // Preserve validated data when a format or popup fails; changing the
+      // print format must not request another label batch from the server.
+      setLabels(data);
       const printer = await import('../../../services/printer/labelPdfService');
       if (!mounted.current) return;
-      try { if (open) printer.openLabelsPdf(data); else printer.downloadLabelsPdf(data); }
+      try { if (open) printer.openLabelsPdf(data, { layout }); else printer.downloadLabelsPdf(data, undefined, { layout }); }
       catch (failure) { throw new LabelSelectionError(failure instanceof Error ? failure.message : 'No se pudo generar el PDF. Intenta nuevamente.'); }
-      setLabels(data);
     } catch (failure) { if (mounted.current) setError(failure instanceof LabelSelectionError ? failure.message : asAppError(failure).message); }
     finally { sending.current = false; if (mounted.current) setBusy(false); }
   }
 
+  const labelCount = model.isSerialized ? Object.keys(selected).length : Number(copies);
+  const validCount = Number.isSafeInteger(labelCount) && labelCount > 0;
+
   return <section className="min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-    <header><h3 className="break-words font-semibold text-slate-900">{model.name}</h3><p className="mt-1 text-sm text-slate-500">{model.isSerialized ? 'Una etiqueta para cada unidad seleccionada.' : 'Las copias comparten el código del producto.'}</p><p className="mt-1 text-sm text-slate-500">{locationName ? `Ubicación: ${locationName}` : model.isSerialized ? 'Todas las ubicaciones' : 'Ubicación: Almacén Central'}</p></header>
+    <header className="flex min-w-0 flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
+      <div className="min-w-0">
+        <h3 className="break-words text-lg font-semibold text-slate-900">{model.name}</h3>
+        <p className="mt-1 text-sm text-slate-500">{model.isSerialized ? 'Unidades con serie' : 'Copias del mismo producto'} · {locationName ?? (model.isSerialized ? 'Todas las ubicaciones' : 'Almacén Central')}</p>
+      </div>
+      <p role="status" aria-live="polite" className="rounded-lg bg-brand-50 px-3 py-2 text-sm font-semibold tabular-nums text-brand-800">{validCount ? labelCount : 0} etiquetas para imprimir</p>
+    </header>
     {error && <Notification kind="error">{error}</Notification>}
     {model.isSerialized ? <fieldset disabled={busy} className="min-w-0 space-y-3">
-      <label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={includeUnavailable} onChange={(event) => { setIncludeUnavailable(event.target.checked); setPage(1); setSelected({}); setLabels(null); }} />Incluir unidades vendidas y otros estados para reimprimir</label>
+      <legend className="mb-3 text-sm font-medium text-slate-900">Seleccionar unidades</legend>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <label className="flex min-h-10 items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={includeUnavailable} onChange={(event) => { setIncludeUnavailable(event.target.checked); setPage(1); setSelected({}); setLabels(null); }} />Incluir unidades vendidas y otros estados para reimprimir</label>
+        {!loading && units.length > 0 && <div className="flex flex-wrap gap-2"><button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => void selectAll()}>Seleccionar todas ({total})</button><button type="button" className={SECONDARY_BUTTON_CLASS} disabled={!Object.keys(selected).length} onClick={() => { setSelected({}); setLabels(null); }}>Limpiar selección</button></div>}
+      </div>
       {loading ? <p role="status">Cargando unidades…</p> : error && !units.length ? <button className={SECONDARY_BUTTON_CLASS} onClick={() => setRevision((value) => value + 1)}>Reintentar</button> : <>
         {!units.length ? <p role="status" className="text-sm text-slate-600">No hay unidades para estos filtros.</p> : <>
-          <div className="flex flex-wrap gap-2"><button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => void selectAll()}>Seleccionar todas ({total})</button><button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => { setSelected({}); setLabels(null); }}>Limpiar selección</button></div>
-          <ul aria-label="Unidades para imprimir" className="divide-y divide-slate-100">{units.map((item) => <li key={item.id}><label className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm"><span className="flex min-w-0 items-center gap-3"><input type="checkbox" checked={Boolean(selected[item.id])} onChange={() => toggle(item)} /><span className="break-all">{item.serialNumber}</span></span><span className="shrink-0 text-xs text-slate-500">{STATUS[item.status]}</span></label></li>)}</ul>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm"><span>Página {page} · {total} unidades</span><div className="flex gap-2"><button type="button" className={SECONDARY_BUTTON_CLASS} disabled={page === 1} onClick={() => setPage((value) => value - 1)}>Anterior</button><button type="button" className={SECONDARY_BUTTON_CLASS} disabled={page * 50 >= total} onClick={() => setPage((value) => value + 1)}>Siguiente</button></div></div>
+          <ul aria-label="Unidades para imprimir" className="grid max-h-72 min-w-0 grid-cols-1 gap-2 overflow-y-auto overscroll-contain rounded-lg sm:grid-cols-2 lg:grid-cols-3">{units.map((item) => <li key={item.id} className="min-w-0"><label className={`flex min-h-14 min-w-0 cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm transition-colors ${selected[item.id] ? 'border-brand-300 bg-brand-50' : 'border-slate-200 hover:bg-slate-50'}`}><input className="h-4 w-4 shrink-0 accent-brand-600" type="checkbox" checked={Boolean(selected[item.id])} onChange={() => toggle(item)} /><span className="min-w-0"><span className="block break-all font-mono font-medium text-slate-900">{item.serialNumber}</span><span className="mt-0.5 block text-xs text-slate-500">{STATUS[item.status]}</span></span></label></li>)}</ul>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500"><span>Página {page} · {total} unidades</span><div className="flex gap-2"><button type="button" className={SECONDARY_BUTTON_CLASS} disabled={page === 1} onClick={() => setPage((value) => value - 1)}>Anterior</button><button type="button" className={SECONDARY_BUTTON_CLASS} disabled={page * 50 >= total} onClick={() => setPage((value) => value + 1)}>Siguiente</button></div></div>
         </>}
       </>}
-      <p role="status" className="text-sm font-medium text-slate-700">{Object.keys(selected).length} unidades seleccionadas</p>
     </fieldset> : <div className="max-w-xs"><label htmlFor="label-copies" className={LABEL_CLASS}>Número de copias</label><input id="label-copies" type="number" min="1" max="100" step="1" inputMode="numeric" disabled={busy} value={copies} onChange={(event) => { setCopies(event.target.value); setLabels(null); }} className={TEXT_INPUT_CLASS} /></div>}
-    <div className="flex flex-wrap gap-2"><button type="button" disabled={busy || loading} onClick={() => void generate()} className={PRIMARY_BUTTON_CLASS}>{busy ? 'Generando…' : labels ? 'Descargar PDF nuevamente' : 'Generar PDF de etiquetas'}</button>{labels && <button type="button" disabled={busy} onClick={() => void generate(true)} className={SECONDARY_BUTTON_CLASS}>Abrir PDF para imprimir</button>}</div>
-    {labels && <Notification kind="success">PDF preparado: {labels.length} etiquetas sin precio.</Notification>}
+    <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0 sm:max-w-sm"><label htmlFor="label-layout" className={LABEL_CLASS}>Formato de etiquetas</label><select id="label-layout" disabled={busy} value={layout} onChange={(event) => setLayout(event.target.value as 'compact' | 'small')} className={TEXT_INPUT_CLASS}><option value="compact">Medianas · 93 × 30 mm (2 columnas)</option><option value="small">Pequeñas · 62 × 30 mm (3 columnas)</option></select></div>
+      <div className="flex flex-wrap gap-2"><button type="button" disabled={busy || loading} onClick={() => void generate()} className={PRIMARY_BUTTON_CLASS}>{busy ? 'Generando…' : labels ? 'Descargar PDF nuevamente' : 'Generar PDF de etiquetas'}</button>{labels && <button type="button" disabled={busy} onClick={() => void generate(true)} className={SECONDARY_BUTTON_CLASS}>Abrir PDF para imprimir</button>}</div>
+    </div>
+    {labels && !error && <Notification kind="success">PDF preparado: {labels.length} etiquetas sin precio.</Notification>}
   </section>;
 }

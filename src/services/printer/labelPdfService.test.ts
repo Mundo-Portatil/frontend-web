@@ -12,19 +12,22 @@ describe('printable inventory labels', () => {
     expect(() => buildLabelsPdf([])).toThrow(/Selecciona/);
   });
   it('builds real multi-page PDFs with bars and exact readable codes, omitting price', () => {
-    const doc = buildLabelsPdf(Array.from({ length: 15 }, (_, i) => ({ ...label, barcodeValue: `SN-${i}` })));
+    const doc = buildLabelsPdf(Array.from({ length: 17 }, (_, i) => ({ ...label, barcodeValue: `SN-${i}` })));
     expect(doc.getNumberOfPages()).toBe(2);
     expect(new TextDecoder().decode(doc.output('arraybuffer'))).toMatch(/^%PDF-/);
     const content = (doc.internal as unknown as { pages: string[][] }).pages.flat().join('\n');
     expect(content).toContain('(SN-0) Tj');
-    expect(content).toContain('(SN-14) Tj');
+    expect(content).toContain('(SN-16) Tj');
     expect(content).toContain(' re');
     expect(content).not.toContain('9876');
+    expect(content).not.toContain('Central');
     expect(() => downloadLabelsPdf([])).toThrow(/Selecciona/);
   });
   it('fits long codes without shrinking narrow bars and rejects codes too long for A4', () => {
     expect(buildLabelsPdf([{ ...label, barcodeValue: 'SDD-CLOSE-1795144709524-QTY' }]).getNumberOfPages()).toBe(1);
     expect(() => buildLabelsPdf([{ ...label, barcodeValue: 'A'.repeat(90) }])).toThrow(/demasiado largo/);
+    expect(() => buildLabelsPdf([{ ...label, barcodeValue: 'SDD-CLOSE-1795144709524-QTY' }], { layout: 'small' })).toThrow(/formato compacto/);
+    expect(buildLabelsPdf(Array.from({ length: 24 }, () => label), { layout: 'small' }).getNumberOfPages()).toBe(1);
   });
   it('opens a generated PDF and reports popup blocking instead of silent success', () => {
     vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:labels'), revokeObjectURL: vi.fn() });

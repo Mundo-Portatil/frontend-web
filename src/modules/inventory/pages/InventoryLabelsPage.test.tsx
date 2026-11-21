@@ -39,10 +39,14 @@ it('generates model copies and reopens the PDF without exposing a provisional ma
   expect(getModelLabels).not.toHaveBeenCalled();
   await user.clear(screen.getByLabelText('Número de copias')); await user.type(screen.getByLabelText('Número de copias'), '2');
   await user.click(screen.getByRole('button', { name: 'Generar PDF de etiquetas' }));
-  await waitFor(() => expect(downloadLabelsPdf).toHaveBeenCalledWith(labels));
+  await waitFor(() => expect(downloadLabelsPdf).toHaveBeenCalledWith(labels, undefined, { layout: 'compact' }));
   expect(getModelLabels).toHaveBeenCalledWith({ catalogId: product.id, copies: 2 });
   await user.click(screen.getByRole('button', { name: 'Abrir PDF para imprimir' }));
-  await waitFor(() => expect(openLabelsPdf).toHaveBeenCalledWith(labels));
+  await waitFor(() => expect(openLabelsPdf).toHaveBeenCalledWith(labels, { layout: 'compact' }));
+  expect(getModelLabels).toHaveBeenCalledTimes(1);
+  await user.selectOptions(screen.getByLabelText('Formato de etiquetas'), 'small');
+  await user.click(screen.getByRole('button', { name: 'Descargar PDF nuevamente' }));
+  await waitFor(() => expect(downloadLabelsPdf).toHaveBeenLastCalledWith(labels, undefined, { layout: 'small' }));
   expect(getModelLabels).toHaveBeenCalledTimes(1);
   await user.clear(screen.getByLabelText('Número de copias')); await user.type(screen.getByLabelText('Número de copias'), '1');
   vi.mocked(getModelLabels).mockResolvedValue([labels[0]]);
@@ -52,13 +56,15 @@ it('generates model copies and reopens the PDF without exposing a provisional ma
 });
 it('selects exact individual units and keeps reprinting available beyond stock', async () => {
   const user = await choose(true);
-  await user.click(await screen.findByRole('checkbox', { name: /SN-A/ }));
+  const unitCheckbox = await screen.findByRole('checkbox', { name: /SN-A/ });
+  expect(screen.getByRole('list', { name: 'Unidades para imprimir' })).toHaveClass('sm:grid-cols-2', 'lg:grid-cols-3', 'max-h-72');
+  await user.click(unitCheckbox);
   await user.click(screen.getByRole('button', { name: 'Generar PDF de etiquetas' }));
-  await waitFor(() => expect(downloadLabelsPdf).toHaveBeenCalledWith([label]));
+  await waitFor(() => expect(downloadLabelsPdf).toHaveBeenCalledWith([label], undefined, { layout: 'compact' }));
   expect(getBatchLabels).toHaveBeenCalledWith(['unit-a']);
   await user.click(screen.getByLabelText('Incluir unidades vendidas y otros estados para reimprimir'));
   await waitFor(() => expect(listHardwareUnits).toHaveBeenLastCalledWith({ catalogItemId: 'model', page: 1, limit: 50 }, expect.any(AbortSignal)));
-  expect(screen.getByText('0 unidades seleccionadas')).toBeInTheDocument();
+  expect(screen.getByText('0 etiquetas para imprimir')).toBeInTheDocument();
 });
 it('selects all matching units across pages rather than only the visible page', async () => {
   const second = { ...unit, id: 'unit-b', serialNumber: 'SN-B' };
@@ -67,7 +73,7 @@ it('selects all matching units across pages rather than only the visible page', 
     .mockResolvedValueOnce({ items: [second], total: 2, page: 2, limit: 50 });
   const user = await choose(true);
   await user.click(await screen.findByRole('button', { name: 'Seleccionar todas (51)' }));
-  expect(await screen.findByText('2 unidades seleccionadas')).toBeInTheDocument();
+  expect(await screen.findByText('2 etiquetas para imprimir')).toBeInTheDocument();
   expect(listHardwareUnits).toHaveBeenLastCalledWith({ catalogItemId: 'model', status: 'EN_STOCK', page: 2, limit: 50 });
 });
 it('reports failed requests and mismatched unit labels without generating a PDF', async () => {
@@ -80,4 +86,18 @@ it('reports failed requests and mismatched unit labels without generating a PDF'
   vi.mocked(getBatchLabels).mockRejectedValue({ kind: 'network', message: 'Sin conexión' });
   await user.click(screen.getByRole('button', { name: 'Generar PDF de etiquetas' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Sin conexión');
+});
+
+it('retains validated labels when a small format cannot fit the barcode', async () => {
+  const labels = [{ catalogId: product.id, barcodeValue: product.sku, title: product.name, specsSummary: '', locationName: 'Central', price: 100, copyNumber: 1, totalCopies: 1 }];
+  vi.mocked(getModelLabels).mockResolvedValue(labels);
+  vi.mocked(downloadLabelsPdf).mockImplementationOnce(() => { throw new Error('El código no cabe en el formato pequeño. Selecciona etiquetas medianas.'); });
+  const user = await choose();
+  await user.selectOptions(screen.getByLabelText('Formato de etiquetas'), 'small');
+  await user.click(screen.getByRole('button', { name: 'Generar PDF de etiquetas' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('no cabe');
+  await user.selectOptions(screen.getByLabelText('Formato de etiquetas'), 'compact');
+  await user.click(screen.getByRole('button', { name: 'Descargar PDF nuevamente' }));
+  await waitFor(() => expect(downloadLabelsPdf).toHaveBeenLastCalledWith(labels, undefined, { layout: 'compact' }));
+  expect(getModelLabels).toHaveBeenCalledTimes(1);
 });

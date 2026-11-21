@@ -23,69 +23,76 @@ export function encodeLabelBarcode(value: string): string {
   return bits;
 }
 
-const MODULE_MM = 0.3;
+const MODULE_MM = 0.254;
 const QUIET_MODULES = 10;
-const GAP = 5;
-const LEFT = 12;
-const TOP = 12;
-const FULL_WIDTH = 186;
-const HALF_WIDTH = (FULL_WIDTH - GAP) / 2;
-const LABEL_HEIGHT = 40;
+const GAP_MM = 4;
+const MARGIN_MM = 8;
 
-/** Vector bars stay sharp when printing; no canvas, raster fallback or identifier rewriting. */
-export function buildLabelsPdf(labels: readonly PrintableBarcodeLabel[]): jsPDF {
+export interface LabelPdfOptions {
+  /** A4 sheets for cutting; these are not thermal-printer media settings. */
+  layout?: 'compact' | 'small';
+}
+
+export const LABEL_PDF_LAYOUTS = {
+  compact: { widthMm: 93, heightMm: 30 },
+  small: { widthMm: 62, heightMm: 30 },
+} as const;
+
+/** Fixed physical modules preserve scanning: never stretch bars to fill a label. */
+export function buildLabelsPdf(labels: readonly PrintableBarcodeLabel[], options: LabelPdfOptions = {}): jsPDF {
   if (!labels.length) throw new Error('Selecciona al menos una etiqueta.');
-  const encoded = labels.map((label) => ({ label, bits: encodeLabelBarcode(label.barcodeValue) }));
+  const layout = LABEL_PDF_LAYOUTS[options.layout ?? 'compact'];
+  const encoded = labels.map((label) => {
+    const bits = encodeLabelBarcode(label.barcodeValue);
+    const barcodeWidth = (bits.length + QUIET_MODULES * 2) * MODULE_MM;
+    if (barcodeWidth > layout.widthMm - 4) {
+      throw new Error(options.layout === 'small'
+        ? 'El código no cabe en la etiqueta pequeña sin perder legibilidad. Elige el formato compacto.'
+        : 'El código es demasiado largo para este formato de etiqueta. Se requiere un formato de mayor ancho.');
+    }
+    return { label, bits, barcodeWidth };
+  });
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
   doc.setProperties({ title: 'Etiquetas de inventario', subject: 'Códigos de barras Code 128' });
-  let column = 0;
-  let y = TOP;
-  for (const { label, bits } of encoded) {
-    const barcodeWidth = (bits.length + QUIET_MODULES * 2) * MODULE_MM;
-    const wide = barcodeWidth > HALF_WIDTH - 8;
-    if (barcodeWidth > FULL_WIDTH - 8) throw new Error('El código es demasiado largo para una etiqueta legible en A4.');
-    if (wide && column) { column = 0; y += LABEL_HEIGHT + GAP; }
-    if (y + LABEL_HEIGHT > 285) { doc.addPage(); y = TOP; column = 0; }
-    const width = wide ? FULL_WIDTH : HALF_WIDTH;
-    const x = LEFT + column * (HALF_WIDTH + GAP);
+  const columns = Math.floor((210 - MARGIN_MM * 2 + GAP_MM) / (layout.widthMm + GAP_MM));
+  const rows = Math.floor((297 - MARGIN_MM * 2 + GAP_MM) / (layout.heightMm + GAP_MM));
+  const perPage = columns * rows;
+  encoded.forEach(({ label, bits, barcodeWidth }, index) => {
+    if (index > 0 && index % perPage === 0) doc.addPage();
+    const position = index % perPage;
+    const x = MARGIN_MM + (position % columns) * (layout.widthMm + GAP_MM);
+    const y = MARGIN_MM + Math.floor(position / columns) * (layout.heightMm + GAP_MM);
     doc.setDrawColor(195);
     doc.setLineWidth(0.15);
-    doc.rect(x, y, width, LABEL_HEIGHT);
+    doc.rect(x, y, layout.widthMm, layout.heightMm);
     doc.setTextColor(20);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    const titleLines = doc.splitTextToSize(label.title || 'Producto', width - 8) as string[];
-    doc.text(titleLines.slice(0, 2), x + width / 2, y + 5, { align: 'center' });
-    const startX = x + (width - barcodeWidth) / 2 + QUIET_MODULES * MODULE_MM;
+    doc.setFontSize(8);
+    const titleLines = doc.splitTextToSize(label.title || 'Producto', layout.widthMm - 4) as string[];
+    doc.text(titleLines.slice(0, 2), x + layout.widthMm / 2, y + 4, { align: 'center' });
+    const startX = x + (layout.widthMm - barcodeWidth) / 2 + QUIET_MODULES * MODULE_MM;
     doc.setFillColor(0, 0, 0);
     for (let offset = 0; offset < bits.length;) {
       if (bits[offset] === '0') { offset += 1; continue; }
       let end = offset + 1;
       while (bits[end] === '1') end += 1;
-      doc.rect(startX + offset * MODULE_MM, y + 11, (end - offset) * MODULE_MM, 13, 'F');
+      doc.rect(startX + offset * MODULE_MM, y + 9, (end - offset) * MODULE_MM, 12, 'F');
       offset = end;
     }
     doc.setFont('courier', 'normal');
     doc.setFontSize(8);
-    doc.text(label.barcodeValue, x + width / 2, y + 28, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    const specs = label.specsSummary && label.specsSummary !== 'N/A' ? label.specsSummary : '';
-    const footer = [specs, label.locationName].filter(Boolean).join(' | ');
-    const footerLines = doc.splitTextToSize(footer, width - 8) as string[];
-    if (footerLines.length) doc.text(footerLines.slice(0, 2), x + width / 2, y + 33, { align: 'center' });
-    if (wide || column) { column = 0; y += LABEL_HEIGHT + GAP; } else column = 1;
-  }
+    doc.text(label.barcodeValue, x + layout.widthMm / 2, y + 26, { align: 'center' });
+  });
   return doc;
 }
 
-export function downloadLabelsPdf(labels: readonly PrintableBarcodeLabel[], fileName = 'etiquetas-inventario.pdf'): void {
-  buildLabelsPdf(labels).save(fileName);
+export function downloadLabelsPdf(labels: readonly PrintableBarcodeLabel[], fileName = 'etiquetas-inventario.pdf', options: LabelPdfOptions = {}): void {
+  buildLabelsPdf(labels, options).save(fileName);
 }
 
 /** Use from a user click; fail clearly if the browser blocks opening the PDF. */
-export function openLabelsPdf(labels: readonly PrintableBarcodeLabel[]): void {
-  const blob = buildLabelsPdf(labels).output('blob');
+export function openLabelsPdf(labels: readonly PrintableBarcodeLabel[], options: LabelPdfOptions = {}): void {
+  const blob = buildLabelsPdf(labels, options).output('blob');
   const url = URL.createObjectURL(blob);
   const opened = window.open(url, '_blank');
   if (!opened) {

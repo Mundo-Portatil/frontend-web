@@ -44,7 +44,7 @@ La ficha ofrece consulta paginada de unidades con `GET /hardware-items` e histor
 
 ## Etiquetas
 
-`POST /inventory/barcode-labels/by-model` acepta `catalogId`, `copies` (1–100) y `locationId` opcional; sin ubicación el servidor resuelve Central. Se presenta el código devuelto (SKU), título, características pertinentes, ubicación y número de copia. No se modifica el formato ni se incluye el precio en la vista.
+`POST /inventory/barcode-labels/by-model` acepta `catalogId`, `copies` (1–100) y `locationId` opcional; sin ubicación el servidor resuelve Central. El PDF presenta el código devuelto (SKU) y la identificación del producto; las copias conservan ese código. No se modifica el formato ni se incluye el precio en la vista.
 
 Para unidades se conserva `POST /hardware-items/barcode-labels/batch`, selección múltiple y reimpresión. La generación de datos alimenta un documento PDF con códigos CODE128 vectoriales, sin precio, descargable y abrible para imprimir mediante el visor del usuario. La comunicación directa con impresoras físicas sigue requiriendo su ADR previo.
 
@@ -78,3 +78,10 @@ Por solicitud posterior del usuario, Etiquetas permite buscar el modelo y genera
 El ingreso serializado presenta un campo numerado por unidad. Enter avanza entre campos; la revisión comprueba vacíos y duplicados normalizados. Reducir temporalmente la cantidad no borra los valores para cuando se restaure. Solo se envían las series de la cantidad confirmada.
 
 Se verificaron contra el servidor local autenticación, catálogo, ubicaciones, stock, generación de copias por modelo y correspondencia serie-etiqueta de unidad existente, sin registrar mercancía adicional. La conexión de navegador de la sesión no estaba disponible; esa revisión visual de la aplicación no se considera realizada.
+
+
+## Ajustes de usabilidad del registro y PDF
+
+La cantidad se muestra desde el inicio como «Cantidad que ingresa», junto a la selección o los datos del modelo. «Continuar con el ingreso» prepara el modelo nuevo sin guardarlo; las unidades se revisan y se confirman en el mismo flujo. Se conserva la cantidad al cambiar de modo, y las series al reducir/restaurar el conteo.
+
+Etiquetas presenta unidades en una cuadrícula responsive con selección individual, de todas las páginas y contador de etiquetas. El formato PDF se elige sin repetir la solicitud de etiquetas al servidor: A4 compacto de 93 × 30 mm (dos columnas), o pequeño de 62 × 30 mm (tres columnas). Son formatos para hojas imprimibles, no una configuración de impresora térmica. Cada etiqueta contiene producto, código legible y barras CODE128; se omiten precio, ubicación y características extensas. Las barras conservan módulos físicos de 0,254 mm y márgenes de silencio; si un código no cabe, se informa el problema en lugar de comprimirlo o truncarlo. Se mantienen los identificadores originales y no se modifica stock al imprimir.
