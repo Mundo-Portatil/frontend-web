@@ -8,18 +8,20 @@ interface RoleGuardProps {
   /** Roles allowed to access the wrapped route. */
   allowedRoles: Role[];
   children: ReactNode;
+  /** Optional redirect URL when unauthorized. Defaults to /unauthorized. */
+  fallbackUrl?: string;
 }
 
 /**
  * Restricts route access to the given roles (FR-012 / FR-014). The role check
  * delegates to the shared `useHasRole` mechanism; users with a role outside
- * `allowedRoles` are redirected to /unauthorized.
+ * `allowedRoles` are redirected to fallbackUrl (or /unauthorized).
  */
-export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
+export function RoleGuard({ allowedRoles, children, fallbackUrl }: RoleGuardProps) {
   const isAllowed = useHasRole(allowedRoles);
 
   if (!isAllowed) {
-    return <Navigate to={ROUTES.unauthorized} replace />;
+    return <Navigate to={fallbackUrl ?? ROUTES.unauthorized} replace />;
   }
 
   return <>{children}</>;

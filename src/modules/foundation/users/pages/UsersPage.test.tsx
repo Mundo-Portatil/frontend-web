@@ -418,3 +418,12 @@ it('ends a confirmed own-account deactivation even if the profile refresh has a 
   expect(getProfile).toHaveBeenCalledTimes(1);
   expect(getAccessToken()).toBeNull();
 });
+
+it('allows selecting ENCARGADO_ALMACEN role when creating a user', async () => {
+  vi.mocked(userService.listUsers).mockResolvedValueOnce(SAMPLE_USERS);
+  useAuthStore.setState(ADMIN_SESSION);
+  render(<UsersPage />);
+  const roleSelect = await screen.findByLabelText('Rol');
+  expect(within(roleSelect).getByRole('option', { name: 'Encargado de almacén' })).toBeInTheDocument();
+});
+

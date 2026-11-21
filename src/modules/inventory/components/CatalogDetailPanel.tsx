@@ -58,7 +58,7 @@ export function CatalogDetailPanel({ id, onClose }: { id: string; onClose: () =>
       ) : (
         <div className="mt-4 space-y-5">
           <div className="min-w-0">
-            <h4 className="break-words font-semibold text-slate-900">{detail.item.name}</h4>
+            <h4 className="break-words font-semibold text-slate-900">{detail.item.brand} {detail.item.model}</h4>
             <p className="mt-1 break-words text-xs text-slate-500">Código de producto: {detail.item.sku}</p>
           </div>
 

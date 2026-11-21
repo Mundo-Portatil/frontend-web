@@ -7,12 +7,13 @@ import { AuditLogsPage } from '../modules/foundation/audit-logs/pages/AuditLogsP
 import { LocationsPage } from '../modules/foundation/locations/pages/LocationsPage';
 import { ProfilePage } from '../modules/foundation/users/pages/ProfilePage';
 import { UsersPage } from '../modules/foundation/users/pages/UsersPage';
-import { CatalogPage } from '../modules/inventory/pages/CatalogPage';
-import { InventoryPage } from '../modules/inventory/pages/InventoryPage';
-import { HardwareInboundPage } from '../modules/inventory/pages/HardwareInboundPage';
-import { QuantityStockPage } from '../modules/inventory/pages/QuantityStockPage';
 import { InventoryLayout } from '../modules/inventory/components/InventoryLayout';
-import { CategoriesPage } from '../modules/inventory';
+import { InventoryCatalogPage } from '../modules/inventory/pages/InventoryCatalogPage';
+import { InventoryCategoriesPage } from '../modules/inventory/pages/InventoryCategoriesPage';
+import { InventoryInboundPage } from '../modules/inventory/pages/InventoryInboundPage';
+import { InventoryLabelsPage } from '../modules/inventory/pages/InventoryLabelsPage';
+import { InventorySecondHandPage } from '../modules/inventory/pages/InventorySecondHandPage';
+import { InventoryStockPage } from '../modules/inventory/pages/InventoryStockPage';
 import { useAuthStore } from '../stores/authStore';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleGuard } from './RoleGuard';
@@ -53,10 +54,6 @@ function WildcardRedirect() {
 
 /**
  * Centralized route configuration for the application.
- *
- * - Public routes: /login.
- * - Protected routes (session required): rendered inside AppLayout.
- * - ADMIN-only routes: wrapped with RoleGuard.
  */
 export function AppRouter() {
   return (
@@ -66,19 +63,58 @@ export function AppRouter() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path={ROUTES.inventory} element={<InventoryLayout />}>
-            <Route index element={<InventoryPage />} />
-            <Route path="stock" element={<QuantityStockPage />} />
+            <Route index element={<Navigate to={ROUTES.inventoryStock} replace />} />
+            <Route path="stock" element={<InventoryStockPage />} />
             <Route
               path="inbound"
               element={
-                <RoleGuard allowedRoles={['ADMIN']}>
-                  <HardwareInboundPage />
+                <RoleGuard
+                  allowedRoles={['ADMIN', 'ENCARGADO_ALMACEN']}
+                  fallbackUrl={ROUTES.inventoryStock}
+                >
+                  <InventoryInboundPage />
                 </RoleGuard>
               }
             />
-            <Route path="catalog" element={<CatalogPage />} />
-            <Route path="categories" element={<CategoriesPage />} />
+            <Route
+              path="catalog"
+              element={
+                <RoleGuard
+                  allowedRoles={['ADMIN', 'ENCARGADO_ALMACEN']}
+                  fallbackUrl={ROUTES.inventoryStock}
+                >
+                  <InventoryCatalogPage />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="categories"
+              element={
+                <RoleGuard
+                  allowedRoles={['ADMIN', 'ENCARGADO_ALMACEN']}
+                  fallbackUrl={ROUTES.inventoryStock}
+                >
+                  <InventoryCategoriesPage />
+                </RoleGuard>
+              }
+            />
+            <Route path="labels" element={<InventoryLabelsPage />} />
+            <Route
+              path="second-hand"
+              element={
+                <RoleGuard
+                  allowedRoles={['ADMIN', 'ENCARGADO_ALMACEN']}
+                  fallbackUrl={ROUTES.inventoryStock}
+                >
+                  <InventorySecondHandPage />
+                </RoleGuard>
+              }
+            />
+
+            {/* Legacy alias */}
+            <Route path="consult" element={<Navigate to={ROUTES.inventoryStock} replace />} />
           </Route>
+
           <Route path={ROUTES.profile} element={<ProfilePage />} />
           <Route path={ROUTES.locations} element={<LocationsPage />} />
           <Route path={ROUTES.unauthorized} element={<UnauthorizedPage />} />

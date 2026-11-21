@@ -7,7 +7,7 @@ import { CatalogDetailPanel } from './CatalogDetailPanel';
 
 vi.mock('../services/catalogService', () => ({ getCatalogDetail: vi.fn() }));
 const item: CatalogItem = {
-  id: 'product', name: 'Memoria 16GB', sku: 'RAM-16', brand: 'Kingston', model: 'K16', categoryId: 'category',
+  id: 'product', sku: 'RAM-16', brand: 'Kingston', model: 'K16', categoryId: 'category',
   processor: null, ramCapacity: '16 GB', storageCapacity: null, gpu: null, screenSize: null,
   isSerialized: true, minStockThreshold: 0, basePrice: 0, isSecondHand: false, active: true, createdAt: '',
 };
@@ -23,7 +23,7 @@ beforeEach(() => {
 it('shows only populated RAM characteristics and preserves zero general values', async () => {
   const user = userEvent.setup();
   render(<CatalogDetailPanel id="product" onClose={vi.fn()} />);
-  await screen.findByText('Memoria 16GB');
+  await screen.findByRole('heading', { level: 4, name: 'Kingston K16' });
   expect(screen.getByText('Código de producto: RAM-16')).toBeInTheDocument();
   const general = screen.getByRole('region', { name: 'Información general' });
   expect(within(general).getAllByText('0')).toHaveLength(2);
@@ -40,11 +40,11 @@ it('shows only populated RAM characteristics and preserves zero general values',
 
 it('keeps laptop technical values in a compact expandable section regardless of category name', async () => {
   vi.mocked(getCatalogDetail).mockResolvedValue({ ...detail, categoryName: 'Portátiles de trabajo', item: {
-    ...item, name: 'Laptop de trabajo', processor: 'Intel i5', ramCapacity: '16 GB', storageCapacity: '512 GB', gpu: 'Iris Xe', screenSize: '15.6 pulgadas',
+    ...item, brand: 'Acer', model: 'Aspire 5', processor: 'Intel i5', ramCapacity: '16 GB', storageCapacity: '512 GB', gpu: 'Iris Xe', screenSize: '15.6 pulgadas',
   } });
   const user = userEvent.setup();
   render(<CatalogDetailPanel id="product" onClose={vi.fn()} />);
-  await screen.findByText('Laptop de trabajo');
+  await screen.findByRole('heading', { level: 4, name: 'Acer Aspire 5' });
   const summary = screen.getByText('Características técnicas');
   expect(summary.closest('details')).not.toHaveAttribute('open');
   await user.click(summary);

@@ -115,7 +115,7 @@ export function CatalogProductPicker({
   function choose(item: CatalogItem) {
     if (disabled) return;
     setSelected(item);
-    setSearch(`${item.name} · ${item.sku}`);
+    setSearch(`${item.brand} ${item.model} · ${item.sku}`);
     setActiveIndex(-1);
     onChange(item.id);
     onSelect?.(item);
@@ -244,7 +244,7 @@ export function CatalogProductPicker({
                   onClick={() => choose(item)}
                   className={`w-full break-words rounded-md px-3 py-2 text-left text-sm text-slate-900 hover:bg-brand-50 ${activeIndex === index ? 'bg-brand-50 ring-1 ring-inset ring-brand-300' : ''}`}
                 >
-                  {item.name} · {item.sku}{!item.active && !activeOnly ? ' (inactivo)' : ''}
+                  {item.brand} {item.model} · {item.sku}{!item.active && !activeOnly ? ' (inactivo)' : ''}
                 </button>
               </li>
             ))}
@@ -256,7 +256,7 @@ export function CatalogProductPicker({
         {error ? <ErrorState error={error} onRetry={disabled ? undefined : () => setRevision((value) => value + 1)} />
           : busy && expanded ? <p role="status" className="text-sm text-slate-500">Buscando productos…</p>
           : expanded && !selected && !results.items.length ? <p role="status" className="text-sm text-slate-600">{emptyMessage}</p>
-          : selected ? <p role="status" className="sr-only">Seleccionado: {selected.name} · {selected.sku}</p> : null}
+          : selected ? <p role="status" className="sr-only">Seleccionado: {selected.brand} {selected.model} · {selected.sku}</p> : null}
       </div>
     </div>
   );

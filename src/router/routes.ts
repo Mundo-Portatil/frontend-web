@@ -9,10 +9,14 @@ export const ROUTES = {
   users: '/users',
   profile: '/profile',
   inventory: '/inventory',
-  inventoryInbound: '/inventory/inbound',
   inventoryStock: '/inventory/stock',
-  inventoryCategories: '/inventory/categories',
+  inventoryInbound: '/inventory/inbound',
   inventoryCatalog: '/inventory/catalog',
+  inventoryCategories: '/inventory/categories',
+  inventoryLabels: '/inventory/labels',
+  inventorySecondHand: '/inventory/second-hand',
+  // Legacy alias
+  inventoryConsult: '/inventory/stock',
   auditLogs: '/audit-logs',
   unauthorized: '/unauthorized',
 } as const;

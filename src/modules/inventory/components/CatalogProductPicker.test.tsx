@@ -6,7 +6,18 @@ import { listCatalog } from '../services/catalogService';
 import type { CatalogItem } from '../catalogModels';
 
 vi.mock('../services/catalogService', () => ({ listCatalog: vi.fn() }));
-const product = { id: 'mouse', name: 'Mouse Logitech', sku: 'M170', isSerialized: false, active: true } as CatalogItem;
+
+const product = {
+  id: 'mouse',
+  brand: 'Logitech',
+  model: 'M170',
+  sku: 'M170',
+  isSerialized: false,
+  active: true,
+  basePrice: 30,
+  categoryId: 'c1',
+} as CatalogItem;
+
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(listCatalog).mockResolvedValue({ items: [product], total: 1, page: 1, limit: 50 });
@@ -20,10 +31,10 @@ it.each(['Logitech', 'M170'])('searches %s and selects with keyboard without sub
   const input = screen.getByRole('combobox', { name: 'Producto por cantidad' });
   await user.type(input, `${search}{Enter}`);
   await waitFor(() => expect(listCatalog).toHaveBeenLastCalledWith({ active: true, page: 1, limit: 50, search }, expect.any(AbortSignal)));
-  await screen.findByRole('option', { name: 'Mouse Logitech · M170' });
+  await screen.findByRole('option', { name: 'Logitech M170 · M170' });
   await user.keyboard('{ArrowDown}{Enter}');
   expect(selected).toHaveBeenCalledWith(product);
-  expect(input).toHaveValue('Mouse Logitech · M170');
+  expect(input).toHaveValue('Logitech M170 · M170');
   expect(input).toHaveAttribute('aria-expanded', 'false');
   expect(submit).not.toHaveBeenCalled();
 });
@@ -35,7 +46,7 @@ it('automatically skips pages containing only serialised products before announc
   const user = userEvent.setup();
   render(<CatalogProductPicker id="product" serialized={false} onChange={vi.fn()} />);
   await user.click(screen.getByRole('combobox'));
-  expect(await screen.findByRole('option', { name: 'Mouse Logitech · M170' })).toBeInTheDocument();
+  expect(await screen.findByRole('option', { name: 'Logitech M170 · M170' })).toBeInTheDocument();
   expect(listCatalog).toHaveBeenLastCalledWith({ active: true, page: 2, limit: 50 }, expect.any(AbortSignal));
   expect(screen.queryByText(/No se encontraron productos/)).not.toBeInTheDocument();
 });
@@ -59,12 +70,12 @@ it('excludes inactive entry products but includes them when filtering existing s
   entry.unmount();
   render(<CatalogProductPicker id="filter" serialized={false} activeOnly={false} onChange={vi.fn()} />);
   await user.click(screen.getByRole('combobox'));
-  expect(await screen.findByRole('option', { name: 'Mouse Logitech · M170 (inactivo)' })).toBeInTheDocument();
+  expect(await screen.findByRole('option', { name: 'Logitech M170 · M170 (inactivo)' })).toBeInTheDocument();
   expect(listCatalog).toHaveBeenLastCalledWith({ page: 1, limit: 50 }, expect.any(AbortSignal));
 });
 
 it('appends and deduplicates more products and clears the selection when changing it', async () => {
-  const second = { ...product, id: 'keyboard', name: 'Teclado', sku: 'K120' };
+  const second = { ...product, id: 'keyboard', brand: 'Logitech', model: 'K120', sku: 'K120' };
   vi.mocked(listCatalog)
     .mockResolvedValueOnce({ items: [product], total: 51, page: 1, limit: 50 })
     .mockResolvedValueOnce({ items: [product, second], total: 51, page: 2, limit: 50 });
@@ -74,9 +85,9 @@ it('appends and deduplicates more products and clears the selection when changin
   render(<CatalogProductPicker id="product" serialized={false} onChange={onChange} onSelect={onSelect} />);
   await user.click(screen.getByRole('combobox'));
   await user.click(await screen.findByRole('button', { name: 'Más productos' }));
-  await screen.findByRole('option', { name: 'Teclado · K120' });
+  await screen.findByRole('option', { name: 'Logitech K120 · K120' });
   expect(screen.getAllByRole('option')).toHaveLength(2);
-  await user.click(screen.getByRole('option', { name: 'Mouse Logitech · M170' }));
+  await user.click(screen.getByRole('option', { name: 'Logitech M170 · M170' }));
   expect(onChange).toHaveBeenLastCalledWith('mouse');
   await user.type(screen.getByRole('combobox'), 'X');
   expect(onChange).toHaveBeenLastCalledWith('');
@@ -91,10 +102,10 @@ it('ignores an obsolete response after starting another search', async () => {
   const user = userEvent.setup();
   render(<CatalogProductPicker id="product" serialized={false} onChange={vi.fn()} />);
   await user.type(screen.getByRole('combobox'), 'M170{Enter}');
-  await screen.findByRole('option', { name: 'Mouse Logitech · M170' });
-  finish({ items: [{ ...product, name: 'Resultado obsoleto' }], total: 1, page: 1, limit: 50 });
-  await waitFor(() => expect(screen.queryByRole('option', { name: /obsoleto/ })).not.toBeInTheDocument());
-  expect(screen.getByRole('option', { name: 'Mouse Logitech · M170' })).toBeInTheDocument();
+  await screen.findByRole('option', { name: 'Logitech M170 · M170' });
+  finish({ items: [{ ...product, brand: 'Obsoleto', model: 'Item' }], total: 1, page: 1, limit: 50 });
+  await waitFor(() => expect(screen.queryByRole('option', { name: /Obsoleto/ })).not.toBeInTheDocument());
+  expect(screen.getByRole('option', { name: 'Logitech M170 · M170' })).toBeInTheDocument();
 });
 
 it('closes with Escape and does not change values when disabled', async () => {
@@ -121,7 +132,7 @@ it('does not offer old matches or their next page when a new search fails', asyn
   const user = userEvent.setup();
   render(<CatalogProductPicker id="product" serialized={false} onChange={onChange} />);
   await user.click(screen.getByRole('combobox'));
-  await screen.findByRole('option', { name: 'Mouse Logitech · M170' });
+  await screen.findByRole('option', { name: 'Logitech M170 · M170' });
   expect(screen.getByRole('button', { name: 'Más productos' })).toBeInTheDocument();
   await user.type(screen.getByRole('combobox'), 'Otro producto{Enter}');
   expect(await screen.findByRole('alert')).toHaveTextContent('Sin conexión');
@@ -132,11 +143,11 @@ it('does not offer old matches or their next page when a new search fails', asyn
 
 it.each([true, false])('offers every eligible product from the five-product catalogue (serialized=%s)', async (serialized) => {
   const items = [
-    { ...product, id: 'asus', name: 'asus tuf', sku: '874598', isSerialized: true },
-    { ...product, id: 'lenovo', name: 'lenovo v15', sku: '1346789', isSerialized: true },
-    { ...product, id: 'other-series', name: 'Otro equipo', sku: 'OFF', isSerialized: true },
+    { ...product, id: 'asus', brand: 'Asus', model: 'TUF', sku: '874598', isSerialized: true },
+    { ...product, id: 'lenovo', brand: 'Lenovo', model: 'V15', sku: '1346789', isSerialized: true },
+    { ...product, id: 'other-series', brand: 'Otro', model: 'Equipo', sku: 'OFF', isSerialized: true },
     product,
-    { ...product, id: 'inactive', name: 'Equipo inactivo', sku: 'SER', isSerialized: true, active: false },
+    { ...product, id: 'inactive', brand: 'Equipo', model: 'Inactivo', sku: 'SER', isSerialized: true, active: false },
   ];
   vi.mocked(listCatalog).mockResolvedValue({ items, total: 5, page: 1, limit: 50 });
   const user = userEvent.setup();
@@ -145,12 +156,12 @@ it.each([true, false])('offers every eligible product from the five-product cata
   await user.click(input);
   await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(serialized ? 3 : 1));
   if (serialized) {
-    expect(screen.getByRole('option', { name: 'asus tuf · 874598' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'lenovo v15 · 1346789' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Asus TUF · 874598' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Lenovo V15 · 1346789' })).toBeInTheDocument();
   } else {
-    expect(screen.getByRole('option', { name: 'Mouse Logitech · M170' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Logitech M170 · M170' })).toBeInTheDocument();
   }
-  expect(screen.queryByRole('option', { name: /Equipo inactivo/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('option', { name: /Equipo Inactivo/ })).not.toBeInTheDocument();
   await user.keyboard('{Escape}');
   expect(screen.queryByRole('option')).not.toBeInTheDocument();
   await user.click(input);
