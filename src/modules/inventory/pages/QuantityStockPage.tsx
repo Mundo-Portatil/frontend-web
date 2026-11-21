@@ -1,7 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { useRestoreFocus } from '../../../hooks/useRestoreFocus';
-import { Can } from '../../../components/guards/Can';
+import { useEffect, useState } from 'react';
 import { EmptyState } from '../../../components/feedback/EmptyState';
 import { ErrorState } from '../../../components/feedback/ErrorState';
 import { LoadingState } from '../../../components/feedback/LoadingState';
@@ -9,7 +6,6 @@ import { Notification } from '../../../components/notifications/Notification';
 import { asAppError, type AppError } from '../../../services/api/errors';
 import {
   LABEL_CLASS,
-  PRIMARY_BUTTON_CLASS,
   SECONDARY_BUTTON_CLASS,
   TEXT_INPUT_CLASS,
 } from '../../../utils/formStyles';
@@ -18,14 +14,12 @@ import { listLocations } from '../../foundation/locations/services/locationServi
 import type { Location } from '../../foundation/locations/models';
 import { listCategories } from '../services/categoryService';
 import type { Category } from '../models';
-import type { QuantityStockQuery, QuantityStock } from '../quantityModels';
+import type { QuantityStockQuery } from '../quantityModels';
 import { useQuantityStock } from '../hooks/useQuantityStock';
 import { CatalogProductPicker } from '../components/CatalogProductPicker';
-import { QuantityStockForm } from '../components/QuantityStockForm';
 import { InventoryBadge } from '../components/InventoryBadge';
 
 export function QuantityStockPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
   const { query, setQuery, data, loading, error, reload } = useQuantityStock();
   const [locations, setLocations] = useState<Location[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -35,22 +29,6 @@ export function QuantityStockPage() {
   const [limit, setLimit] = useState('50');
   const [filterError, setFilterError] = useState<string | null>(null);
   const [filterKey, setFilterKey] = useState(0);
-  const [saved, setSaved] = useState<QuantityStock | null>(null);
-  const showMovement = searchParams.get('operation') === 'inbound';
-  const [movementBusy, setMovementBusy] = useState(false);
-  const movementPending = useRef(false);
-  const movementTriggerRef = useRef<HTMLButtonElement>(null);
-  const restoreMovementFocus = useRestoreFocus(showMovement, movementTriggerRef);
-
-  function closeMovement() {
-    if (searchParams.has('operation')) {
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.delete('operation');
-      setSearchParams(nextParams, { replace: true });
-    }
-    restoreMovementFocus();
-  }
-
   useEffect(() => {
     let ignore = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -97,28 +75,7 @@ export function QuantityStockPage() {
             Cantidades registradas por ubicación.
           </p>
         </div>
-        <Can roles={['ADMIN']}>
-          <button
-            ref={movementTriggerRef}
-            type="button"
-            disabled={movementBusy}
-            aria-expanded={showMovement}
-            aria-controls="stock-movement-panel"
-            onClick={() => {
-              if (movementPending.current) return;
-              if (showMovement) {
-                closeMovement();
-              } else {
-                const nextParams = new URLSearchParams(searchParams);
-                nextParams.set('operation', 'inbound');
-                setSearchParams(nextParams);
-              }
-            }}
-            className={showMovement ? SECONDARY_BUTTON_CLASS : PRIMARY_BUTTON_CLASS}
-          >
-            {showMovement ? 'Cerrar registro' : 'Agregar o corregir cantidades'}
-          </button>
-        </Can>
+
       </header>
 
       {referenceError && (
@@ -128,35 +85,6 @@ export function QuantityStockPage() {
         />
       )}
       {referenceLoading && <LoadingState message="Cargando ubicaciones y categorías…" />}
-
-      <Can roles={['ADMIN']}>
-        <div
-          id="stock-movement-panel"
-          hidden={!showMovement || referenceLoading || Boolean(referenceError)}
-        >
-          {showMovement && !referenceLoading && !referenceError && (
-            <QuantityStockForm
-              locations={locations}
-              onBusyChange={(value) => {
-                movementPending.current = value;
-                setMovementBusy(value);
-              }}
-              onSaved={(result) => {
-                setSaved(result);
-                closeMovement();
-                setQuery((current) => ({ ...current, page: 1 }));
-              }}
-            />
-          )}
-        </div>
-      </Can>
-
-      {saved && (
-        <Notification kind="success">
-          Operación registrada. Saldo confirmado: {saved.quantity} unidades de{' '}
-          {saved.catalogName ?? 'producto seleccionado'} en {saved.locationName ?? 'ubicación seleccionada'}.
-        </Notification>
-      )}
 
       <section aria-label="Filtros de cantidades" className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -170,7 +98,7 @@ export function QuantityStockPage() {
           <CatalogProductPicker
             key={filterKey}
             id="quantity-product-filter"
-            serialized={false}
+
             activeOnly={false}
             label="Filtrar por producto"
             onChange={(catalogItemId) => updateFilters({ catalogItemId: catalogItemId || undefined })}
@@ -259,7 +187,7 @@ export function QuantityStockPage() {
                   {data.items.map((item) => (
                     <tr key={item.id}>
                       <td className="px-3 py-2 text-slate-900">
-                        {item.catalogName ?? 'Producto sin nombre'}
+                        {[item.catalogBrand, item.catalogModel].filter(Boolean).join(' ') || item.catalogName || item.catalogSku || 'Producto'}
                       </td>
                       <td className="px-3 py-2 text-slate-700">{item.catalogSku ?? '—'}</td>
                       <td className="px-3 py-2 text-slate-700">

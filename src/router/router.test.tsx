@@ -32,7 +32,7 @@ vi.mock('../modules/foundation/audit-logs/services/auditLogService', () => ({
   listAuditLogs: vi.fn(),
 }));
 
-vi.mock('../modules/inventory/services/catalogService', () => ({ listCatalog: vi.fn() }));
+vi.mock('../modules/inventory/services/catalogService', () => ({ listCatalog: vi.fn(), getCatalogDetail: vi.fn(), createCatalogItem: vi.fn(), updateCatalogItem: vi.fn() }));
 vi.mock('../modules/inventory/services/quantityStockService', () => ({ listQuantityStock: vi.fn() }));
 vi.mock('../modules/inventory/services/categoryService', () => ({ listCategories: vi.fn() }));
 
@@ -103,9 +103,9 @@ describe('AppRouter', () => {
     useAuthStore.setState({ status: 'authenticated', user });
     renderAt('/inventory');
     expect(await screen.findByRole('heading', { name: 'Consultar inventario' })).toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: 'Buscar equipo o pieza' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Por serie o código' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'Por cantidad' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Buscar mercancía' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Modelos y existencias' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Cantidades por ubicación' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Productos y categorías' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Categorías' })).not.toBeInTheDocument();
   });
@@ -114,15 +114,14 @@ describe('AppRouter', () => {
     useAuthStore.setState({ status: 'authenticated', user });
     renderAt('/inventory/inbound');
     expect(await screen.findByRole('heading', { name: 'Acceso denegado' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Ingresar equipos y piezas' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ingreso de mercancía' })).not.toBeInTheDocument();
   });
 
   it('allows an ADMIN to open hardware intake', async () => {
     useAuthStore.setState({ status: 'authenticated', user: ADMIN });
     renderAt('/inventory/inbound');
-    expect(await screen.findByRole('heading', { name: 'Ingresar equipos y piezas' })).toBeInTheDocument();
-    expect(await screen.findByLabelText('Ubicación inicial')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Ingresar equipos y piezas' })).toHaveAttribute('aria-current', 'page');
+    expect(await screen.findByRole('heading', { name: 'Ingreso de mercancía', level: 1 })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Ubicación inicial')).not.toBeInTheDocument();
   });
 
   it('protects inventory for unauthenticated users', async () => {
@@ -269,4 +268,36 @@ it.each([ADMIN, VENDEDOR, TECNICO])('allows $role to consult the catalog route',
   renderAt('/inventory/catalog');
   expect(await screen.findByRole('heading', { name: 'Productos y modelos' })).toBeInTheDocument();
   expect(await screen.findByText('No hay productos disponibles.')).toBeInTheDocument();
+});
+
+it.each([
+  ['/inventory/adjustments', VENDEDOR], ['/inventory/adjustments', TECNICO],
+] as const)('protects administrative inventory operations at %s for $role', async (path, user) => {
+  useAuthStore.setState({ status: 'authenticated', user });
+  renderAt(path);
+  expect(await screen.findByRole('heading', { name: 'Acceso denegado' })).toBeInTheDocument();
+});
+
+it.each([ADMIN, VENDEDOR, TECNICO])('allows $role to open the labels section', async (user) => {
+  useAuthStore.setState({ status: 'authenticated', user });
+  renderAt('/inventory/labels');
+  expect(await screen.findByRole('heading', { name: 'Etiquetas', level: 1 })).toBeInTheDocument();
+  expect(screen.getByLabelText('Serie o código del equipo o pieza')).toBeInTheDocument();
+});
+
+
+it('allows warehouse managers to receive inventory but keeps user administration restricted', async () => {
+  useAuthStore.setState({ status: 'authenticated', user: { ...ADMIN, role: 'ENCARGADO_ALMACEN' } });
+  renderAt('/inventory/inbound');
+  expect(await screen.findByRole('heading', { name: 'Ingreso de mercancía', level: 1 })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Usuarios' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Bitácora' })).not.toBeInTheDocument();
+});
+
+
+it.each([ADMIN, VENDEDOR, TECNICO])('keeps existing component relationships consultable for $role', async (user) => {
+  useAuthStore.setState({ status: 'authenticated', user });
+  renderAt('/inventory/components');
+  expect(await screen.findByRole('heading', { name: 'Buscar equipo o pieza' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Acoplar componentes' })).not.toBeInTheDocument();
 });

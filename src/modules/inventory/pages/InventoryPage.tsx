@@ -1,12 +1,11 @@
-import { Can } from '../../../components/guards/Can';
 import { Notification } from '../../../components/notifications/Notification';
 import {
   LABEL_CLASS,
   PRIMARY_BUTTON_CLASS,
-  SECONDARY_BUTTON_CLASS,
   TEXT_INPUT_CLASS,
 } from '../../../utils/formStyles';
-import { BarcodeLabelsPanel } from '../components/BarcodeLabelsPanel';
+import { CatalogPage } from './CatalogPage';
+import { LoadingState } from '../../../components/feedback/LoadingState';
 import { InventoryBadge, type BadgeTone } from '../components/InventoryBadge';
 import { useHardwareScan } from '../hooks/useHardwareScan';
 import type { ItemStatus } from '../hardwareModels';
@@ -27,66 +26,19 @@ const STATUS_TONE: Record<ItemStatus, BadgeTone> = {
   DE_BAJA: 'danger',
 };
 
-export function InventoryPage() {
+export function InventoryPage({ allowManagement = false }: { allowManagement?: boolean }) {
   const {
     code,
     setCode,
     item,
     busy,
-    mutating,
     error,
-    message,
-    childIds,
-    setChildIds,
     search,
-    attach,
-    detach,
+    errorStatus,
+    clearLookup,
   } = useHardwareScan();
 
-  return (
-    <section className="space-y-6">
-      <header>
-        <h2 className="text-lg font-semibold text-slate-900">Buscar equipo o pieza</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Escanea o escribe el número de serie o código del equipo o pieza.
-        </p>
-      </header>
-
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          void search(code);
-        }}
-        className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5"
-      >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="min-w-0 flex-1">
-            <span className={LABEL_CLASS}>Serie o código</span>
-            <input
-              aria-label="Serie o código"
-              name="code"
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              disabled={mutating}
-              className={TEXT_INPUT_CLASS}
-              autoComplete="off"
-              placeholder="Número de serie o código…"
-              spellCheck={false}
-            />
-          </label>
-          <button
-            disabled={busy || mutating}
-            className={`${PRIMARY_BUTTON_CLASS} w-full sm:w-auto`}
-          >
-            {busy ? 'Buscando…' : 'Buscar equipo o pieza'}
-          </button>
-        </div>
-      </form>
-
-      {error && <Notification kind="error">{error}</Notification>}
-      {message && <Notification kind="success">{message}</Notification>}
-
-      {item && (
+  const detail = item && (
         <article className="space-y-5 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
           <header className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -131,58 +83,72 @@ export function InventoryPage() {
                     <span className="text-sm text-slate-700">
                       {child.serialNumber} — {STATUS_LABELS[child.status]}
                     </span>
-                    <Can roles={['ADMIN']}>
-                      <button
-                        type="button"
-                        disabled={mutating || busy}
-                        className={SECONDARY_BUTTON_CLASS}
-                        onClick={() => void detach(child)}
-                      >
-                        Desacoplar {child.serialNumber}
-                      </button>
-                    </Can>
+
                   </li>
                 ))}
               </ul>
             )}
           </section>
 
-          <Can roles={['ADMIN']}>
-            <form
-              onSubmit={(event) => void attach(event)}
-              className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4"
-            >
-              <div>
-                <h4 className="font-semibold text-slate-900">Acoplar componentes</h4>
-                <p className="mt-1 text-sm text-slate-600">
-                  El equipo y las piezas deben estar disponibles en la misma ubicación.
-                </p>
-              </div>
-              <label className="block">
-                <span className={LABEL_CLASS}>Series de los componentes</span>
-                <input
-                  aria-label="Series de los componentes"
-                  value={childIds}
-                  onChange={(event) => setChildIds(event.target.value)}
-                  disabled={mutating || busy}
-                  className={TEXT_INPUT_CLASS}
-                  autoComplete="off"
-                  placeholder="Series separadas por comas…"
-                  spellCheck={false}
-                />
-              </label>
-              <button
-                className={PRIMARY_BUTTON_CLASS}
-                disabled={mutating || busy}
-              >
-                {mutating ? 'Guardando…' : 'Acoplar componentes'}
-              </button>
-            </form>
-          </Can>
+          {allowManagement && <Notification kind="warning">La asociación y separación de componentes está temporalmente deshabilitada. Puedes consultar las relaciones existentes.</Notification>}
         </article>
-      )}
+      );
 
-      <BarcodeLabelsPanel hardwareItem={item} />
-    </section>
+  if (!allowManagement) return (
+    <CatalogPage
+      mode="consult"
+      onSearchCode={(value) => void search(value)}
+      onSearchChange={clearLookup}
+      hasExactMatch={Boolean(item)}
+      lookupResult={<>
+        {busy && <LoadingState message="Buscando unidad por serie o código…" />}
+        {error && errorStatus !== 404 && <Notification kind="error">{error}</Notification>}
+        {detail}
+      </>}
+    />
   );
+
+  return <section className="space-y-6">
+      <header>
+        <h2 className="text-lg font-semibold text-slate-900">Buscar equipo o pieza</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Escanea o escribe el número de serie o código del equipo o pieza.
+        </p>
+      </header>
+
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void search(code);
+        }}
+        className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5"
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="min-w-0 flex-1">
+            <span className={LABEL_CLASS}>Serie o código</span>
+            <input
+              aria-label="Serie o código"
+              name="code"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              className={TEXT_INPUT_CLASS}
+              autoComplete="off"
+              placeholder="Número de serie o código…"
+              spellCheck={false}
+            />
+          </label>
+          <button
+            disabled={busy}
+            className={`${PRIMARY_BUTTON_CLASS} w-full sm:w-auto`}
+          >
+            {busy ? 'Buscando…' : 'Buscar equipo o pieza'}
+          </button>
+        </div>
+      </form>
+
+      {error && <Notification kind="error">{error}</Notification>}
+
+
+    {detail}
+  </section>;
 }

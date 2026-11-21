@@ -11,9 +11,9 @@ import { CatalogProductPicker } from './CatalogProductPicker';
 import type { CatalogItem } from '../catalogModels';
 import type { QuantityStock } from '../quantityModels';
 
-export function QuantityStockForm({ locations, onSaved, onBusyChange }: { locations: Location[]; onSaved: (stock: QuantityStock) => void; onBusyChange?: (busy: boolean) => void }) {
+export function QuantityStockForm({ locations, onSaved, onBusyChange, operation }: { locations: Location[]; onSaved: (stock: QuantityStock) => void; onBusyChange?: (busy: boolean) => void; operation?: 'inbound' | 'adjust' }) {
   const currentLocation = useLocationStore((state) => state.activeLocation);
-  const [mode, setMode] = useState('inbound');
+  const [mode, setMode] = useState(operation ?? 'inbound');
   const [catalogId, setCatalogId] = useState('');
   const [product, setProduct] = useState<CatalogItem | null>(null);
   const [locationId, setLocationId] = useState(currentLocation?.id ?? '');
@@ -79,7 +79,7 @@ export function QuantityStockForm({ locations, onSaved, onBusyChange }: { locati
   }
 
   async function confirm() {
-    if (!review || sendingRef.current || useAuthStore.getState().user?.role !== 'ADMIN') return;
+    if (!review || sendingRef.current || !['ADMIN', 'ENCARGADO_ALMACEN'].includes(useAuthStore.getState().user?.role ?? '')) return;
     const sessionToken = getAccessToken();
     const accountId = useAuthStore.getState().user?.id;
     sendingRef.current = true;
@@ -114,7 +114,7 @@ export function QuantityStockForm({ locations, onSaved, onBusyChange }: { locati
 
   return (
     <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-      <h2 className="text-lg font-semibold text-slate-900">Agregar o corregir cantidades</h2>
+      <h2 className="text-lg font-semibold text-slate-900">{operation === 'adjust' ? 'Corregir existencias' : 'Agregar o corregir cantidades'}</h2>
       {error && (
         <div ref={errorRef} tabIndex={-1} className="mt-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
           <Notification kind="error">{error}</Notification>
@@ -124,13 +124,13 @@ export function QuantityStockForm({ locations, onSaved, onBusyChange }: { locati
         <fieldset disabled={busy || review} className="min-w-0 space-y-5">
           <CatalogProductPicker id="stock-catalog" serialized={false} onChange={setCatalogId} onSelect={setProduct} disabled={busy || review} />
           <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-            <div>
+            {!operation && <div>
               <label htmlFor="stock-mode" className={LABEL_CLASS}>Operación</label>
-              <select id="stock-mode" name="operation" value={mode} onChange={(event) => { setMode(event.target.value); setError(null); }} className={TEXT_INPUT_CLASS}>
+              <select id="stock-mode" name="operation" value={mode} onChange={(event) => { setMode(event.target.value as 'inbound' | 'adjust'); setError(null); }} className={TEXT_INPUT_CLASS}>
                 <option value="inbound">Agregar unidades</option>
                 <option value="adjust">Corregir conteo</option>
               </select>
-            </div>
+            </div>}
             <div>
               <label htmlFor="stock-location" className={LABEL_CLASS}>Ubicación de ingreso o ajuste</label>
               <select id="stock-location" name="location" value={locationId} onChange={(event) => setLocationId(event.target.value)} className={TEXT_INPUT_CLASS} required>

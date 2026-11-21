@@ -1,7 +1,10 @@
 export interface QuantityStock {
   id: string;
   catalogId: string;
+  /** Legacy presentation field; current API provides brand/model separately. */
   catalogName?: string;
+  catalogBrand?: string;
+  catalogModel?: string;
   catalogSku?: string;
   locationId: string;
   locationName?: string;

@@ -1,0 +1,40 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, expect, it, vi } from 'vitest';
+import { QuantityAdjustmentPage } from './QuantityAdjustmentPage';
+import { useAuthStore } from '../../../stores/authStore';
+import { listActiveLocations } from '../../foundation/locations/services/locationService';
+import { listCatalog } from '../services/catalogService';
+import { adjustQuantityStock } from '../services/quantityStockService';
+import { selectCatalogProduct } from '../../../test/selectCatalogProduct';
+import type { CatalogItem } from '../catalogModels';
+vi.mock('../../foundation/locations/services/locationService', () => ({ listActiveLocations: vi.fn() }));
+vi.mock('../services/catalogService', () => ({ listCatalog: vi.fn() }));
+vi.mock('../services/quantityStockService', () => ({ adjustQuantityStock: vi.fn() }));
+beforeEach(() => {
+  vi.resetAllMocks();
+  useAuthStore.setState({ status: 'authenticated', user: { id: 'admin', name: 'Ana', email: 'a@mp.pe', role: 'ADMIN', active: true } });
+  vi.mocked(listActiveLocations).mockResolvedValue([{ id: 'puesto', name: 'Puesto 1', type: 'PUESTO', active: true, createdAt: '' }]);
+  vi.mocked(listCatalog).mockResolvedValue({ items: [{ id: 'p', name: 'Mouse', sku: 'M', isSerialized: false, active: true } as CatalogItem], total: 1, page: 1, limit: 50 });
+});
+it('preserves absolute adjustments outside the read-only query and does not force Central', async () => {
+  vi.mocked(adjustQuantityStock).mockResolvedValue({ id: 's', catalogId: 'p', locationId: 'puesto', quantity: 0, costPrice: null, salePrice: null, updatedAt: '' });
+  const user = userEvent.setup();
+  render(<QuantityAdjustmentPage />);
+  await selectCatalogProduct(user, 'Producto por cantidad', 'Mouse · M');
+  expect(screen.queryByLabelText('Operación')).not.toBeInTheDocument();
+  await user.selectOptions(screen.getByLabelText('Ubicación de ingreso o ajuste'), 'puesto');
+  await user.type(screen.getByLabelText('Nueva cantidad total'), '0');
+  await user.type(screen.getByLabelText('Motivo del ajuste'), 'Conteo físico');
+  await user.click(screen.getByRole('button', { name: 'Continuar' }));
+  expect(adjustQuantityStock).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: 'Confirmar operación' }));
+  expect(await screen.findByText(/Conteo actualizado: 0/)).toBeInTheDocument();
+  expect(adjustQuantityStock).toHaveBeenCalledWith({ catalogId: 'p', locationId: 'puesto', newQuantity: 0, reason: 'Conteo físico' });
+});
+it.each(['VENDEDOR', 'TECNICO'] as const)('does not expose correction or fetch its form for %s', (role) => {
+  useAuthStore.setState((state) => ({ user: { ...state.user!, role } }));
+  render(<QuantityAdjustmentPage />);
+  expect(screen.queryByRole('button', { name: 'Continuar' })).not.toBeInTheDocument();
+  expect(listActiveLocations).not.toHaveBeenCalled();
+});

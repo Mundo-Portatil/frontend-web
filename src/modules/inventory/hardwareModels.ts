@@ -5,8 +5,5 @@ export interface HardwareItem {
   costPrice: number | null; salePrice: number | null; isSecondHand?: boolean; createdAt: string; updatedAt: string;
   components?: HardwareItem[]; parentChassis?: HardwareItem | null;
 }
-export interface InboundComponent { catalogId: string; serialNumber?: string; costPrice?: number; salePrice?: number }
-export interface InboundItem extends InboundComponent { children?: InboundComponent[] }
-export interface BatchInboundInput { locationId: string; items: InboundItem[] }
 export interface SerialValidation { existingSerials: string[]; allValid: boolean }
 export interface BarcodeLabel { hardwareItemId: string; barcodeValue: string; title: string; specsSummary: string; locationName: string; price: number | null }

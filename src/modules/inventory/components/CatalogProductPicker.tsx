@@ -220,7 +220,7 @@ export function CatalogProductPicker({
           disabled={disabled}
           autoComplete="off"
           spellCheck={false}
-          placeholder="Busca por nombre o código…"
+          placeholder="Busca por marca, modelo o código…"
         />
         {selected && <button type="button" disabled={disabled} onClick={clear} className={`${SECONDARY_BUTTON_CLASS} shrink-0`}>Cambiar producto</button>}
       </div>

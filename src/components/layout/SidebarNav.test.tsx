@@ -31,6 +31,8 @@ describe('SidebarNav inventory sections', () => {
     expect(document.getElementById(trigger.getAttribute('aria-controls')!)).toBeVisible();
     expect(screen.getByRole('link', { name: 'Consultar inventario' })).toHaveAttribute('href', '/inventory');
     expect(screen.getByRole('link', { name: 'Productos y categorías' })).toHaveAttribute('href', '/inventory/catalog');
+    expect(screen.getByRole('link', { name: 'Etiquetas' })).toHaveAttribute('href', '/inventory/labels');
+    expect(screen.queryByRole('link', { name: 'Ingreso de mercancía' }) !== null).toBe(role === 'ADMIN');
     expect(screen.getByRole('link', { name: 'Ubicaciones' })).toBeInTheDocument();
     if (role === 'ADMIN') expect(screen.getByRole('link', { name: 'Usuarios' })).toBeInTheDocument();
     else expect(screen.queryByRole('link', { name: 'Usuarios' })).not.toBeInTheDocument();
@@ -39,7 +41,10 @@ describe('SidebarNav inventory sections', () => {
   it.each([
     ['/inventory', 'Consultar inventario'],
     ['/inventory/stock', 'Consultar inventario'],
-    ['/inventory/inbound/', 'Consultar inventario'],
+    ['/inventory/inbound/', 'Ingreso de mercancía'],
+    ['/inventory/components', 'Consultar inventario'],
+    ['/inventory/adjustments', 'Ingreso de mercancía'],
+    ['/inventory/labels', 'Etiquetas'],
     ['/inventory/catalog', 'Productos y categorías'],
     ['/inventory/categories/', 'Productos y categorías'],
   ])('opens the branch and marks only %s section on a direct visit', (path, section) => {
