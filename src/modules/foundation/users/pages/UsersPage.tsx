@@ -24,7 +24,7 @@ import { isValidEmail, isValidPassword, MIN_PASSWORD_LENGTH } from '../../../../
 import { Notification } from '../../../../components/notifications/Notification';
 import type { NotificationKind } from '../../../../components/notifications/Notification';
 
-const ROLE_OPTIONS: Role[] = ['ADMIN', 'VENDEDOR', 'TECNICO'];
+const ROLE_OPTIONS: Role[] = ['ADMIN', 'ENCARGADO_ALMACEN', 'VENDEDOR', 'TECNICO'];
 
 interface Feedback {
   kind: NotificationKind;

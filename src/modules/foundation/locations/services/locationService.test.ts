@@ -72,3 +72,11 @@ describe('locationService', () => {
     expect(result).toEqual(expected);
   });
 });
+
+
+it('bounds and cancels optional location lookups used by inventory', async () => {
+  const signal = new AbortController().signal;
+  vi.mocked(apiClient.get).mockResolvedValueOnce({ data: [] });
+  await listLocations(undefined, { signal, timeout: 10_000 });
+  expect(apiClient.get).toHaveBeenCalledWith('/locations', { params: undefined, signal, timeout: 10_000 });
+});

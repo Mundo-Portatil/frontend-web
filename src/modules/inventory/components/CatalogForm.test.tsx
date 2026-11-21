@@ -22,25 +22,30 @@ beforeEach(() => {
 });
 
 async function fillGeneral(user: ReturnType<typeof userEvent.setup>, categoryId: string) {
-  for (const [label, value] of [['Nombre *', 'Producto X'], ['Marca *', 'Marca'], ['Modelo *', 'X1'], ['Precio base (PEN) *', '100'], ['Código de producto *', 'CODE-X']]) {
+  for (const [label, value] of [['Marca *', 'Marca'], ['Modelo *', 'X1'], ['Precio base (PEN) *', '100'], ['Código de producto (opcional)', 'CODE-X']]) {
     await user.type(screen.getByLabelText(label), value);
   }
   await user.selectOptions(screen.getByLabelText('Categoría *'), categoryId);
 }
 
-it('creates a general product without irrelevant technical fields or properties', async () => {
+it('creates a quantity product with technical fields optional and collapsed', async () => {
   const user = userEvent.setup();
   render(<CatalogForm categories={[otherCategory]} onSaved={vi.fn()} />);
   expect(screen.getByLabelText('Procesador')).not.toBeVisible();
+  expect(screen.queryByRole('checkbox', { name: 'Activo' })).not.toBeInTheDocument();
+  expect(screen.getByRole('checkbox', { name: 'Segunda mano' })).toBeInTheDocument();
   await fillGeneral(user, otherCategory.id);
   await user.selectOptions(screen.getByLabelText('Cómo registrar las unidades'), 'false');
+  expect(screen.getByText('Características técnicas (opcional)')).toBeInTheDocument();
+  expect(screen.getByLabelText('Procesador')).not.toBeVisible();
   await user.click(screen.getByRole('button', { name: 'Crear producto' }));
-  expect(createCatalogItem).toHaveBeenCalledWith({ sku: 'CODE-X', name: 'Producto X', brand: 'Marca', model: 'X1', categoryId: otherCategory.id, basePrice: 100, minStockThreshold: 2, isSerialized: false, isSecondHand: false, active: true });
+  expect(createCatalogItem).toHaveBeenCalledWith({ sku: 'CODE-X', brand: 'Marca', model: 'X1', categoryId: otherCategory.id, basePrice: 100, minStockThreshold: 2, isSerialized: false, isSecondHand: false, active: true });
 });
 
 it('creates a laptop with technical values even when its optional section is closed before saving', async () => {
   const user = userEvent.setup();
   render(<CatalogForm categories={[category]} onSaved={vi.fn()} />);
+  expect(screen.getByText('Características técnicas (opcional)')).toBeInTheDocument();
   await fillGeneral(user, category.id);
   const disclosure = screen.getByText('Características técnicas (opcional)');
   await user.click(disclosure);
@@ -56,10 +61,10 @@ it('preserves hidden technical values and the tracking type when editing general
   const user = userEvent.setup();
   render(<CatalogForm categories={[category, otherCategory]} initialItem={{ ...laptop, processor: ' Core i5 ' }} onSaved={vi.fn()} />);
   await user.selectOptions(screen.getByLabelText('Categoría *'), otherCategory.id);
-  await user.clear(screen.getByLabelText('Nombre *'));
-  await user.type(screen.getByLabelText('Nombre *'), 'Nuevo nombre');
+  await user.clear(screen.getByLabelText('Marca *'));
+  await user.type(screen.getByLabelText('Marca *'), 'Nueva marca');
   await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
-  expect(updateCatalogItem).toHaveBeenCalledWith(laptop.id, { name: 'Nuevo nombre', categoryId: otherCategory.id });
+  expect(updateCatalogItem).toHaveBeenCalledWith(laptop.id, { brand: 'Nueva marca', categoryId: otherCategory.id });
   expect(screen.getByLabelText('Memoria RAM')).toHaveValue('16 GB');
   expect(screen.getByLabelText('Procesador')).toHaveValue(' Core i5 ');
 });
@@ -80,4 +85,47 @@ it('updates only the edited technical value and blocks duplicate saves', async (
   expect(save).toBeDisabled();
   await act(async () => finish({ ...laptop, ramCapacity: '32 GB' }));
   expect(onSaved).toHaveBeenCalledTimes(1);
+});
+
+it('deactivates and reactivates a product from the edit form with an active-only PATCH', async () => {
+  const user = userEvent.setup();
+  const first = render(<CatalogForm categories={[category]} initialItem={laptop} onSaved={vi.fn()} />);
+  const active = screen.getByRole('checkbox', { name: 'Activo' });
+  expect(active).toBeChecked();
+  await user.click(active);
+  await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  expect(updateCatalogItem).toHaveBeenCalledWith(laptop.id, { active: false });
+  first.unmount();
+
+  vi.mocked(updateCatalogItem).mockClear();
+  render(<CatalogForm categories={[category]} initialItem={{ ...laptop, active: false }} onSaved={vi.fn()} />);
+  const inactive = screen.getByRole('checkbox', { name: 'Activo' });
+  expect(inactive).not.toBeChecked();
+  await user.click(inactive);
+  await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  expect(updateCatalogItem).toHaveBeenCalledWith(laptop.id, { active: true });
+});
+
+it('does not send technical fields when editing a quantity product without technical values', async () => {
+  const user = userEvent.setup();
+  const quantityItem = { ...laptop, processor: null, ramCapacity: null, storageCapacity: null, gpu: null, screenSize: null, isSerialized: false };
+  render(<CatalogForm categories={[category]} initialItem={quantityItem} onSaved={vi.fn()} />);
+  expect(screen.getByText('Características técnicas (opcional)')).toBeInTheDocument();
+  await user.clear(screen.getByLabelText('Marca *'));
+  await user.type(screen.getByLabelText('Marca *'), 'Nueva marca por cantidad');
+  await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  expect(updateCatalogItem).toHaveBeenCalledWith(laptop.id, { brand: 'Nueva marca por cantidad' });
+});
+
+
+it('prepares a model without name or SKU, leaving its code generation to the backend', async () => {
+  const onPrepare = vi.fn();
+  const user = userEvent.setup();
+  useAuthStore.setState((state) => ({ user: state.user ? { ...state.user, role: 'ENCARGADO_ALMACEN' } : null }));
+  render(<CatalogForm categories={[category]} onSaved={vi.fn()} onPrepare={onPrepare} />);
+  for (const [label, value] of [['Marca *', 'Acer'], ['Modelo *', 'Aspire 5'], ['Precio base (PEN) *', '1500']]) await user.type(screen.getByLabelText(label), value);
+  await user.selectOptions(screen.getByLabelText('Categoría *'), category.id);
+  await user.click(screen.getByRole('button', { name: 'Usar este modelo' }));
+  expect(onPrepare).toHaveBeenCalledWith({ brand: 'Acer', model: 'Aspire 5', categoryId: category.id, basePrice: 1500, minStockThreshold: 2, isSerialized: true, isSecondHand: false, active: true });
+  expect(createCatalogItem).not.toHaveBeenCalled();
 });

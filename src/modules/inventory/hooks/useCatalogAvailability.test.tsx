@@ -2,7 +2,11 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { CatalogDetail, CatalogItem } from '../catalogModels';
 import { getCatalogDetail } from '../services/catalogService';
-import { getAvailableQuantity, useCatalogAvailability } from './useCatalogAvailability';
+import {
+  getAvailabilityDisplay,
+  getAvailableQuantity,
+  useCatalogAvailability,
+} from './useCatalogAvailability';
 
 vi.mock('../services/catalogService', () => ({ getCatalogDetail: vi.fn() }));
 const item = { id: 'laptop', isSerialized: true } as CatalogItem;
@@ -18,6 +22,26 @@ function detail(total = 2): CatalogDetail {
   };
 }
 beforeEach(() => vi.resetAllMocks());
+
+it('maps raw availability to explicit display states without inventing zero stock', () => {
+  expect(getAvailabilityDisplay(undefined)).toEqual({ status: 'loading' });
+  expect(getAvailabilityDisplay({ status: 'error' })).toEqual({ status: 'error' });
+
+  const ready = { status: 'ready' as const, detail: detail(2) };
+  expect(getAvailabilityDisplay(ready)).toEqual({ status: 'ready', quantity: 2 });
+  expect(getAvailabilityDisplay(ready, 'central')).toEqual({ status: 'ready', quantity: 2 });
+  expect(getAvailabilityDisplay(ready, 'store')).toEqual({ status: 'empty' });
+  expect(getAvailabilityDisplay(ready, 'missing-location')).toEqual({ status: 'empty' });
+  expect(getAvailabilityDisplay({ status: 'ready', detail: detail(0) })).toEqual({ status: 'empty' });
+
+  const invalidTotal = detail(2);
+  invalidTotal.totalStockOverall = Number.NaN;
+  expect(getAvailabilityDisplay({ status: 'ready', detail: invalidTotal })).toEqual({ status: 'error' });
+
+  const invalidLocation = detail(2);
+  invalidLocation.stockSummary[0].totalAvailable = -1;
+  expect(getAvailabilityDisplay({ status: 'ready', detail: invalidLocation }, 'central')).toEqual({ status: 'error' });
+});
 
 it.each([true, false])('uses confirmed typed totals and location balances without mixing inventory classes (%s)', async (isSerialized) => {
   const items = [{ ...item, isSerialized }];

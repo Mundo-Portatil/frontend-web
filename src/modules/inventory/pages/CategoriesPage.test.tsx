@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthStore } from '../../../stores/authStore';
@@ -34,10 +34,11 @@ describe('CategoriesPage', () => {
     await user.selectOptions(screen.getByLabelText('Estado de categorías'), 'all');
     await waitFor(() => expect(service.listCategories).toHaveBeenLastCalledWith({}, expect.any(AbortSignal)));
   });
-  it('validates required name then creates and reloads authoritative counts', async () => {
+  it('validates required name then creates an active category without offering the active control', async () => {
     vi.mocked(service.createCategory).mockResolvedValue(category);
     const user = userEvent.setup(); render(<CategoriesPage />); await screen.findByText('RAM');
     await user.click(screen.getByRole('button', { name: 'Registrar categoría' }));
+    expect(screen.queryByRole('checkbox', { name: 'Activa' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Crear categoría' }));
     expect(screen.getByRole('alert')).toHaveTextContent('El nombre es obligatorio.'); expect(service.createCategory).not.toHaveBeenCalled();
     await user.type(screen.getByLabelText('Nombre'), 'SSD');
@@ -75,6 +76,31 @@ describe('CategoriesPage', () => {
     await act(async () => finish([category]));
     expect(screen.queryByText('RAM')).not.toBeInTheDocument();
   });
+  it('shows only the edit action in the category table', async () => {
+    vi.mocked(service.listCategories).mockResolvedValue([{ ...category, active: false }]);
+    render(<CategoriesPage />);
+    await screen.findByText('Inactiva');
+    const row = screen.getByRole('cell', { name: 'RAM' }).closest('tr')!;
+    expect(within(row).getAllByRole('button')).toHaveLength(1);
+    expect(within(row).getByRole('button', { name: 'Editar' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Activar' })).not.toBeInTheDocument();
+  });
+  it('reactivates a category from the edit form', async () => {
+    vi.mocked(service.listCategories).mockResolvedValue([{ ...category, active: false }]);
+    vi.mocked(service.updateCategory).mockResolvedValue(category);
+    const user = userEvent.setup();
+    render(<CategoriesPage />);
+    await screen.findByText('Inactiva');
+    await user.click(screen.getByRole('button', { name: 'Editar' }));
+    const active = screen.getByRole('checkbox', { name: 'Activa' });
+    expect(active).not.toBeChecked();
+    await user.click(active);
+    vi.mocked(service.listCategories).mockResolvedValue([category]);
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(await screen.findByText('Categoría actualizada correctamente.')).toBeInTheDocument();
+    expect(service.updateCategory).toHaveBeenCalledWith(category.id, { name: 'RAM', description: '', active: true });
+    expect(await screen.findByText('Activa')).toBeInTheDocument();
+  });
 });
 
 it('prevents switching the edited category while its save is pending', async () => {
@@ -91,43 +117,4 @@ it('prevents switching the edited category while its save is pending', async () 
   await act(async () => finish(category));
   await screen.findByText('Categoría actualizada correctamente.');
   for (const button of screen.getAllByRole('button', { name: 'Editar' })) expect(button).toBeEnabled();
-});
-
-
-it.each(['ADMIN', 'VENDEDOR', 'TECNICO'] as const)('limits explicit category reactivation to ADMIN (%s)', async (role) => {
-  useAuthStore.setState({ user: { ...session, role } });
-  vi.mocked(service.listCategories).mockResolvedValue([{ ...category, active: false }]);
-  render(<CategoriesPage />);
-  await screen.findByText('Inactiva');
-  expect(screen.queryByRole('button', { name: 'Activar' }) !== null).toBe(role === 'ADMIN');
-});
-
-it('reactivates a category once and refreshes the inactive filter', async () => {
-  vi.mocked(service.listCategories).mockResolvedValue([{ ...category, active: false }]);
-  let finish!: (result: typeof category) => void;
-  vi.mocked(service.updateCategory).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
-  const user = userEvent.setup();
-  render(<CategoriesPage />);
-  await user.selectOptions(screen.getByLabelText('Estado de categorías'), 'inactive');
-  await user.dblClick(await screen.findByRole('button', { name: 'Activar' }));
-  expect(service.updateCategory).toHaveBeenCalledTimes(1);
-  expect(service.updateCategory).toHaveBeenCalledWith(category.id, { active: true });
-  expect(screen.getByRole('button', { name: 'Activar' })).toBeDisabled();
-  vi.mocked(service.listCategories).mockResolvedValue([]);
-  await act(async () => finish(category));
-  expect(await screen.findByText('Categoría activada correctamente.')).toBeInTheDocument();
-  await waitFor(() => expect(service.listCategories).toHaveBeenLastCalledWith({ active: false }, expect.any(AbortSignal)));
-  expect(await screen.findByText('No hay categorías disponibles.')).toBeInTheDocument();
-});
-
-it('shows category reactivation failure without changing its state or claiming success', async () => {
-  vi.mocked(service.listCategories).mockResolvedValue([{ ...category, active: false }]);
-  vi.mocked(service.updateCategory).mockRejectedValue({ kind: 'validation', message: 'No se pudo activar la categoría.' });
-  const user = userEvent.setup();
-  render(<CategoriesPage />);
-  await user.click(await screen.findByRole('button', { name: 'Activar' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo activar la categoría.');
-  expect(screen.getByText('Inactiva')).toBeInTheDocument();
-  expect(screen.queryByText('Categoría activada correctamente.')).not.toBeInTheDocument();
-  expect(service.listCategories).toHaveBeenCalledTimes(1);
 });

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { CheckboxField } from '../../../components/forms/CheckboxField';
 import { Notification } from '../../../components/notifications/Notification';
 import { asAppError } from '../../../services/api/errors';
 import { LABEL_CLASS, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, TEXT_INPUT_CLASS } from '../../../utils/formStyles';
@@ -14,11 +15,11 @@ export function CategoryForm({ category, onSaved, onCancel, onBusyChange }: { ca
   const [error, setError] = useState<string | null>(null);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || useAuthStore.getState().user?.role !== 'ADMIN') return;
+    if (busy || !['ADMIN', 'ENCARGADO_ALMACEN'].includes(useAuthStore.getState().user?.role ?? '')) return;
     if (!name.trim()) { setError('El nombre es obligatorio.'); return; }
     setError(null); setBusy(true); onBusyChange(true);
     try {
-      const payload = { name: name.trim(), description: description.trim(), active };
+      const payload = { name: name.trim(), description: description.trim(), active: category ? active : true };
       if (category) await updateCategory(category.id, payload);
       else await createCategory(payload);
       setName(''); setDescription(''); setActive(true);
@@ -34,7 +35,17 @@ export function CategoryForm({ category, onSaved, onCancel, onBusyChange }: { ca
       <fieldset disabled={busy} className="grid min-w-0 gap-4 sm:grid-cols-2">
         <div><label htmlFor="category-name" className={LABEL_CLASS}>Nombre</label><input id="category-name" required value={name} onChange={(event) => setName(event.target.value)} className={TEXT_INPUT_CLASS} /></div>
         <div><label htmlFor="category-description" className={LABEL_CLASS}>Descripción</label><input id="category-description" value={description} onChange={(event) => setDescription(event.target.value)} className={TEXT_INPUT_CLASS} /></div>
-        <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} />Activa</label>
+        {category && (
+          <div className="sm:col-span-2">
+            <CheckboxField
+              id="category-active"
+              label="Activa"
+              description="Las categorías inactivas no se pueden asignar a nuevos productos."
+              checked={active}
+              onChange={(event) => setActive(event.target.checked)}
+            />
+          </div>
+        )}
         <div className="flex flex-wrap gap-2 sm:col-span-2"><button disabled={busy} className={PRIMARY_BUTTON_CLASS}>{busy ? 'Guardando...' : category ? 'Guardar cambios' : 'Crear categoría'}</button>{category && <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={onCancel}>Cancelar</button>}</div>
       </fieldset>
     </form>

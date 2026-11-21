@@ -16,10 +16,6 @@ import { CategoryForm } from '../components/CategoryForm';
 import { InventoryBadge } from '../components/InventoryBadge';
 import { useCategories, type CategoryFilter } from '../hooks/useCategories';
 import type { Category } from '../models';
-import { updateCategory } from '../services/categoryService';
-import { asAppError } from '../../../services/api/errors';
-import { useAuthStore } from '../../../stores/authStore';
-import { getAccessToken } from '../../../config/authToken';
 
 export function CategoriesPage() {
   const { filter, setFilter, items, loading, error, reload } = useCategories();
@@ -28,10 +24,6 @@ export function CategoriesPage() {
   const [showForm, setShowForm] = useState(false);
   const [createKey, setCreateKey] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
-  const [activating, setActivating] = useState(false);
-  const [activationError, setActivationError] = useState<string | null>(null);
-  const activationPending = useRef(false);
-  const formSaving = useRef(false);
   const formTriggerRef = useRef<HTMLButtonElement>(null);
   const restoreFormFocus = useRestoreFocus(showForm, formTriggerRef);
 
@@ -60,29 +52,6 @@ export function CategoriesPage() {
     restoreFormFocus();
   }
 
-  async function activate(category: Category) {
-    if (activationPending.current || formSaving.current || useAuthStore.getState().user?.role !== 'ADMIN') return;
-    activationPending.current = true;
-    const accountId = useAuthStore.getState().user?.id;
-    const token = getAccessToken();
-    setActivating(true);
-    setActivationError(null);
-    setMessage(null);
-    try {
-      await updateCategory(category.id, { active: true });
-      if (getAccessToken() !== token || useAuthStore.getState().user?.id !== accountId) return;
-      setMessage('Categoría activada correctamente.');
-      reload();
-    } catch (failure) {
-      if (getAccessToken() === token && useAuthStore.getState().user?.id === accountId) {
-        setActivationError(asAppError(failure).message);
-      }
-    } finally {
-      activationPending.current = false;
-      setActivating(false);
-    }
-  }
-
   return (
     <section className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -92,11 +61,11 @@ export function CategoriesPage() {
             Agrupa los productos por tipo.
           </p>
         </div>
-        <Can roles={['ADMIN']}>
+        <Can roles={['ADMIN', 'ENCARGADO_ALMACEN']}>
           <button
             ref={formTriggerRef}
             type="button"
-            disabled={saving || activating}
+            disabled={saving}
             aria-expanded={showForm}
             aria-controls="category-form-panel"
             onClick={showForm ? closeForm : startCreate}
@@ -107,20 +76,19 @@ export function CategoriesPage() {
         </Can>
       </header>
 
-      <Can roles={['ADMIN']}>
+      <Can roles={['ADMIN', 'ENCARGADO_ALMACEN']}>
         <div id="category-form-panel" hidden={!showForm}>
           <CategoryForm
             key={editing?.id ?? `new-${createKey}`}
             category={editing}
             onSaved={saved}
-            onBusyChange={(value) => { formSaving.current = value; setSaving(value); }}
+            onBusyChange={setSaving}
             onCancel={closeForm}
           />
         </div>
       </Can>
 
       {message && <Notification kind="success">{message}</Notification>}
-      {activationError && <Notification kind="error">{activationError}</Notification>}
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
@@ -165,7 +133,7 @@ export function CategoriesPage() {
                   <th scope="col" className="px-3 py-2 font-medium">Estado</th>
                   <th scope="col" className="px-3 py-2 font-medium">Productos</th>
                   <th scope="col" className="px-3 py-2 font-medium">Creada</th>
-                  <Can roles={['ADMIN']}>
+                  <Can roles={['ADMIN', 'ENCARGADO_ALMACEN']}>
                     <th scope="col" className="px-3 py-2 font-medium">Acciones</th>
                   </Can>
                 </tr>
@@ -182,22 +150,15 @@ export function CategoriesPage() {
                     </td>
                     <td className="px-3 py-2 text-slate-700">{category.productsCount ?? '—'}</td>
                     <td className="px-3 py-2 text-slate-700">{formatDate(category.createdAt)}</td>
-                    <Can roles={['ADMIN']}>
+                    <Can roles={['ADMIN', 'ENCARGADO_ALMACEN']}>
                       <td className="px-3 py-2">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            className={SECONDARY_BUTTON_CLASS}
-                            disabled={saving || activating}
-                            onClick={() => startEdit(category)}
-                          >
-                            Editar
-                          </button>
-                          {!category.active && editing?.id !== category.id && (
-                            <button type="button" className={SECONDARY_BUTTON_CLASS} disabled={saving || activating} onClick={() => void activate(category)}>
-                              Activar
-                            </button>
-                          )}
-                        </div>
+                        <button
+                          className={SECONDARY_BUTTON_CLASS}
+                          disabled={saving}
+                          onClick={() => startEdit(category)}
+                        >
+                          Editar
+                        </button>
                       </td>
                     </Can>
                   </tr>

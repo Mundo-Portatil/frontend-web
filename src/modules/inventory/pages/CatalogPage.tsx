@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '../../../router/routes';
 import { useRestoreFocus } from '../../../hooks/useRestoreFocus';
 import { Can } from '../../../components/guards/Can';
 import { EmptyState } from '../../../components/feedback/EmptyState';
@@ -13,18 +15,35 @@ import {
 } from '../../../utils/formStyles';
 import { useCategories } from '../hooks/useCategories';
 import { useCatalog } from '../hooks/useCatalog';
-import { getAvailableQuantity, useCatalogAvailability } from '../hooks/useCatalogAvailability';
+import { getAvailabilityDisplay, useCatalogAvailability } from '../hooks/useCatalogAvailability';
 import { useLocationStore } from '../../../stores/locationStore';
+import { CatalogAvailabilityCell } from '../components/CatalogAvailabilityCell';
 import { CatalogForm } from '../components/CatalogForm';
 import { CatalogDetailPanel } from '../components/CatalogDetailPanel';
 import { InventoryBadge } from '../components/InventoryBadge';
 import type { CatalogItem } from '../catalogModels';
-import { setCatalogActive } from '../services/catalogService';
-import { asAppError } from '../../../services/api/errors';
-import { useAuthStore } from '../../../stores/authStore';
-import { getAccessToken } from '../../../config/authToken';
 
-export function CatalogPage() {
+const COLUMNS = [
+  'Producto',
+  'Categoría',
+  'Control de unidades',
+  'Precio base (PEN)',
+  'Cantidad disponible',
+  'Estado',
+  'Acciones',
+] as const;
+
+interface CatalogPageProps {
+  mode?: 'manage' | 'consult';
+  onSearchCode?: (value: string) => void;
+  onSearchChange?: () => void;
+  lookupResult?: ReactNode;
+  hasExactMatch?: boolean;
+}
+
+export function CatalogPage({ mode = 'manage', onSearchCode, onSearchChange, lookupResult, hasExactMatch = false }: CatalogPageProps) {
+  const managing = mode === 'manage';
+  const [consultSearch, setConsultSearch] = useState('');
   const categories = useCategories();
   const { query, setQuery, result, loading, error, reload } = useCatalog();
   const activeLocation = useLocationStore((state) => state.activeLocation);
@@ -36,18 +55,14 @@ export function CatalogPage() {
   const [editingItem, setEditingItem] = useState<CatalogItem | undefined>();
   const [formBusy, setFormBusy] = useState(false);
   const formPending = useRef(false);
-  const [pendingDeactivation, setPendingDeactivation] = useState<CatalogItem | null>(null);
-  const [statusBusy, setStatusBusy] = useState(false);
-  const [statusError, setStatusError] = useState<string | null>(null);
   const [detailRevision, setDetailRevision] = useState(0);
-  const statusPending = useRef(false);
-  const deactivationButtonRef = useRef<HTMLButtonElement>(null);
   const createTriggerRef = useRef<HTMLButtonElement>(null);
   const restoreCreateFocus = useRestoreFocus(showCreate, createTriggerRef);
-
-  useEffect(() => {
-    if (pendingDeactivation) deactivationButtonRef.current?.focus();
-  }, [pendingDeactivation]);
+  const availabilityPending =
+    !loading && !error && result.items.some((item) => availability.entries[item.id] === undefined);
+  const availabilityError = result.items.some(
+    (item) => availability.entries[item.id]?.status === 'error',
+  );
 
   function closeCreate() {
     setShowCreate(false);
@@ -56,72 +71,27 @@ export function CatalogPage() {
     restoreCreateFocus();
   }
 
-  async function changeStatus(item: CatalogItem, active: boolean) {
-    if (statusPending.current || formPending.current || (showCreate && editingItem?.id === item.id) || useAuthStore.getState().user?.role !== 'ADMIN') return;
-    statusPending.current = true;
-    const accountId = useAuthStore.getState().user?.id;
-    const token = getAccessToken();
-    setStatusBusy(true);
-    setStatusError(null);
-    setMessage(null);
-    try {
-      const updated = await setCatalogActive(item.id, active);
-      if (getAccessToken() !== token || useAuthStore.getState().user?.id !== accountId) return;
-      setMessage(updated.active ? 'Producto activado correctamente.' : 'Producto desactivado correctamente.');
-      setPendingDeactivation(null);
-      setDetailRevision((value) => value + 1);
-      reload();
-    } catch (failure) {
-      if (getAccessToken() === token && useAuthStore.getState().user?.id === accountId) {
-        setStatusError(asAppError(failure).message);
-      }
-    } finally {
-      statusPending.current = false;
-      setStatusBusy(false);
-    }
-  }
-
   return (
     <section className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Productos y modelos</h2>
+          <h2 className="text-lg font-semibold text-slate-900">{managing ? 'Productos y modelos' : 'Buscar mercancía'}</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Modelos, características y precios.
+            {managing ? 'Modelos, características y precios.' : 'Busca por marca, modelo, código o número de serie.'}
           </p>
         </div>
-        <Can roles={['ADMIN']}>
-          <button
-            ref={createTriggerRef}
-            type="button"
-            disabled={formBusy || statusBusy}
-            aria-expanded={showCreate}
-            aria-controls="catalog-create-panel"
-            onClick={() => {
-              if (formPending.current || statusPending.current) return;
-              if (showCreate) {
-                closeCreate();
-              } else {
-                setEditingItem(undefined);
-                setShowCreate(true);
-              }
-            }}
-            className={showCreate ? SECONDARY_BUTTON_CLASS : PRIMARY_BUTTON_CLASS}
-          >
-            {showCreate ? 'Cerrar formulario' : 'Registrar producto'}
-          </button>
-        </Can>
+        {managing && <Can roles={['ADMIN', 'ENCARGADO_ALMACEN']}><Link to={ROUTES.inventoryInbound} className={PRIMARY_BUTTON_CLASS}>Ingresar mercancía</Link></Can>}
       </header>
 
       {categories.error && <ErrorState error={categories.error} onRetry={categories.reload} />}
       {categories.loading && <LoadingState message="Cargando categorías..." />}
 
-      <Can roles={['ADMIN']}>
+      {managing && <Can roles={['ADMIN', 'ENCARGADO_ALMACEN']}>
         <div
           id="catalog-create-panel"
           hidden={!showCreate || categories.loading || Boolean(categories.error)}
         >
-          {showCreate && !categories.loading && !categories.error && (
+          {showCreate && editingItem && !categories.loading && !categories.error && (
             <CatalogForm
               key={`${editingItem?.id ?? 'new'}-${createKey}`}
               categories={categories.items}
@@ -129,7 +99,7 @@ export function CatalogPage() {
               onCancel={closeCreate}
               onBusyChange={(value) => { formPending.current = value; setFormBusy(value); }}
               onSaved={() => {
-                setMessage(editingItem ? 'Producto actualizado correctamente.' : 'Producto creado correctamente.');
+                setMessage('Producto actualizado correctamente.');
                 closeCreate();
                 setDetailRevision((value) => value + 1);
                 reload();
@@ -137,25 +107,10 @@ export function CatalogPage() {
             />
           )}
         </div>
-      </Can>
+      </Can>}
 
+      {lookupResult}
       {message && <Notification kind="success">{message}</Notification>}
-      {statusError && <Notification kind="error">{statusError}</Notification>}
-
-      <Can roles={['ADMIN']}>
-        {pendingDeactivation && (
-          <section aria-label="Confirmar desactivación de producto" className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-            <h3 className="font-semibold text-slate-900">Desactivar {pendingDeactivation.name}</h3>
-            <p className="text-sm text-slate-600">Dejará de estar disponible para nuevos ingresos. Podrás volver a activarlo.</p>
-            <div className="flex flex-wrap gap-2">
-              <button ref={deactivationButtonRef} type="button" disabled={statusBusy} className={PRIMARY_BUTTON_CLASS} onClick={() => void changeStatus(pendingDeactivation, false)}>
-                {statusBusy ? 'Guardando…' : 'Confirmar desactivación'}
-              </button>
-              <button type="button" disabled={statusBusy} className={SECONDARY_BUTTON_CLASS} onClick={() => setPendingDeactivation(null)}>Cancelar</button>
-            </div>
-          </section>
-        )}
-      </Can>
 
       {selectedId && (
         <CatalogDetailPanel key={`${selectedId}-${detailRevision}`} id={selectedId} onClose={() => setSelectedId(null)} />
@@ -167,26 +122,52 @@ export function CatalogPage() {
             <h3 className="font-semibold text-slate-900">Productos</h3>
             <p className="mt-1 text-sm text-slate-600">{activeLocation ? `Cantidades en ${activeLocation.name}` : 'Cantidad total en ubicaciones activas'}</p>
           </div>
-          <button className={SECONDARY_BUTTON_CLASS} disabled={loading} onClick={reload}>
-            Recargar catálogo
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {availabilityPending && (
+              <span className="text-xs text-slate-500" role="status">
+                Actualizando cantidades…
+              </span>
+            )}
+            {availabilityError && (
+              <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={availability.retry}>
+                Reintentar cantidades
+              </button>
+            )}
+            <button className={SECONDARY_BUTTON_CLASS} disabled={loading} onClick={reload}>
+              Recargar catálogo
+            </button>
+          </div>
         </div>
 
         <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
+            <form onSubmit={(event) => {
+              event.preventDefault();
+              if (managing) return;
+              const search = consultSearch.trim();
+              setQuery({ ...query, search: search || undefined, page: 1 });
+              if (search) onSearchCode?.(search);
+              else onSearchChange?.();
+            }}>
             <label htmlFor="catalog-search" className={LABEL_CLASS}>
-              Buscar producto
+              {managing ? 'Buscar producto' : 'Marca, modelo, código o serie'}
             </label>
+            <div className="flex min-w-0 gap-2">
             <input
               id="catalog-search"
               type="search"
-              value={query.search ?? ''}
-              onChange={(event) =>
-                setQuery({ ...query, search: event.target.value || undefined, page: 1 })
-              }
+              value={managing ? query.search ?? '' : consultSearch}
+              onChange={(event) => {
+                onSearchChange?.();
+                if (managing) setQuery({ ...query, search: event.target.value || undefined, page: 1 });
+                else setConsultSearch(event.target.value);
+              }}
               className={TEXT_INPUT_CLASS}
-              placeholder="Nombre, marca, modelo o código…"
+              placeholder={managing ? 'Marca, modelo o código…' : 'Marca, modelo, código o serie…'}
             />
+            {!managing && <button type="submit" className={`${SECONDARY_BUTTON_CLASS} shrink-0`}>Buscar</button>}
+            </div>
+            </form>
           </div>
           <div>
             <label htmlFor="catalog-filter-category" className={LABEL_CLASS}>
@@ -257,7 +238,7 @@ export function CatalogPage() {
         ) : (
           <>
             {!result.items.length ? (
-              <EmptyState message="No hay productos disponibles." />
+              hasExactMatch ? null : <EmptyState message={managing ? 'No hay productos disponibles.' : 'No hay modelos que coincidan con esta búsqueda. Prueba también una serie o código y pulsa Buscar.'} />
             ) : (
               <div
                 role="region"
@@ -265,18 +246,10 @@ export function CatalogPage() {
                 tabIndex={0}
                 className="overflow-x-auto rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
               >
-                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <table className="min-w-[56rem] divide-y divide-slate-200 text-sm">
                   <thead className="bg-slate-50">
                     <tr>
-                      {[
-                        'Cantidad disponible',
-                        'Producto',
-                        'Categoría',
-                        'Control de unidades',
-                        'Precio base (PEN)',
-                        'Estado',
-                        'Acciones',
-                      ].map((label) => (
+                      {COLUMNS.map((label) => (
                         <th key={label} scope="col" className="px-3 py-2 text-left font-medium text-slate-600">
                           {label}
                         </th>
@@ -286,19 +259,7 @@ export function CatalogPage() {
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {result.items.map((item) => (
                       <tr key={item.id}>
-                        <td className="px-3 py-2 font-semibold tabular-nums text-slate-900">
-                          {availability.entries[item.id] === undefined ? (
-                            <span className="text-xs font-normal text-slate-500">Cargando…</span>
-                          ) : availability.entries[item.id].status === 'error' ? (
-                            <div className="space-y-1">
-                              <span className="block text-xs font-normal text-slate-600">No disponible</span>
-                              <button type="button" onClick={availability.retry} aria-label={`Reintentar cantidades de ${item.name}`} className="rounded text-xs font-medium text-brand-700 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Reintentar</button>
-                            </div>
-                          ) : getAvailableQuantity(availability.entries[item.id], activeLocation?.id) === undefined ? (
-                            <span className="text-xs font-normal text-slate-600">Sin datos</span>
-                          ) : getAvailableQuantity(availability.entries[item.id], activeLocation?.id)}
-                        </td>
-                        <td className="px-3 py-2 text-slate-900">{item.name}</td>
+                        <td className="px-3 py-2 text-slate-900"><span className="block font-medium">{item.name}</span><span className="block text-xs text-slate-500">{item.brand} · {item.model}</span></td>
                         <td className="px-3 py-2 text-slate-700">
                           {categories.items.find((category) => category.id === item.categoryId)
                             ?.name ?? '—'}
@@ -308,6 +269,15 @@ export function CatalogPage() {
                         </td>
                         <td className="px-3 py-2 text-slate-700">{item.basePrice}</td>
                         <td className="px-3 py-2">
+                          <CatalogAvailabilityCell
+                            itemName={item.name}
+                            display={getAvailabilityDisplay(
+                              availability.entries[item.id],
+                              activeLocation?.id,
+                            )}
+                          />
+                        </td>
+                        <td className="px-3 py-2">
                           <InventoryBadge tone={item.active ? 'success' : 'neutral'}>
                             {item.active ? 'Activo' : 'Inactivo'}
                           </InventoryBadge>
@@ -315,40 +285,30 @@ export function CatalogPage() {
                         <td className="px-3 py-2">
                           <div className="inline-flex flex-nowrap items-center gap-2 whitespace-nowrap">
                             <button
+                              type="button"
                               className={SECONDARY_BUTTON_CLASS}
+                              aria-label={`Ver ficha de ${item.name}`}
                               onClick={() => setSelectedId(item.id)}
                             >
                               Ver ficha
                             </button>
-                            <Can roles={['ADMIN']}>
+                            {managing && <Can roles={['ADMIN', 'ENCARGADO_ALMACEN']}>
                               <button
                                 type="button"
                                 className={SECONDARY_BUTTON_CLASS}
-                                disabled={formBusy || statusBusy}
-                                onClick={() => {
-                                  if (formPending.current || statusPending.current) return;
+                                disabled={formBusy}
+                                aria-label={`Editar ${item.name}`}
+                                onClick={(event) => {
+                                  if (formPending.current) return;
+                                  createTriggerRef.current = event.currentTarget;
                                   setEditingItem(item);
-                                  setPendingDeactivation(null);
                                   setShowCreate(true);
                                   setMessage(null);
                                 }}
                               >
                                 Editar
                               </button>
-                              <button
-                                type="button"
-                                disabled={statusBusy || formBusy || (showCreate && editingItem?.id === item.id)}
-                                className={SECONDARY_BUTTON_CLASS}
-                                onClick={() => {
-                                  if (statusPending.current || formPending.current) return;
-                                  setStatusError(null);
-                                  if (item.active) setPendingDeactivation(item);
-                                  else void changeStatus(item, true);
-                                }}
-                              >
-                                {item.active ? 'Desactivar' : 'Activar'}
-                              </button>
-                            </Can>
+                            </Can>}
                           </div>
                         </td>
                       </tr>

@@ -14,7 +14,9 @@ export function useCatalog() {
     setLoading(true);
     setError(null);
     void listCatalog(query, controller.signal).then((data) => {
-      if (!controller.signal.aborted) setResult(data);
+      // A fresh items array makes the availability hook reload the page even
+      // when the backend returns an equivalent payload after a manual reload.
+      if (!controller.signal.aborted) setResult({ ...data, items: [...data.items] });
     }).catch((reason: unknown) => {
       if (!controller.signal.aborted) setError(asAppError(reason));
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });

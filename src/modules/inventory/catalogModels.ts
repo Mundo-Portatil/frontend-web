@@ -1,6 +1,7 @@
 export interface CatalogItem {
   id: string;
   sku: string;
+  /** Display-only label derived from brand/model; never sent to the backend. */
   name: string;
   brand: string;
   model: string;
@@ -18,7 +19,7 @@ export interface CatalogItem {
   createdAt: string;
 }
 export interface CreateCatalogInput {
-  sku: string; name: string; brand: string; model: string; categoryId: string; basePrice: number;
+  sku?: string; brand: string; model: string; categoryId: string; basePrice: number;
   processor?: string; ramCapacity?: string; storageCapacity?: string; gpu?: string; screenSize?: string;
   isSerialized?: boolean; minStockThreshold?: number; isSecondHand?: boolean; active?: boolean;
 }
@@ -31,4 +32,13 @@ export interface CatalogDetail {
   categoryName: string;
   stockSummary: { locationId: string; locationName: string; locationType: string; serializedCount: number; quantityCount: number; totalAvailable: number }[];
   totalStockOverall: number;
+}
+
+/** Wire DTO in backend refact/inventario deliberately has no name property. */
+export type CatalogItemResponse = Omit<CatalogItem, 'name'>;
+export type CatalogDetailResponse = Omit<CatalogDetail, 'item'> & { item: CatalogItemResponse };
+export type CatalogPageResponse = Omit<CatalogPageResult, 'items'> & { items: CatalogItemResponse[] };
+
+export function getCatalogDisplayName(product: { brand: string; model: string; sku?: string }): string {
+  return [product.brand?.trim(), product.model?.trim()].filter(Boolean).join(' ') || product.sku?.trim() || 'Producto';
 }

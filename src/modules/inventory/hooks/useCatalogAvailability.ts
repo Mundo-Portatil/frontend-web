@@ -6,6 +6,12 @@ export type Availability =
   | { status: 'ready'; detail: CatalogDetail }
   | { status: 'error' };
 
+export type AvailabilityDisplay =
+  | { status: 'loading' }
+  | { status: 'error' }
+  | { status: 'empty' }
+  | { status: 'ready'; quantity: number };
+
 const EMPTY: Record<string, Availability> = {};
 
 /** The list endpoint has no totals: fetch only the visible page, with bounded parallelism. */
@@ -43,6 +49,34 @@ export function useCatalogAvailability(items: readonly CatalogItem[], enabled: b
   }, [items, enabled, revision]);
 
   return { entries: enabled && snapshot.items === items ? snapshot.entries : EMPTY, retry };
+}
+
+/**
+ * Translates the raw availability entry into an explicit display state.
+ *
+ * The backend summary is the only source of truth: while there is no entry the
+ * cell is loading, a failed entry is an error, a confirmed zero or a missing
+ * location row means there is no stock, and an invalid value is an error. A
+ * missing row is never replaced by a fictitious zero.
+ */
+export function getAvailabilityDisplay(
+  availability: Availability | undefined,
+  locationId?: string,
+): AvailabilityDisplay {
+  if (!availability) return { status: 'loading' };
+  if (availability.status === 'error') return { status: 'error' };
+
+  const value = locationId
+    ? availability.detail.stockSummary.find((stock) => stock.locationId === locationId)?.totalAvailable
+    : availability.detail.totalStockOverall;
+
+  if (locationId && !availability.detail.stockSummary.some((stock) => stock.locationId === locationId)) {
+    return { status: 'empty' };
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    return { status: 'error' };
+  }
+  return value === 0 ? { status: 'empty' } : { status: 'ready', quantity: value };
 }
 
 /** A loaded summary row is required for a location; an absent row is not zero stock. */

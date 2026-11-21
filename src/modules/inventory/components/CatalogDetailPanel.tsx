@@ -5,6 +5,7 @@ import { asAppError, type AppError } from '../../../services/api/errors';
 import { SECONDARY_BUTTON_CLASS } from '../../../utils/formStyles';
 import type { CatalogDetail } from '../catalogModels';
 import { getCatalogDetail } from '../services/catalogService';
+import { CatalogUnitsPanel } from './CatalogUnitsPanel';
 
 export function CatalogDetailPanel({ id, onClose }: { id: string; onClose: () => void }) {
   const [detail, setDetail] = useState<CatalogDetail | null>(null);
@@ -133,6 +134,7 @@ export function CatalogDetailPanel({ id, onClose }: { id: string; onClose: () =>
               </table>
             </div>
           )}
+          {detail.item.isSerialized && <CatalogUnitsPanel catalogId={detail.item.id} locations={detail.stockSummary} />}
         </div>
       )}
     </section>

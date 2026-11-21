@@ -1,5 +1,5 @@
 /** User roles supported by the backend (single role per user). */
-export type Role = 'ADMIN' | 'VENDEDOR' | 'TECNICO';
+export type Role = 'ADMIN' | 'ENCARGADO_ALMACEN' | 'VENDEDOR' | 'TECNICO';
 
 /** Authenticated user returned by POST /auth/login. */
 export interface AuthUser {

@@ -226,6 +226,19 @@ describe('UsersPage', () => {
     });
   });
 
+  it('allows editing a warehouse manager without rejecting the existing role', async () => {
+    const manager = { ...SAMPLE_USERS[0], role: 'ENCARGADO_ALMACEN' as const };
+    vi.mocked(userService.listUsers).mockResolvedValueOnce([manager]);
+    vi.mocked(userService.updateUser).mockResolvedValueOnce({ ...manager, name: 'Encargado actualizado' });
+    render(<UsersPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Editar' }));
+    await user.clear(screen.getByLabelText('Nombre completo'));
+    await user.type(screen.getByLabelText('Nombre completo'), 'Encargado actualizado');
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(userService.updateUser).toHaveBeenCalledWith('user-1', { name: 'Encargado actualizado', role: 'ENCARGADO_ALMACEN' }));
+  });
+
   it('refreshes the session role after editing the current account', async () => {
     saveAccessToken('active-jwt');
     useAuthStore.setState({

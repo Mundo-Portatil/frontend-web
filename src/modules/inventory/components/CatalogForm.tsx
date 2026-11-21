@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { CheckboxField } from '../../../components/forms/CheckboxField';
 import { Notification } from '../../../components/notifications/Notification';
 import { asAppError } from '../../../services/api/errors';
 import { useAuthStore } from '../../../stores/authStore';
@@ -8,7 +9,7 @@ import type { Category } from '../models';
 import type { CatalogItem, CreateCatalogInput, UpdateCatalogInput } from '../catalogModels';
 import { createCatalogItem, updateCatalogItem } from '../services/catalogService';
 
-const GENERAL_FIELDS = [['name', 'Nombre'], ['brand', 'Marca'], ['model', 'Modelo']] as const;
+const GENERAL_FIELDS = [['brand', 'Marca'], ['model', 'Modelo']] as const;
 const TECHNICAL_FIELDS = [
   ['processor', 'Procesador'], ['ramCapacity', 'Memoria RAM'],
   ['storageCapacity', 'Almacenamiento'], ['gpu', 'Tarjeta gráfica'], ['screenSize', 'Tamaño de pantalla'],
@@ -28,11 +29,13 @@ interface CatalogFormProps {
   categories: Category[];
   initialItem?: CatalogItem;
   onSaved: () => void;
+  /** Prepare a validated new model for a surrounding intake; does not write to the API. */
+  onPrepare?: (payload: CreateCatalogInput) => void;
   onCancel?: () => void;
   onBusyChange?: (busy: boolean) => void;
 }
 
-export function CatalogForm({ categories, initialItem, onSaved, onCancel, onBusyChange }: CatalogFormProps) {
+export function CatalogForm({ categories, initialItem, onSaved, onPrepare, onCancel, onBusyChange }: CatalogFormProps) {
   const [fields, setFields] = useState<Record<string, string>>(() => initialFields(initialItem));
   const [serialized, setSerialized] = useState(initialItem?.isSerialized ?? true);
   const [secondHand, setSecondHand] = useState(initialItem?.isSecondHand ?? false);
@@ -45,6 +48,8 @@ export function CatalogForm({ categories, initialItem, onSaved, onCancel, onBusy
   const editing = Boolean(initialItem);
   const unchangedCategory = Boolean(initialItem && fields.categoryId === initialItem.categoryId);
   const currentCategory = categories.find((category) => category.id === initialItem?.categoryId);
+  // Categories have no reliable product-kind discriminator; optional details stay available to every model.
+  const showTechnicalFields = true;
 
   useEffect(() => { headingRef.current?.focus(); }, []);
 
@@ -57,11 +62,11 @@ export function CatalogForm({ categories, initialItem, onSaved, onCancel, onBusy
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (sending.current || useAuthStore.getState().user?.role !== 'ADMIN') return;
+    if (sending.current || !['ADMIN', 'ENCARGADO_ALMACEN'].includes(useAuthStore.getState().user?.role ?? '')) return;
     setError(null);
-    const required = ['sku', 'name', 'brand', 'model', 'categoryId', 'basePrice'];
+    const required = ['brand', 'model', 'categoryId', 'basePrice'];
     const missing = required.find((key) => !(fields[key] ?? '').trim());
-    if (missing) return reject('Completa el código de producto, nombre, marca, modelo, categoría y precio base.', missing === 'basePrice' ? 'price' : missing);
+    if (missing) return reject('Completa marca, modelo, categoría y precio base.', missing === 'basePrice' ? 'price' : missing);
     if (!unchangedCategory && !categories.some((category) => category.id === fields.categoryId && category.active)) {
       return reject('Selecciona una categoría activa.', 'categoryId');
     }
@@ -71,17 +76,30 @@ export function CatalogForm({ categories, initialItem, onSaved, onCancel, onBusy
     if (!Number.isFinite(threshold) || threshold < 0) return reject('El precio y el umbral deben ser números mayores o iguales a cero.', 'threshold');
 
     const payload: CreateCatalogInput = {
-      sku: fields.sku.trim(), name: fields.name.trim(), brand: fields.brand.trim(), model: fields.model.trim(),
+      ...(fields.sku?.trim() ? { sku: fields.sku.trim() } : {}), brand: fields.brand.trim(), model: fields.model.trim(),
       categoryId: fields.categoryId, basePrice: price, minStockThreshold: threshold,
-      isSerialized: serialized, isSecondHand: secondHand, active,
+      isSerialized: serialized, isSecondHand: secondHand, active: true,
     };
-    for (const [key] of TECHNICAL_FIELDS) if (fields[key]?.trim()) payload[key] = fields[key].trim();
+    if (showTechnicalFields) {
+      for (const [key] of TECHNICAL_FIELDS) if (fields[key]?.trim()) payload[key] = fields[key].trim();
+    }
+
+    if (onPrepare && !initialItem) {
+      onPrepare({ ...payload, isSecondHand: false });
+      return;
+    }
 
     const update: UpdateCatalogInput = {};
     if (initialItem) {
-      for (const [key] of [...GENERAL_FIELDS, ...TECHNICAL_FIELDS]) {
+      for (const [key] of GENERAL_FIELDS) {
         const value = fields[key] ?? '';
         if (value !== (initialItem[key] ?? '')) update[key] = value.trim();
+      }
+      if (showTechnicalFields) {
+        for (const [key] of TECHNICAL_FIELDS) {
+          const value = fields[key] ?? '';
+          if (value !== (initialItem[key] ?? '')) update[key] = value.trim();
+        }
       }
       if (fields.categoryId !== initialItem.categoryId) update.categoryId = fields.categoryId;
       if (price !== initialItem.basePrice) update.basePrice = price;
@@ -121,7 +139,7 @@ export function CatalogForm({ categories, initialItem, onSaved, onCancel, onBusy
 
   return (
     <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-      <h2 ref={headingRef} tabIndex={-1} className="rounded text-lg font-semibold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">{editing ? 'Editar producto' : 'Registrar producto'}</h2>
+      <h2 ref={headingRef} tabIndex={-1} className="rounded text-lg font-semibold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">{editing ? 'Editar producto' : onPrepare ? 'Datos del modelo nuevo' : 'Registrar producto'}</h2>
       <p className="mt-1 text-sm text-slate-500">Datos del modelo. Las unidades se registran al ingresar mercancía.</p>
       {error && <div className="mt-3"><Notification kind="error">{error}</Notification></div>}
       <form ref={formRef} onSubmit={(event) => void submit(event)} noValidate className="mt-4">
@@ -141,25 +159,41 @@ export function CatalogForm({ categories, initialItem, onSaved, onCancel, onBusy
                 </select>
               </div>
               <div><label htmlFor="catalog-price" className={LABEL_CLASS}>Precio base (PEN) *</label><input id="catalog-price" name="basePrice" type="number" inputMode="decimal" min="0" step="any" required value={fields.basePrice ?? ''} onChange={(event) => field('basePrice', event.target.value)} className={TEXT_INPUT_CLASS} /></div>
-              <div><label htmlFor="catalog-sku" className={LABEL_CLASS}>Código de producto *</label><input id="catalog-sku" name="sku" value={fields.sku ?? ''} readOnly={editing} onChange={(event) => field('sku', event.target.value)} className={TEXT_INPUT_CLASS} required autoComplete="off" spellCheck={false} /></div>
+              <div><label htmlFor="catalog-sku" className={LABEL_CLASS}>{editing ? 'Código de producto' : 'Código de producto (opcional)'}</label><input id="catalog-sku" name="sku" value={fields.sku ?? ''} readOnly={editing} onChange={(event) => field('sku', event.target.value)} className={TEXT_INPUT_CLASS} autoComplete="off" spellCheck={false} /></div>
               <div><label htmlFor="catalog-threshold" className={LABEL_CLASS}>Mínimo recomendado</label><input id="catalog-threshold" name="minStockThreshold" type="number" inputMode="decimal" min="0" step="any" value={fields.minStockThreshold ?? '2'} onChange={(event) => field('minStockThreshold', event.target.value)} className={TEXT_INPUT_CLASS} /></div>
               <div><label htmlFor="catalog-tracking" className={LABEL_CLASS}>Cómo registrar las unidades</label><select id="catalog-tracking" name="tracking" value={String(serialized)} disabled={editing} onChange={(event) => setSerialized(event.target.value === 'true')} className={TEXT_INPUT_CLASS}><option value="true">Una por una, con serie o código</option><option value="false">Agrupadas por cantidad</option></select></div>
-              <div className="flex flex-wrap items-center gap-4">
-                <label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={secondHand} onChange={(event) => setSecondHand(event.target.checked)} />Segunda mano</label>
-                <label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} />Activo</label>
-              </div>
+              {(!onPrepare || editing) && <div className="grid min-w-0 gap-3 sm:col-span-2 lg:col-span-3 sm:grid-cols-2">
+                {!onPrepare && <CheckboxField
+                  id="catalog-second-hand"
+                  label="Segunda mano"
+                  description="Marca el producto como usado o reacondicionado."
+                  checked={secondHand}
+                  onChange={(event) => setSecondHand(event.target.checked)}
+                />}
+                {editing && (
+                  <CheckboxField
+                    id="catalog-active"
+                    label="Activo"
+                    description="Los productos inactivos dejan de estar disponibles para nuevos ingresos. Puedes reactivarlo cuando lo necesites."
+                    checked={active}
+                    onChange={(event) => setActive(event.target.checked)}
+                  />
+                )}
+              </div>}
             </div>
           </fieldset>
-          <details className="rounded-lg border border-slate-200 p-3">
-            <summary className="w-fit cursor-pointer rounded font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Características técnicas (opcional)</summary>
-            <div className="mt-3 grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {TECHNICAL_FIELDS.map(([key, label]) => (
-                <div key={key} className="min-w-0"><label htmlFor={`catalog-${key}`} className={LABEL_CLASS}>{label}</label><input id={`catalog-${key}`} name={key} value={fields[key] ?? ''} onChange={(event) => field(key, event.target.value)} className={TEXT_INPUT_CLASS} /></div>
-              ))}
-            </div>
-          </details>
+          {showTechnicalFields && (
+            <details className="rounded-lg border border-slate-200 p-3">
+              <summary className="w-fit cursor-pointer rounded font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Características técnicas (opcional)</summary>
+              <div className="mt-3 grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {TECHNICAL_FIELDS.map(([key, label]) => (
+                  <div key={key} className="min-w-0"><label htmlFor={`catalog-${key}`} className={LABEL_CLASS}>{label}</label><input id={`catalog-${key}`} name={key} value={fields[key] ?? ''} onChange={(event) => field(key, event.target.value)} className={TEXT_INPUT_CLASS} /></div>
+                ))}
+              </div>
+            </details>
+          )}
           <div className="flex flex-wrap gap-2">
-            <button className={PRIMARY_BUTTON_CLASS} disabled={busy}>{busy ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear producto'}</button>
+            <button className={PRIMARY_BUTTON_CLASS} disabled={busy}>{busy ? 'Guardando…' : editing ? 'Guardar cambios' : onPrepare ? 'Usar este modelo' : 'Crear producto'}</button>
             {onCancel && <button type="button" disabled={busy} className={SECONDARY_BUTTON_CLASS} onClick={onCancel}>Cancelar</button>}
           </div>
         </fieldset>
