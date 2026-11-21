@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { Notification } from '../../../components/notifications/Notification';
 import { asAppError } from '../../../services/api/errors';
 import {
@@ -13,13 +13,15 @@ import { isUuidV4 } from '../hardwareValidation';
 
 export function BarcodeLabelsPanel({ hardwareItem }: { hardwareItem?: HardwareItem | null }) {
   const [ids, setIds] = useState('');
+  const [selectedNames, setSelectedNames] = useState<Record<string, string>>({});
+  const requesting = useRef(false);
   const [busy, setBusy] = useState(false);
   const [labels, setLabels] = useState<BarcodeLabel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy) return;
+    if (requesting.current) return;
     setError(null);
     setLabels(null);
     const values = [...new Set(ids.split(/[\s,]+/).filter(Boolean))];
@@ -28,12 +30,14 @@ export function BarcodeLabelsPanel({ hardwareItem }: { hardwareItem?: HardwareIt
       return;
     }
     setBusy(true);
+    requesting.current = true;
     try {
       setLabels(await getBatchLabels(values));
     } catch (failure) {
       setError(asAppError(failure).message);
     } finally {
       setBusy(false);
+      requesting.current = false;
     }
   }
 
@@ -51,11 +55,12 @@ export function BarcodeLabelsPanel({ hardwareItem }: { hardwareItem?: HardwareIt
           type="button"
           className={SECONDARY_BUTTON_CLASS}
           disabled={busy}
-          onClick={() =>
+          onClick={() => {
+            setSelectedNames((current) => ({ ...current, [hardwareItem.id]: hardwareItem.serialNumber }));
             setIds((value) =>
               [...new Set([...value.split(/[\s,]+/).filter(Boolean), hardwareItem.id])].join('\n'),
-            )
-          }
+            );
+          }}
         >
           Añadir {hardwareItem.serialNumber} a etiquetas
         </button>
@@ -65,6 +70,14 @@ export function BarcodeLabelsPanel({ hardwareItem }: { hardwareItem?: HardwareIt
         <p role="status" className="mb-3 text-sm text-slate-600">
           Equipos y piezas seleccionados: {new Set(ids.split(/[\s,]+/).filter(Boolean)).size}
         </p>
+        {ids.trim() && <ul aria-label="Equipos seleccionados para etiquetas" className="mb-3 space-y-2">
+          {[...new Set(ids.split(/[\s,]+/).filter(Boolean))].map((id, index) => (
+            <li key={id} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 p-2 text-sm">
+              <span className="break-all">{selectedNames[id] ?? `Equipo o pieza ${index + 1}`}</span>
+              <button type="button" disabled={busy} className={SECONDARY_BUTTON_CLASS} aria-label={`Quitar ${selectedNames[id] ?? `equipo o pieza ${index + 1}`}`} onClick={() => setIds((value) => value.split(/[\s,]+/).filter((entry) => entry && entry !== id).join('\n'))}>Quitar</button>
+            </li>
+          ))}
+        </ul>}
         <details className="rounded-lg border border-slate-200 p-3">
           <summary className="cursor-pointer rounded text-sm text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
             Agregar referencias manualmente
@@ -99,9 +112,6 @@ export function BarcodeLabelsPanel({ hardwareItem }: { hardwareItem?: HardwareIt
             <p className="break-all font-mono text-sm text-slate-700">{label.barcodeValue}</p>
             <p className="text-sm text-slate-600">{label.specsSummary}</p>
             <p className="text-sm text-slate-600">{label.locationName}</p>
-            <p className="text-sm font-medium text-slate-900">
-              Precio: {label.price ?? 'No definido'}
-            </p>
           </article>
         ))}
       </div>

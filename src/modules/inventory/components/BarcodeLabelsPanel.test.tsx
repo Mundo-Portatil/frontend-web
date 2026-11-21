@@ -36,6 +36,6 @@ describe('label data panel', () => {
     await user.click(screen.getByRole('button', { name: 'Ver etiquetas' }));
     expect(await screen.findByText('SN1')).toBeInTheDocument();
     expect(screen.getByText('16GB')).toBeInTheDocument();
-    expect(screen.getByText('Precio: 1200')).toBeInTheDocument();
+    expect(screen.queryByText('Precio: 1200')).not.toBeInTheDocument();
   });
 });
