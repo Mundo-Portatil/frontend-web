@@ -4,6 +4,7 @@ import type { HardwareItem, ItemStatus } from './hardwareModels';
 export interface HardwareListQuery {
   catalogItemId: string;
   locationId?: string;
+  search?: string;
   status?: ItemStatus;
   page: number;
   limit: number;

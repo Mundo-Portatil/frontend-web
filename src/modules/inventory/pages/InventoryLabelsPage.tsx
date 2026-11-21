@@ -31,6 +31,8 @@ function LabelSelection({ model, locationId, locationName }: { model: CatalogIte
   const [units, setUnits] = useState<HardwareItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [serialSearch, setSerialSearch] = useState('');
+  const [searchDraft, setSearchDraft] = useState('');
   const [includeUnavailable, setIncludeUnavailable] = useState(false);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [labels, setLabels] = useState<LabelData[] | null>(null);
@@ -41,7 +43,7 @@ function LabelSelection({ model, locationId, locationName }: { model: CatalogIte
   const sending = useRef(false);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  const query = { catalogItemId: model.id, ...(locationId ? { locationId } : {}), ...(!includeUnavailable ? { status: 'EN_STOCK' as const } : {}), limit: 50 };
+  const query = { catalogItemId: model.id, ...(serialSearch ? { search: serialSearch } : {}), ...(locationId ? { locationId } : {}), ...(!includeUnavailable ? { status: 'EN_STOCK' as const } : {}), limit: 50 };
 
   useEffect(() => {
     if (!model.isSerialized) return;
@@ -50,12 +52,12 @@ function LabelSelection({ model, locationId, locationName }: { model: CatalogIte
     setLoading(true);
     setUnits([]);
     setError(null);
-    void listHardwareUnits({ catalogItemId: model.id, ...(locationId ? { locationId } : {}), ...(!includeUnavailable ? { status: 'EN_STOCK' as const } : {}), page, limit: 50 }, controller.signal)
+    void listHardwareUnits({ catalogItemId: model.id, ...(serialSearch ? { search: serialSearch } : {}), ...(locationId ? { locationId } : {}), ...(!includeUnavailable ? { status: 'EN_STOCK' as const } : {}), page, limit: 50 }, controller.signal)
       .then((data) => { if (!controller.signal.aborted) { setUnits(data.items); setTotal(data.total); } })
       .catch((failure: unknown) => { if (!controller.signal.aborted) setError(failure instanceof LabelSelectionError ? failure.message : asAppError(failure).message); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [model.id, model.isSerialized, locationId, page, includeUnavailable, revision]);
+  }, [model.id, model.isSerialized, locationId, page, includeUnavailable, revision, serialSearch]);
 
   function toggle(item: HardwareItem) {
     setSelected((current) => { const next = { ...current }; if (next[item.id]) delete next[item.id]; else next[item.id] = item.serialNumber; return next; });
@@ -123,9 +125,14 @@ function LabelSelection({ model, locationId, locationName }: { model: CatalogIte
     {error && <Notification kind="error">{error}</Notification>}
     {model.isSerialized ? <fieldset disabled={busy} className="min-w-0 space-y-3">
       <legend className="mb-3 text-sm font-medium text-slate-900">Seleccionar unidades</legend>
+      <form onSubmit={(event) => { event.preventDefault(); setSerialSearch(searchDraft.trim()); setPage(1); }} className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end">
+        <div className="min-w-0 flex-1"><label htmlFor="label-serial-search" className={LABEL_CLASS}>Buscar por número de serie</label><input id="label-serial-search" type="search" value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} className={TEXT_INPUT_CLASS} placeholder="Escribe o escanea la serie…" autoComplete="off" spellCheck={false} /></div>
+        <button type="submit" className={SECONDARY_BUTTON_CLASS}>Buscar serie</button>
+        {serialSearch && <button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => { setSearchDraft(''); setSerialSearch(''); setPage(1); }}>Ver todas las series</button>}
+      </form>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <label className="flex min-h-10 items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={includeUnavailable} onChange={(event) => { setIncludeUnavailable(event.target.checked); setPage(1); setSelected({}); setLabels(null); }} />Incluir unidades vendidas y otros estados para reimprimir</label>
-        {!loading && units.length > 0 && <div className="flex flex-wrap gap-2"><button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => void selectAll()}>Seleccionar todas ({total})</button><button type="button" className={SECONDARY_BUTTON_CLASS} disabled={!Object.keys(selected).length} onClick={() => { setSelected({}); setLabels(null); }}>Limpiar selección</button></div>}
+        {!loading && units.length > 0 && <div className="flex flex-wrap gap-2"><button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => void selectAll()}>{serialSearch ? 'Seleccionar resultados' : 'Seleccionar todas'} ({total})</button><button type="button" className={SECONDARY_BUTTON_CLASS} disabled={!Object.keys(selected).length} onClick={() => { setSelected({}); setLabels(null); }}>Limpiar selección</button></div>}
       </div>
       {loading ? <p role="status">Cargando unidades…</p> : error && !units.length ? <button className={SECONDARY_BUTTON_CLASS} onClick={() => setRevision((value) => value + 1)}>Reintentar</button> : <>
         {!units.length ? <p role="status" className="text-sm text-slate-600">No hay unidades para estos filtros.</p> : <>

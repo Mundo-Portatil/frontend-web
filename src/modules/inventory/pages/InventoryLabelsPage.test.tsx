@@ -101,3 +101,20 @@ it('retains validated labels when a small format cannot fit the barcode', async 
   await waitFor(() => expect(downloadLabelsPdf).toHaveBeenLastCalledWith(labels, undefined, { layout: 'compact' }));
   expect(getModelLabels).toHaveBeenCalledTimes(1);
 });
+
+it('searches serials through the server across all model pages and preserves selections', async () => {
+  const found = { ...unit, id: 'unit-100', serialNumber: 'SN-100' };
+  vi.mocked(listHardwareUnits).mockResolvedValue({ items: [unit], total: 100, page: 1, limit: 50 });
+  const user = await choose(true);
+  await user.click(await screen.findByRole('checkbox', { name: /SN-A/ }));
+  await user.click(screen.getByRole('button', { name: 'Siguiente' }));
+  await waitFor(() => expect(listHardwareUnits).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }), expect.any(AbortSignal)));
+  vi.mocked(listHardwareUnits).mockResolvedValue({ items: [found], total: 1, page: 1, limit: 50 });
+  await user.type(screen.getByLabelText('Buscar por número de serie'), 'SN-100{Enter}');
+  await waitFor(() => expect(listHardwareUnits).toHaveBeenLastCalledWith({ catalogItemId: 'model', status: 'EN_STOCK', search: 'SN-100', page: 1, limit: 50 }, expect.any(AbortSignal)));
+  await user.click(await screen.findByRole('checkbox', { name: /SN-100/ }));
+  expect(screen.getByText('2 etiquetas para imprimir')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Ver todas las series' }));
+  await waitFor(() => expect(listHardwareUnits).toHaveBeenLastCalledWith({ catalogItemId: 'model', status: 'EN_STOCK', page: 1, limit: 50 }, expect.any(AbortSignal)));
+  expect(screen.getByText('2 etiquetas para imprimir')).toBeInTheDocument();
+});
