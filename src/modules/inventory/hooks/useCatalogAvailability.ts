@@ -15,7 +15,7 @@ export type AvailabilityDisplay =
 const EMPTY: Record<string, Availability> = {};
 
 /** The list endpoint has no totals: fetch only the visible page, with bounded parallelism. */
-export function useCatalogAvailability(items: readonly CatalogItem[], enabled: boolean) {
+export function useCatalogAvailability(items: readonly CatalogItem[], enabled: boolean, seed?: CatalogDetail) {
   const [revision, setRevision] = useState(0);
   const [snapshot, setSnapshot] = useState<{ items: readonly CatalogItem[]; entries: Record<string, Availability> }>({ items, entries: EMPTY });
   const retry = useCallback(() => setRevision((value) => value + 1), []);
@@ -23,9 +23,9 @@ export function useCatalogAvailability(items: readonly CatalogItem[], enabled: b
   useEffect(() => {
     const controller = new AbortController();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSnapshot({ items, entries: EMPTY });
+    setSnapshot({ items, entries: seed ? { [seed.item.id]: { status: 'ready', detail: seed } } : EMPTY });
     if (!enabled || !items.length) return () => controller.abort();
-    const ids = [...new Set(items.map((item) => item.id))];
+    const ids = [...new Set(items.map((item) => item.id))].filter((id) => id !== seed?.item.id);
     let next = 0;
     async function worker() {
       while (!controller.signal.aborted && next < ids.length) {
@@ -46,7 +46,7 @@ export function useCatalogAvailability(items: readonly CatalogItem[], enabled: b
     }
     void Promise.all(Array.from({ length: Math.min(4, ids.length) }, () => worker()));
     return () => controller.abort();
-  }, [items, enabled, revision]);
+  }, [items, enabled, revision, seed]);
 
   return { entries: enabled && snapshot.items === items ? snapshot.entries : EMPTY, retry };
 }

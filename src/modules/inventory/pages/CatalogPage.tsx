@@ -1,6 +1,7 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../../../router/routes';
+import { useBarcodeScanner } from '../../../hooks/useBarcodeScanner';
 import { useRestoreFocus } from '../../../hooks/useRestoreFocus';
 import { Can } from '../../../components/guards/Can';
 import { EmptyState } from '../../../components/feedback/EmptyState';
@@ -33,22 +34,31 @@ const COLUMNS = [
   'Acciones',
 ] as const;
 
-interface CatalogPageProps {
-  mode?: 'manage' | 'consult';
-  onSearchCode?: (value: string) => void;
-  onSearchChange?: () => void;
-  lookupResult?: ReactNode;
-  hasExactMatch?: boolean;
-}
+const UNIT_STATUS = { EN_STOCK: 'En stock', VENDIDO: 'Vendido', SEGUNDA_MANO_PENDIENTE: 'Segunda mano pendiente', EN_GARANTIA: 'En garantía', DE_BAJA: 'De baja' } as const;
 
-export function CatalogPage({ mode = 'manage', onSearchCode, onSearchChange, lookupResult, hasExactMatch = false }: CatalogPageProps) {
+interface CatalogPageProps { mode?: 'manage' | 'consult'; searchUnits?: boolean }
+
+export function CatalogPage({ mode = 'manage', searchUnits = false }: CatalogPageProps) {
   const managing = mode === 'manage';
-  const unifiedSearch = Boolean(onSearchCode);
-  const [consultSearch, setConsultSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const categories = useCategories();
-  const { query, setQuery, result, loading, error, reload } = useCatalog();
+  const { query, setQuery, result, loading, error, reload, cancelPending, applySearch: commitSearch, unit, detail, unitError } = useCatalog(searchUnits);
+  const pendingTerm = searchInput.trim() !== (query.search ?? '');
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showUnit, setShowUnit] = useState(false);
+  function applySearch(value: string) {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    commitSearch(value);
+  }
+  useEffect(() => {
+    searchTimer.current = setTimeout(() => {
+      commitSearch(searchInput);
+    }, 300);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, [searchInput, commitSearch]);
+  useBarcodeScanner((value) => { cancelPending(); setSearchInput(value); setShowUnit(false); applySearch(value); }, searchUnits);
   const activeLocation = useLocationStore((state) => state.activeLocation);
-  const availability = useCatalogAvailability(result.items, !loading && !error);
+  const availability = useCatalogAvailability(result.items, !loading && !error && !pendingTerm, detail);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -110,7 +120,7 @@ export function CatalogPage({ mode = 'manage', onSearchCode, onSearchChange, loo
         </div>
       </Can>}
 
-      {lookupResult}
+      {unitError && !pendingTerm && !loading && <Notification kind="warning">{unitError}</Notification>}
       {message && <Notification kind="success">{message}</Notification>}
 
       {selectedId && (
@@ -144,29 +154,26 @@ export function CatalogPage({ mode = 'manage', onSearchCode, onSearchChange, loo
           <div>
             <form onSubmit={(event) => {
               event.preventDefault();
-              if (!unifiedSearch) return;
-              const search = consultSearch.trim();
-              setQuery({ ...query, search: search || undefined, page: 1 });
-              if (search) onSearchCode?.(search);
-              else onSearchChange?.();
+              applySearch(searchInput);
             }}>
             <label htmlFor="catalog-search" className={LABEL_CLASS}>
-              {unifiedSearch ? 'Marca, modelo, código o serie' : 'Buscar producto'}
+              {searchUnits ? 'Marca, modelo, código o serie' : 'Buscar producto'}
             </label>
             <div className="flex min-w-0 gap-2">
             <input
               id="catalog-search"
               type="search"
-              value={unifiedSearch ? consultSearch : query.search ?? ''}
+              value={searchInput}
               onChange={(event) => {
-                onSearchChange?.();
-                if (!unifiedSearch) setQuery({ ...query, search: event.target.value || undefined, page: 1 });
-                else setConsultSearch(event.target.value);
+                const value = event.target.value;
+                if (value.trim() !== (query.search ?? '')) cancelPending();
+                setSearchInput(value);
+                setShowUnit(false);
+                if (!value.trim()) applySearch('');
               }}
               className={`${TEXT_INPUT_CLASS} min-w-0 flex-1`}
-              placeholder={unifiedSearch ? 'Marca, modelo, código o serie…' : 'Marca, modelo o código…'}
+              placeholder={searchUnits ? 'Marca, modelo, código o serie…' : 'Marca, modelo o código…'}
             />
-            {unifiedSearch && <button type="submit" className={`${SECONDARY_BUTTON_CLASS} shrink-0`}>Buscar</button>}
             </div>
             </form>
           </div>
@@ -232,14 +239,14 @@ export function CatalogPage({ mode = 'manage', onSearchCode, onSearchChange, loo
           </div>
         </div>
 
-        {error ? (
+        {error && !pendingTerm ? (
           <ErrorState error={error} onRetry={reload} />
-        ) : loading ? (
+        ) : loading || pendingTerm ? (
           <LoadingState message="Cargando catálogo..." />
         ) : (
           <>
             {!result.items.length ? (
-              hasExactMatch ? null : <EmptyState message={managing ? 'No hay productos disponibles.' : 'No hay modelos que coincidan con esta búsqueda. Prueba también una serie o código y pulsa Buscar.'} />
+              <EmptyState message={managing ? 'No hay productos disponibles.' : 'No hay modelos o series que coincidan con esta búsqueda.'} />
             ) : (
               <div
                 role="region"
@@ -259,8 +266,13 @@ export function CatalogPage({ mode = 'manage', onSearchCode, onSearchChange, loo
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {result.items.map((item) => (
-                      <tr key={item.id}>
-                        <td className="px-3 py-2 text-slate-900"><span className="block font-medium">{item.name}</span><span className="block text-xs text-slate-500">{item.brand} · {item.model}</span></td>
+                      <tr key={item.id} className={unit?.catalogId === item.id ? 'bg-brand-50/40' : undefined}>
+                        <td className="px-3 py-2 text-slate-900"><span className="block font-medium">{item.name}</span><span className="block text-xs text-slate-500">{item.brand} · {item.model}</span>
+                          {unit?.catalogId === item.id && <div className="mt-2 space-y-1 text-xs"><p className="break-all font-semibold text-brand-800">Serie encontrada: {unit.serialNumber}</p><p>{unit.locationName ?? 'Ubicación no disponible'} · {UNIT_STATUS[unit.status]}</p>
+                            <button type="button" className="rounded text-brand-800 underline focus-visible:ring-2" aria-expanded={showUnit} aria-controls={`catalog-unit-${unit.id}`} onClick={() => setShowUnit((value) => !value)}>{showUnit ? 'Ocultar unidad' : 'Ver unidad'}</button>
+                            {showUnit && <dl id={`catalog-unit-${unit.id}`} className="space-y-1"><div><dt className="inline font-medium">Equipo asociado: </dt><dd className="inline">{unit.parentChassis?.serialNumber ?? (unit.parentChassisId ? 'Equipo asociado' : 'Sin equipo asociado')}</dd></div><div><dt className="font-medium">Componentes</dt><dd>{unit.components?.length ? unit.components.map((child) => child.serialNumber).join(', ') : 'Sin componentes asociados'}</dd></div></dl>}
+                          </div>}
+                        </td>
                         <td className="px-3 py-2 text-slate-700">
                           {categories.items.find((category) => category.id === item.categoryId)
                             ?.name ?? '—'}

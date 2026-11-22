@@ -1,5 +1,3 @@
-import { useState } from 'react';
-import { CatalogDetailPanel } from '../components/CatalogDetailPanel';
 import { Notification } from '../../../components/notifications/Notification';
 import {
   LABEL_CLASS,
@@ -7,7 +5,6 @@ import {
   TEXT_INPUT_CLASS,
 } from '../../../utils/formStyles';
 import { CatalogPage } from './CatalogPage';
-import { LoadingState } from '../../../components/feedback/LoadingState';
 import { InventoryBadge, type BadgeTone } from '../components/InventoryBadge';
 import { useHardwareScan } from '../hooks/useHardwareScan';
 import type { ItemStatus } from '../hardwareModels';
@@ -29,7 +26,10 @@ const STATUS_TONE: Record<ItemStatus, BadgeTone> = {
 };
 
 export function InventoryPage({ allowManagement = false }: { allowManagement?: boolean }) {
-  const [showModel, setShowModel] = useState(false);
+  return allowManagement ? <LegacyUnitLookup /> : <CatalogPage searchUnits />;
+}
+
+function LegacyUnitLookup() {
   const {
     code,
     setCode,
@@ -37,8 +37,6 @@ export function InventoryPage({ allowManagement = false }: { allowManagement?: b
     busy,
     error,
     search,
-    errorStatus,
-    clearLookup,
   } = useHardwareScan();
 
   const detail = item && (
@@ -93,24 +91,10 @@ export function InventoryPage({ allowManagement = false }: { allowManagement?: b
             )}
           </section>
 
-          {allowManagement && <Notification kind="warning">La asociación y separación de componentes está temporalmente deshabilitada. Puedes consultar las relaciones existentes.</Notification>}
+          {<Notification kind="warning">La asociación y separación de componentes está temporalmente deshabilitada. Puedes consultar las relaciones existentes.</Notification>}
         </article>
       );
 
-  if (!allowManagement) return (
-    <CatalogPage
-      onSearchCode={(value) => { setShowModel(false); void search(value); }}
-      onSearchChange={() => { clearLookup(); setShowModel(false); }}
-      hasExactMatch={Boolean(item)}
-      lookupResult={<>
-        {busy && <LoadingState message="Buscando unidad por serie o código…" />}
-        {error && errorStatus !== 404 && <Notification kind="error">{error}</Notification>}
-        {detail}
-        {item && <button type="button" className={PRIMARY_BUTTON_CLASS} onClick={() => setShowModel((value) => !value)}>{showModel ? 'Ocultar ficha del modelo' : 'Ver ficha del modelo'}</button>}
-        {item && showModel && <CatalogDetailPanel id={item.catalogId} onClose={() => setShowModel(false)} />}
-      </>}
-    />
-  );
 
   return <section className="space-y-6">
       <header>

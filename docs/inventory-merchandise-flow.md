@@ -93,3 +93,12 @@ Se retiró la entrada duplicada «Consultar inventario / Modelos y existencias»
 Etiquetas ofrece dos acciones independientes: «Vista previa» abre un diálogo y «Descargar PDF» descarga directamente sin abrirlo. El diálogo presenta hojas SVG sin visor nativo, comparte con el PDF el plan de posiciones, medidas, títulos y barras CODE128, y recorta el espacio vacío solo en pantalla. Se cierra con botón, Escape o fondo; conserva el foco dentro y lo devuelve al control de apertura. En móvil, el desplazamiento queda dentro del diálogo para mantener las etiquetas legibles.
 
 «Imprimir etiquetas» abre las mismas hojas en una ventana con estilos A4 y solicita la impresión del navegador al terminar la carga. Una ventana bloqueada o una hoja que no cargue produce un error visible. No se integra ningún protocolo de impresora. La selección, copias, tamaños, códigos originales y ausencia de precios se mantienen; generar etiquetas no modifica las existencias.
+
+
+## Búsqueda reactiva y asociación de series
+
+La búsqueda principal aplica debounce de 300 ms y Enter inmediato, conserva categoría/estado/límite y vuelve a la primera página al cambiar el término. Las peticiones previas se cancelan al editar; limpiar o restaurar un término cancelado reinicia correctamente la consulta. Se conserva el lector HID.
+
+Una serie exacta se resuelve a HardwareItem y después a la ficha real de ProductCatalog mediante catalogId. El modelo aparece en la misma tabla, con anotación de serie, ubicación y estado de esa unidad; se reutiliza su resumen para mostrar el saldo oficial sin crear modelos ni contadores adicionales. La información de la unidad se expande en la fila y la ficha normal mantiene las consultas de unidades/historial. Una unidad vendida conserva ese estado aunque el modelo tenga otras unidades disponibles.
+
+Si el nombre visible combinado (marca + modelo) no tiene resultados en la búsqueda textual de la API, se consultan candidatos con uno de sus términos y los filtros activos. Se completa la paginación de candidatos antes de filtrar y paginar las coincidencias reales, evitando totales ficticios. Esta consulta adicional solo se realiza cuando hace falta; no se modifica el backend.
