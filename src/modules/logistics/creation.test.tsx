@@ -162,7 +162,8 @@ describe('registro accesible de traslados', () => {
     fireEvent.change(screen.getByLabelText('Puesto'), { target: { value: 'post' } });
     fireEvent.change(screen.getByLabelText('Serie o código de unidad (escáner o teclado)'), { target: { value: 'SN123' } });
     fireEvent.click(screen.getByRole('button', { name: 'Agregar unidad' }));
-    await screen.findByText('Laptop · SN123');
+    await screen.findByText('Laptop');
+    expect(screen.getByText('SN123')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Revisar traslado' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('button', { name: 'Confirmar traslado' })).toBeEnabled();

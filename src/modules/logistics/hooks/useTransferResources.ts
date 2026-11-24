@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { listQuantityStock, scanHardware, type HardwareItem } from '../../inventory';
+import { listQuantityStock, lookupHardware, scanHardware, type HardwareItem } from '../../inventory';
 import { listActiveLocations } from '../../foundation/locations/services/locationService';
 import type { Location } from '../../foundation/locations/models';
 import { asAppError } from '../../../services/api/errors';
@@ -39,13 +39,21 @@ export function useSerializedLookup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => () => request.current?.abort(), []);
-  async function find(code: string, originId: string, existingIds: string[]): Promise<HardwareItem | null> {
+  async function find(code: string, originId: string, existingIds: string[], fallbackCatalogName?: string): Promise<HardwareItem | null> {
     if (!code.trim()) return null;
     request.current?.abort();
     const controller = new AbortController(); request.current = controller;
     setLoading(true); setError('');
     try {
-      const item = await scanHardware(code.trim(), controller.signal);
+      let item: HardwareItem;
+      try {
+        item = await lookupHardware(code.trim(), controller.signal);
+      } catch {
+        item = await scanHardware(code.trim(), controller.signal);
+      }
+      if (fallbackCatalogName && !item.catalogName) {
+        item = { ...item, catalogName: fallbackCatalogName };
+      }
       if (controller.signal.aborted) return null;
       if (existingIds.includes(item.id)) { setError('Esta unidad ya está agregada.'); return null; }
       if (item.locationId !== originId || item.status !== 'EN_STOCK' || item.parentChassisId) { setError('La unidad no está disponible para salir de este origen.'); return null; }

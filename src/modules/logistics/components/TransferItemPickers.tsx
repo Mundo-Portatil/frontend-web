@@ -115,8 +115,8 @@ export function SerializedItemPicker({
   const [selectedSerialId, setSelectedSerialId] = useState('');
   const lookup = useSerializedLookup();
 
-  async function add(value: string) {
-    const item = await lookup.find(value, originId, serials.map((unit) => unit.id));
+  async function add(value: string, catalogFallbackName?: string) {
+    const item = await lookup.find(value, originId, serials.map((unit) => unit.id), catalogFallbackName);
     if (item) {
       onAdd(item);
       setCode('');
@@ -162,7 +162,8 @@ export function SerializedItemPicker({
     if (!selectedSerialId) return;
     const found = availableSerials.find((s) => s.id === selectedSerialId);
     if (!found) return;
-    await add(found.serialNumber);
+    const catalogName = catalog ? `${catalog.brand} ${catalog.model}`.trim() || catalog.name : undefined;
+    await add(found.serialNumber, catalogName);
     setSelectedSerialId('');
   }
 

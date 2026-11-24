@@ -91,7 +91,11 @@ export function TransferSummaryDialog({
         <ul className="my-4 divide-y divide-slate-100 rounded-lg border border-slate-200 text-sm">
           {draft.serials.map((item) => (
             <li className="px-3 py-2 text-slate-800" key={item.id}>
-              {item.catalogName || 'Unidad'} · {item.serialNumber}
+              <span className="font-medium text-slate-900">{item.catalogName || item.catalogSku || 'Equipo'}</span>
+              <span className="text-xs text-slate-500 font-mono ml-2">Serie: {item.serialNumber}</span>
+              {item.isSecondHand !== undefined && (
+                <span className="text-xs text-slate-500 ml-2">({item.isSecondHand ? 'Segunda mano' : 'Nuevo'})</span>
+              )}
             </li>
           ))}
           {draft.quantities.map((line) => (

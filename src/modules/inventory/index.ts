@@ -7,6 +7,7 @@ export type { QuantityStock, QuantityStockQuery, QuantityStockPageResult, Inboun
 // Public read interfaces reused by logistics; writes remain in their owning module.
 export { CatalogProductPicker } from './components/CatalogProductPicker';
 export { scanHardware } from './services/hardwareItemService';
+export { lookupHardware } from './services/hardwareLookupService';
 export { listCatalog, getCatalogDetail } from './services/catalogService';
 export { listQuantityStock } from './services/quantityStockService';
 export { listHardwareUnits, getHardwareLifecycle, getAvailableSerials } from './services/hardwareReadService';

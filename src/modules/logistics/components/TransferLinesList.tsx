@@ -29,11 +29,14 @@ export function TransferLinesList({
           {draft.serials.map((item) => (
             <li key={item.id} className="flex items-center justify-between gap-2 px-3 py-2.5">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-slate-900">
-                  {item.catalogName || item.catalogSku || 'Unidad'} · {item.serialNumber}
+                <p className="truncate text-sm font-semibold text-slate-900">
+                  {item.catalogName || item.catalogSku || 'Equipo'}
+                </p>
+                <p className="text-xs text-slate-600">
+                  Serie: <span className="font-mono font-medium text-slate-800">{item.serialNumber}</span>
                 </p>
                 <p className="text-xs text-slate-500">
-                  Con serie · {item.isSecondHand ? 'Segunda mano' : 'Nuevo'}
+                  {item.isSecondHand ? 'Segunda mano' : 'Nuevo'}
                 </p>
                 {item.components?.length ? (
                   <ul className="mt-1 text-xs text-slate-500">
