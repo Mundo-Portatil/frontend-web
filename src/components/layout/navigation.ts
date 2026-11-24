@@ -103,6 +103,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ],
   },
   {
+    id: 'logistics',
+    label: 'Logística interna',
+    icon: LocationsIcon,
+    to: ROUTES.logistics,
+    group: 'operations',
+    roles: ['ADMIN', 'ENCARGADO_ALMACEN', 'VENDEDOR', 'TECNICO'],
+  },
+  {
     id: 'locations',
     label: 'Ubicaciones',
     icon: LocationsIcon,

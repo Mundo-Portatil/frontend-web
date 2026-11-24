@@ -5,6 +5,8 @@
  */
 export const ROUTES = {
   login: '/login',
+  logistics: '/logistics',
+  logisticsNew: '/logistics/new',
   locations: '/locations',
   users: '/users',
   profile: '/profile',

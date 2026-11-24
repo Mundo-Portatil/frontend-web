@@ -9,6 +9,11 @@ import * as categoryService from '../modules/inventory/services/categoryService'
 import * as userService from '../modules/foundation/users/services/userService';
 import * as locationService from '../modules/foundation/locations/services/locationService';
 import * as auditLogService from '../modules/foundation/audit-logs/services/auditLogService';
+import * as transferService from '../modules/logistics/services/transferService';
+
+vi.mock('../modules/logistics/services/transferService', () => ({
+  listTransfers: vi.fn(), getTransferDetail: vi.fn(), createDirectTransfer: vi.fn(),
+}));
 
 vi.mock('../modules/foundation/locations/components/LocationSelector', () => ({
   LocationSelector: () => null,
@@ -71,6 +76,7 @@ function renderAt(path: string) {
 describe('AppRouter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(transferService.listTransfers).mockResolvedValue([]);
     vi.mocked(categoryService.listCategories).mockResolvedValue([]);
     useAuthStore.setState({ status: 'unauthenticated', user: null });
     vi.mocked(userService.listUsers).mockResolvedValue([]);
@@ -90,6 +96,28 @@ describe('AppRouter', () => {
     renderAt('/users');
 
     expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
+  });
+
+  it.each([VENDEDOR, TECNICO])('denies $role the direct logistics creation route', async (user) => {
+    useAuthStore.setState({ status: 'authenticated', user });
+    renderAt('/logistics/new');
+    expect(await screen.findByRole('heading', { name: 'Acceso denegado' })).toBeInTheDocument();
+    expect(transferService.createDirectTransfer).not.toHaveBeenCalled();
+  });
+
+  it('opens logistics history through the operations navigation', async () => {
+    useAuthStore.setState({ status: 'authenticated', user: ADMIN });
+    renderAt('/logistics');
+    expect(await screen.findByText('No hay guías para estos filtros.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Logística interna' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Nueva guía' })).toHaveAttribute('href', '/logistics/new');
+  });
+
+  it('does not request guides when an operative user has no assigned location', async () => {
+    useAuthStore.setState({ status: 'authenticated', user: VENDEDOR });
+    renderAt('/logistics');
+    expect(await screen.findByText(/No tienes un puesto asignado/)).toBeInTheDocument();
+    expect(transferService.listTransfers).not.toHaveBeenCalled();
   });
 
   it.each([ADMIN, VENDEDOR, TECNICO])('allows $role to consult inventory and quantity stock', async (user) => {

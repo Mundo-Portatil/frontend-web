@@ -18,6 +18,10 @@ import { useAuthStore } from '../stores/authStore';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleGuard } from './RoleGuard';
 import { ROUTES } from './routes';
+import { TransferHistoryPage } from '../modules/logistics/pages/TransferHistoryPage';
+import { TransferDetailPage } from '../modules/logistics/pages/TransferDetailPage';
+import { TransferCreatePage } from '../modules/logistics/pages/TransferCreatePage';
+import { TRANSFER_EXECUTOR_ROLES } from '../modules/logistics/permissions';
 
 /**
  * Public route for guests: shows the loading screen while the session is
@@ -83,6 +87,9 @@ export function AppRouter() {
             <Route path="catalog" element={<InventoryPage />} />
             <Route path="categories" element={<CategoriesPage />} />
           </Route>
+          <Route path={ROUTES.logistics} element={<TransferHistoryPage />} />
+          <Route path={ROUTES.logisticsNew} element={<RoleGuard allowedRoles={TRANSFER_EXECUTOR_ROLES}><TransferCreatePage /></RoleGuard>} />
+          <Route path={`${ROUTES.logistics}/:id`} element={<TransferDetailPage />} />
           <Route path={ROUTES.profile} element={<ProfilePage />} />
           <Route path={ROUTES.locations} element={<LocationsPage />} />
           <Route path={ROUTES.unauthorized} element={<UnauthorizedPage />} />
