@@ -1,5 +1,5 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useReducer, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Can } from '../../../components/guards/Can';
 import { LABEL_CLASS, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, TEXT_INPUT_CLASS } from '../../../utils/formStyles';
 import { useAuthStore } from '../../../stores/authStore';
@@ -13,14 +13,11 @@ import { QuantityItemPicker, SerializedItemPicker } from '../components/Transfer
 import { TransferLinesList } from '../components/TransferLinesList';
 import { TransferSummaryDialog } from '../components/TransferSummaryDialog';
 import { TransferReceipt } from '../components/TransferReceipt';
-import { TransferExitConfirmDialog } from '../components/TransferExitConfirmDialog';
 
 function TransferCreateForm() {
   const [draft, dispatch] = useReducer(transferDraftReducer, undefined, emptyTransferDraft);
   const [reviewing, setReviewing] = useState(false);
   const [validationError, setValidationError] = useState('');
-  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
-  const navigate = useNavigate();
   const resources = useTransferLocations();
   const creation = useCreateTransfer();
   const stock = useRefreshTransferStock();
@@ -29,53 +26,10 @@ function TransferCreateForm() {
   const owner = useRef(user?.id);
   const route = getTransferRoute(draft, resources.data);
   const hasLines = draft.serials.length > 0 || draft.quantities.length > 0;
-  const dirty = hasLines || Boolean(draft.notes.trim());
   const busy = creation.phase === 'submitting' || stock.loading;
   const frozen = busy || creation.phase === 'unknown';
   const centers = resources.data.filter((location) => location.active && location.type === 'ALMACEN_CENTRAL');
   const posts = resources.data.filter((location) => location.active && location.type === 'PUESTO');
-
-  // Intercept internal link clicks when there are unsaved changes
-  useEffect(() => {
-    if (!dirty || creation.phase === 'completed') return;
-
-    function handleGlobalClick(event: MouseEvent) {
-      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
-        return;
-      }
-
-      const target = event.target as HTMLElement | null;
-      const anchor = target?.closest('a');
-      if (!anchor || !anchor.href) return;
-
-      const targetUrl = new URL(anchor.href, window.location.href);
-      // Only intercept internal same-origin links
-      if (targetUrl.origin !== window.location.origin) return;
-
-      // Don't intercept anchor links on the current page
-      if (targetUrl.pathname === window.location.pathname && targetUrl.search === window.location.search) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-      setPendingNavigation(targetUrl.pathname + targetUrl.search + targetUrl.hash);
-    }
-
-    document.addEventListener('click', handleGlobalClick, true);
-    return () => document.removeEventListener('click', handleGlobalClick, true);
-  }, [dirty, creation.phase]);
-
-  // Warn on tab close, page refresh, or external navigation
-  useEffect(() => {
-    if (!dirty || creation.phase === 'completed') return;
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty, creation.phase]);
 
   // Session changes unmount this account's draft rather than carrying it forward.
   if (owner.current !== user?.id) {
@@ -84,7 +38,6 @@ function TransferCreateForm() {
 
   function changeRoute(direction: TransferDraft['direction'], postId: string) {
     if (frozen) return;
-    if (hasLines && !window.confirm('¿Cambiar el origen o destino y quitar los productos agregados?')) return;
     dispatch({ type: 'route', direction, postId });
     setValidationError('');
     setReviewing(false);
@@ -317,18 +270,6 @@ function TransferCreateForm() {
           }}
         />
       )}
-
-      <TransferExitConfirmDialog
-        isOpen={Boolean(pendingNavigation)}
-        onStay={() => setPendingNavigation(null)}
-        onLeave={() => {
-          const dest = pendingNavigation;
-          setPendingNavigation(null);
-          if (dest) {
-            navigate(dest);
-          }
-        }}
-      />
     </div>
   );
 }

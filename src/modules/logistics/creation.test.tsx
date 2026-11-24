@@ -182,37 +182,31 @@ describe('registro accesible de traslados', () => {
     expect(mocks.locations).not.toHaveBeenCalled();
   });
 
-  it('muestra el diálogo de confirmación personalizado al intentar salir con cambios pendientes', async () => {
+  it('cambiar de operación o navegar no muestra alertas ni confirmaciones', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm');
     render(<MemoryRouter><TransferCreatePage /></MemoryRouter>);
     await screen.findByRole('option', { name: 'Puesto 212' });
-    
-    // Sin cambios: el enlace a /logistics no abre modal de confirmación
-    const historyLink = screen.getByRole('link', { name: 'Historial de traslados' });
-    fireEvent.click(historyLink);
-    expect(screen.queryByRole('dialog', { name: '¿Salir del traslado?' })).not.toBeInTheDocument();
 
-    // Seleccionar puesto para habilitar el formulario
+    // Seleccionar puesto
     fireEvent.change(screen.getByLabelText('Puesto'), { target: { value: 'post' } });
 
-    // Agregar observaciones para que el borrador tenga cambios (dirty)
+    // Agregar observaciones
     const notesInput = screen.getByLabelText('Observaciones (opcional)');
-    fireEvent.change(notesInput, { target: { value: 'Traslado urgente de prueba' } });
+    fireEvent.change(notesInput, { target: { value: 'Traslado de prueba' } });
 
-    // Clic en enlace interno con cambios pendientes: se abre diálogo personalizado
+    // Cambiar de operación directamente a devolución sin diálogos ni confirmaciones
+    const operationSelect = screen.getByLabelText('Operación');
+    fireEvent.change(operationSelect, { target: { value: 'return' } });
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: /¿Salir/i })).not.toBeInTheDocument();
+
+    // Navegar haciendo clic en enlace interno tampoco muestra diálogos ni bloquea
+    const historyLink = screen.getByRole('link', { name: 'Historial de traslados' });
     fireEvent.click(historyLink);
-    const exitDialog = await screen.findByRole('dialog', { name: '¿Salir del traslado?' });
-    expect(within(exitDialog).getByText('¿Salir del traslado?')).toBeInTheDocument();
-    expect(within(exitDialog).getByText(/perderás los cambios del traslado que todavía no has registrado/)).toBeInTheDocument();
 
-    // Pulsar "Seguir editando" cierra el diálogo y conserva el borrador
-    fireEvent.click(within(exitDialog).getByRole('button', { name: 'Seguir editando' }));
-    expect(screen.queryByRole('dialog', { name: '¿Salir del traslado?' })).not.toBeInTheDocument();
-    expect(notesInput).toHaveValue('Traslado urgente de prueba');
-
-    // Pulsar "Salir sin guardar" procede con la salida
-    fireEvent.click(historyLink);
-    const exitDialogReopen = await screen.findByRole('dialog', { name: '¿Salir del traslado?' });
-    fireEvent.click(within(exitDialogReopen).getByRole('button', { name: 'Salir sin guardar' }));
-    expect(screen.queryByRole('dialog', { name: '¿Salir del traslado?' })).not.toBeInTheDocument();
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: /¿Salir/i })).not.toBeInTheDocument();
+    confirmSpy.mockRestore();
   });
 });
