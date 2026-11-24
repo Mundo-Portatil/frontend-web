@@ -78,3 +78,14 @@ export function ChevronRightIcon(props: LayoutIconProps) {
 export function CategoriesIcon(props: LayoutIconProps) {
   return <svg {...ICON_BASE_PROPS} {...props}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>;
 }
+
+export function TransfersIcon(props: LayoutIconProps) {
+  return (
+    <svg {...ICON_BASE_PROPS} {...props}>
+      <path d="M7 16l-4-4 4-4" />
+      <path d="M3 12h14" />
+      <path d="M17 8l4 4-4 4" />
+      <path d="M21 12H7" />
+    </svg>
+  );
+}
