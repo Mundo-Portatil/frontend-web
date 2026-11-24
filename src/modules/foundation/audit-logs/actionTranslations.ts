@@ -1,5 +1,4 @@
 import type { AuditLog } from './models';
-import { humanizeIdentifier } from './humanizeIdentifier';
 
 /**
  * Centralized Spanish presentation for audit log actions.
@@ -10,28 +9,32 @@ import { humanizeIdentifier } from './humanizeIdentifier';
  */
 export const ACTION_LABELS: Record<string, string> = {
   LOGIN: 'Inició sesión',
-  CREATE_USER: 'Creó usuario',
-  UPDATE_USER: 'Usuario actualizado',
-  CREATE_LOCATION: 'Creó ubicación',
-  UPDATE_LOCATION: 'Ubicación actualizada',
-  CREATE_CATEGORY: 'Categoría creada',
-  UPDATE_CATEGORY: 'Categoría actualizada',
-  UPDATE_PROFILE: 'Perfil personal actualizado',
-  CREATE_CATALOG_ITEM: 'Producto registrado',
-  UPDATE_CATALOG_ITEM: 'Producto actualizado',
-  CREATE_PASS_THROUGH_CATALOG_MODEL: 'Modelo de producto por pase registrado',
-  CREATE_HARDWARE_ITEM: 'Equipo o pieza registrado',
-  UPDATE_HARDWARE_ITEM: 'Equipo o pieza actualizado',
-  BATCH_INBOUND_HARDWARE: 'Ingreso de equipos por lote',
-  ATTACH_HARDWARE_CHILD: 'Componentes vinculados al equipo',
-  DETACH_HARDWARE_CHILD: 'Componente separado del equipo',
-  DECOMMISSION_HARDWARE_ITEM: 'Equipo o pieza dado de baja',
-  APPROVE_USED_COMPONENT: 'Componente usado aprobado',
-  PRINT_BARCODE_LABEL: 'Solicitud de etiqueta de equipo o pieza',
-  PRINT_BARCODE_LABELS_BATCH: 'Solicitud de etiquetas por lote',
-  INBOUND_QUANTITY_STOCK: 'Ingreso de unidades al inventario',
-  ADJUST_QUANTITY_STOCK: 'Corrección de cantidades del inventario',
-  DECREASE_QUANTITY_STOCK: 'Salida de unidades del inventario',
+  DEACTIVATE_USER: 'Desactivó un usuario',
+  REACTIVATE_USER: 'Reactivó un usuario',
+  UNIFIED_INVENTORY_INBOUND: 'Registró un ingreso de mercancía al Almacén Central',
+  PRINT_MODEL_BARCODE_LABELS: 'Solicitó etiquetas de un modelo de producto',
+  CREATE_USER: 'Creó un usuario',
+  UPDATE_USER: 'Modificó un usuario',
+  CREATE_LOCATION: 'Creó una ubicación',
+  UPDATE_LOCATION: 'Modificó una ubicación',
+  CREATE_CATEGORY: 'Creó una categoría',
+  UPDATE_CATEGORY: 'Modificó una categoría',
+  UPDATE_PROFILE: 'Modificó su perfil personal',
+  CREATE_CATALOG_ITEM: 'Registró un modelo de producto',
+  UPDATE_CATALOG_ITEM: 'Modificó un modelo de producto',
+  CREATE_PASS_THROUGH_CATALOG_MODEL: 'Registró un modelo para una venta por encargo',
+  CREATE_HARDWARE_ITEM: 'Registró un equipo o componente',
+  UPDATE_HARDWARE_ITEM: 'Modificó un equipo o componente',
+  BATCH_INBOUND_HARDWARE: 'Registró un ingreso de equipos por número de serie',
+  ATTACH_HARDWARE_CHILD: 'Vinculó componentes a un equipo',
+  DETACH_HARDWARE_CHILD: 'Separó un componente de un equipo',
+  DECOMMISSION_HARDWARE_ITEM: 'Dio de baja un equipo o componente',
+  APPROVE_USED_COMPONENT: 'Aprobó un componente de segunda mano',
+  PRINT_BARCODE_LABEL: 'Solicitó una etiqueta de equipo o componente',
+  PRINT_BARCODE_LABELS_BATCH: 'Solicitó etiquetas para varias unidades',
+  INBOUND_QUANTITY_STOCK: 'Registró un ingreso de mercancía por cantidad',
+  ADJUST_QUANTITY_STOCK: 'Corrigió las cantidades del inventario',
+  DECREASE_QUANTITY_STOCK: 'Registró una salida de mercancía',
 };
 
 /** Accepts `UPDATE_CATEGORY`, `update category` or `update-category`. */
@@ -51,19 +54,19 @@ function describeUserChanges(payload: Record<string, unknown>): string[] {
   const descriptions: string[] = [];
 
   if (changes.active === false) {
-    descriptions.push('Usuario desactivado');
+    descriptions.push('Desactivó un usuario');
   }
   if (changes.active === true) {
-    descriptions.push('Usuario reactivado');
+    descriptions.push('Reactivó un usuario');
   }
   if (changes.role !== undefined) {
-    descriptions.push('Rol de usuario modificado');
+    descriptions.push('Modificó el rol de un usuario');
   }
   if (typeof changes.name === 'string') {
-    descriptions.push('Nombre de usuario actualizado');
+    descriptions.push('Modificó el nombre de un usuario');
   }
   if (changes.passwordUpdated === true) {
-    descriptions.push('Contraseña de usuario actualizada');
+    descriptions.push('Modificó la contraseña de un usuario');
   }
 
   return descriptions;
@@ -74,13 +77,13 @@ function describeLocationChanges(payload: Record<string, unknown>): string[] {
   const descriptions: string[] = [];
 
   if (changes.active === false) {
-    descriptions.push('Ubicación desactivada');
+    descriptions.push('Desactivó una ubicación');
   }
   if (changes.active === true) {
-    descriptions.push('Ubicación reactivada');
+    descriptions.push('Reactivó una ubicación');
   }
   if (typeof changes.name === 'string') {
-    descriptions.push('Nombre de ubicación actualizado');
+    descriptions.push('Modificó el nombre de una ubicación');
   }
 
   return descriptions;
@@ -115,7 +118,9 @@ export function formatAuditAction(item: AuditLog): string {
   }
   if (descriptions.length) return descriptions.join(' · ');
 
-  const label = ACTION_LABELS[actionKey] ?? humanizeIdentifier(item.action, 'Sin acción registrada');
+  const label = ACTION_LABELS[actionKey] ?? (actionKey ? 'Registró una actividad' : 'Sin acción registrada');
+  if (actionKey === 'UNIFIED_INVENTORY_INBOUND' && finiteCount(item.payload.totalUnits)) return `${label} · ${item.payload.totalUnits} unidades`;
+  if (actionKey === 'PRINT_MODEL_BARCODE_LABELS' && finiteCount(item.payload.copies)) return `${label} · ${item.payload.copies} copias`;
   if (actionKey === 'INBOUND_QUANTITY_STOCK') {
     const details = [label];
     if (finiteCount(item.payload.inboundQuantity)) details.push(`${item.payload.inboundQuantity} unidades`);

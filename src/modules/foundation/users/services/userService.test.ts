@@ -31,6 +31,7 @@ describe('userService', () => {
       name: 'Nuevo Usuario',
       password: 'secret12',
       role: 'VENDEDOR' as const,
+      locationId: '550e8400-e29b-41d4-a716-446655440000',
     };
     const expected = { id: 'u-2', ...payload, active: true };
     vi.mocked(apiClient.post).mockResolvedValueOnce({ data: expected });
@@ -42,7 +43,7 @@ describe('userService', () => {
   });
 
   it('updates users with PATCH /users/:id', async () => {
-    const payload = { name: 'Editado', role: 'TECNICO' as const };
+    const payload = { name: 'Editado', role: 'TECNICO' as const, locationId: '550e8400-e29b-41d4-a716-446655440000' };
     const expected = { id: 'u-3', ...payload, active: true };
     vi.mocked(apiClient.patch).mockResolvedValueOnce({ data: expected });
 
@@ -75,7 +76,7 @@ describe('userService', () => {
 
 it('updates authenticated identity via fixed /users/me and strips administrative fields', async () => {
   vi.mocked(apiClient.patch).mockResolvedValueOnce({ data: { id: 'self' } });
-  const payload = { name: 'Ana', email: 'ana@mp.pe', password: 'Nueva123', id: 'other', role: 'ADMIN', active: false };
+  const payload = { name: 'Ana', email: 'ana@mp.pe', password: 'Nueva123', id: 'other', role: 'ADMIN', active: false, locationId: 'another-location' };
   await updateOwnProfile(payload);
   expect(apiClient.patch).toHaveBeenLastCalledWith('/users/me', { name: 'Ana', email: 'ana@mp.pe', password: 'Nueva123' });
 });

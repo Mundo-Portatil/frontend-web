@@ -1,4 +1,3 @@
-import { humanizeIdentifier } from './humanizeIdentifier';
 
 /**
  * Centralized Spanish presentation for audit log modules.
@@ -9,17 +8,26 @@ import { humanizeIdentifier } from './humanizeIdentifier';
  */
 export const MODULE_LABELS: Record<string, string> = {
   auth: 'Autenticación',
+  inventory: 'Inventario',
+  'product-catalog': 'Catálogo de productos',
   users: 'Usuarios',
   locations: 'Ubicaciones',
   categories: 'Categorías',
-  catalog: 'Productos y modelos',
-  'hardware-items': 'Equipos y piezas',
+  catalog: 'Catálogo de productos',
+  'hardware-items': 'Equipos y componentes',
   'quantity-stock': 'Inventario por cantidad',
 };
 
 /** Maps the labels and aliases typed in the filter to the API identifier. */
 const MODULE_ALIASES: Record<string, string> = {
   auth: 'auth',
+  inventory: 'inventory',
+  inventario: 'inventory',
+  'product-catalog': 'product-catalog',
+  'catalogo de productos': 'catalog',
+  'productos y modelos': 'catalog',
+  'equipos y piezas': 'hardware-items',
+  'equipos y componentes': 'hardware-items',
   autenticacion: 'auth',
   users: 'users',
   usuario: 'users',
@@ -32,11 +40,9 @@ const MODULE_ALIASES: Record<string, string> = {
   categorias: 'categories',
   catalog: 'catalog',
   catalogo: 'catalog',
-  'productos y modelos': 'catalog',
   productos: 'catalog',
   'hardware-items': 'hardware-items',
   hardware_items: 'hardware-items',
-  'equipos y piezas': 'hardware-items',
   'quantity-stock': 'quantity-stock',
   quantity_stock: 'quantity-stock',
   'inventario por cantidad': 'quantity-stock',
@@ -50,10 +56,10 @@ function normalizeModuleValue(value: string): string {
     .trim();
 }
 
-/** Translate known modules; only humanize unfamiliar identifiers for display. */
+/** Translate known modules; use a neutral Spanish label for unfamiliar identifiers. */
 export function formatAuditModule(module: string): string {
   const key = resolveModuleFilter(module);
-  return Object.hasOwn(MODULE_LABELS, key) ? MODULE_LABELS[key] : humanizeIdentifier(module, 'Sin módulo registrado');
+  return Object.hasOwn(MODULE_LABELS, key) ? MODULE_LABELS[key] : (module.trim() ? 'Otro módulo' : 'Sin módulo registrado');
 }
 
 /** Resolves the typed module (identifier or visible label) to the API value. */

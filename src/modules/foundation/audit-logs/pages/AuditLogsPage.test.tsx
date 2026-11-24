@@ -241,7 +241,7 @@ describe('AuditLogsPage', () => {
     await user.type(screen.getByLabelText('Módulo'), 'users');
     await user.type(screen.getByLabelText('Usuario'), 'María Auditora');
     await user.click(screen.getByRole('button', { name: 'Filtrar' }));
-    await screen.findByText('Creó usuario');
+    await screen.findByText('Creó un usuario');
 
     await user.clear(screen.getByLabelText('Usuario'));
     await user.type(screen.getByLabelText('Usuario'), 'Otro usuario');
@@ -268,7 +268,7 @@ describe('AuditLogsPage', () => {
 
     render(<AuditLogsPage />);
     const user = userEvent.setup();
-    await screen.findByText('Creó usuario');
+    await screen.findByText('Creó un usuario');
 
     await user.click(screen.getByRole('button', { name: 'Siguiente' }));
     expect(
@@ -346,16 +346,16 @@ describe('AuditLogsPage', () => {
 
     render(<AuditLogsPage />);
 
-    expect(await screen.findByText('Usuario desactivado')).toBeInTheDocument();
-    expect(screen.getByText('Usuario reactivado')).toBeInTheDocument();
-    expect(screen.getByText('Rol de usuario modificado')).toBeInTheDocument();
-    expect(screen.getByText('Nombre de usuario actualizado')).toBeInTheDocument();
-    expect(screen.getByText('Contraseña de usuario actualizada')).toBeInTheDocument();
+    expect(await screen.findByText('Desactivó un usuario')).toBeInTheDocument();
+    expect(screen.getByText('Reactivó un usuario')).toBeInTheDocument();
+    expect(screen.getByText('Modificó el rol de un usuario')).toBeInTheDocument();
+    expect(screen.getByText('Modificó el nombre de un usuario')).toBeInTheDocument();
+    expect(screen.getByText('Modificó la contraseña de un usuario')).toBeInTheDocument();
     expect(
-      screen.getByText('Rol de usuario modificado · Nombre de usuario actualizado'),
+      screen.getByText('Modificó el rol de un usuario · Modificó el nombre de un usuario'),
     ).toBeInTheDocument();
-    expect(screen.getByText('Ubicación reactivada')).toBeInTheDocument();
-    expect(screen.getByText('Usuario actualizado')).toBeInTheDocument();
+    expect(screen.getByText('Reactivó una ubicación')).toBeInTheDocument();
+    expect(screen.getByText('Modificó un usuario')).toBeInTheDocument();
   });
 
   it('shows category actions in Spanish and humanizes unknown actions', async () => {
@@ -389,9 +389,9 @@ describe('AuditLogsPage', () => {
 
     render(<AuditLogsPage />);
 
-    expect(await screen.findByText('Categoría actualizada')).toBeInTheDocument();
-    expect(screen.getByText('Categoría creada')).toBeInTheDocument();
-    expect(screen.getByText('Export report')).toBeInTheDocument();
+    expect(await screen.findByText('Modificó una categoría')).toBeInTheDocument();
+    expect(screen.getByText('Creó una categoría')).toBeInTheDocument();
+    expect(screen.getByText('Registró una actividad')).toBeInTheDocument();
     expect(screen.getAllByText('Categorías')).toHaveLength(2);
   });
 
@@ -423,7 +423,7 @@ describe('AuditLogsPage', () => {
 
     render(<AuditLogsPage />);
 
-    expect(await screen.findByText('Creó usuario')).toBeInTheDocument();
+    expect(await screen.findByText('Creó un usuario')).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'IP' })).not.toBeInTheDocument();
     expect(screen.queryByText('127.0.0.1')).not.toBeInTheDocument();
     expect(screen.queryByText(USER_ID)).not.toBeInTheDocument();
@@ -457,7 +457,7 @@ describe('AuditLogsPage', () => {
 
     render(<AuditLogsPage />);
 
-    expect(await screen.findByText('Creó usuario')).toBeInTheDocument();
+    expect(await screen.findByText('Creó un usuario')).toBeInTheDocument();
     expect(await screen.findByText('No se pudieron cargar los nombres de usuario.')).toBeInTheDocument();
     expect(screen.queryByText(USER_ID)).not.toBeInTheDocument();
   });
@@ -467,7 +467,7 @@ describe('AuditLogsPage', () => {
 
     render(<AuditLogsPage />);
 
-    expect(await screen.findByText('Creó usuario')).toBeInTheDocument();
+    expect(await screen.findByText('Creó un usuario')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /crear|editar|eliminar/i })).not.toBeInTheDocument();
   });
 
@@ -482,9 +482,9 @@ describe('AuditLogsPage', () => {
     });
     const user = userEvent.setup();
     render(<AuditLogsPage />);
-    expect(await screen.findByText('Ingreso de equipos por lote · 2 equipos o piezas')).toBeInTheDocument();
-    expect(screen.getByText('Ingreso de unidades al inventario · 4 unidades · Saldo: 9')).toBeInTheDocument();
-    expect(screen.getByText('Equipos y piezas')).toBeInTheDocument();
+    expect(await screen.findByText('Registró un ingreso de equipos por número de serie · 2 equipos o piezas')).toBeInTheDocument();
+    expect(screen.getByText('Registró un ingreso de mercancía por cantidad · 4 unidades · Saldo: 9')).toBeInTheDocument();
+    expect(screen.getByText('Equipos y componentes')).toBeInTheDocument();
     expect(screen.getByText('Inventario por cantidad')).toBeInTheDocument();
     await user.type(screen.getByLabelText('Módulo'), 'Inventario por cantidad');
     await user.click(screen.getByRole('button', { name: 'Filtrar' }));

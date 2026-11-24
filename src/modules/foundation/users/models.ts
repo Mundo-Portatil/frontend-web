@@ -9,6 +9,9 @@ export interface User {
   active: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Current API returns nullable fields; optional for legacy accounts/responses during rollout. */
+  locationId?: string | null;
+  locationName?: string | null;
 }
 
 /** POST /users payload. */
@@ -17,12 +20,14 @@ export interface CreateUserInput {
   name: string;
   password: string;
   role?: Role;
+  locationId?: string | null;
 }
 
 /** PATCH /users/:id payload. */
 export interface UpdateUserInput {
   name?: string;
   role?: Role;
+  locationId?: string | null;
   active?: boolean;
   password?: string;
 }
