@@ -15,6 +15,10 @@ interface CatalogProductPickerProps {
   searchLabel?: string;
   /** Entry forms require active products; stock queries may include inactive ones. */
   activeOnly?: boolean;
+  /** Optional location filter: only shows products with available stock in this location */
+  locationId?: string;
+  /** Optional custom stock provider to determine availability in location */
+  checkAvailability?: (catalogItem: CatalogItem, locationId: string, signal: AbortSignal) => Promise<number>;
 }
 
 interface ProductResults {
@@ -23,10 +27,12 @@ interface ProductResults {
   hasMore: boolean;
   hasOtherType: boolean;
   hasInactive: boolean;
+  hasNoStockInLocation: boolean;
+  stockMap: Record<string, number>;
 }
 
 const EMPTY_RESULTS: ProductResults = {
-  items: [], nextPage: 1, hasMore: false, hasOtherType: false, hasInactive: false,
+  items: [], nextPage: 1, hasMore: false, hasOtherType: false, hasInactive: false, hasNoStockInLocation: false, stockMap: {},
 };
 
 /** Skip pages without selectable products instead of announcing a false empty result. */
@@ -35,9 +41,11 @@ async function findProducts(
   firstPage: number,
   serialized: boolean | undefined,
   activeOnly: boolean,
+  locationId: string | undefined,
+  checkAvailability: ((catalogItem: CatalogItem, locationId: string, signal: AbortSignal) => Promise<number>) | undefined,
   signal: AbortSignal,
 ): Promise<ProductResults> {
-  const found: ProductResults = { ...EMPTY_RESULTS, items: [], nextPage: firstPage };
+  const found: ProductResults = { ...EMPTY_RESULTS, items: [], nextPage: firstPage, stockMap: {} };
   do {
     const page = found.nextPage;
     const result = await listCatalog({ page, limit: 50, ...(activeOnly ? { active: true } : {}), ...(term ? { search: term } : {}) }, signal);
@@ -49,6 +57,19 @@ async function findProducts(
         found.hasOtherType = true;
       } else if (activeOnly && item.active !== true) {
         found.hasInactive = true;
+      } else if (locationId && checkAvailability) {
+        try {
+          const avail = await checkAvailability(item, locationId, signal);
+          if (signal.aborted) return found;
+          if (avail > 0) {
+            found.items.push(item);
+            found.stockMap[item.id] = avail;
+          } else {
+            found.hasNoStockInLocation = true;
+          }
+        } catch {
+          found.hasNoStockInLocation = true;
+        }
       } else {
         found.items.push(item);
       }
@@ -67,6 +88,8 @@ export function CatalogProductPicker({
   label,
   searchLabel,
   activeOnly = true,
+  locationId,
+  checkAvailability,
 }: CatalogProductPickerProps) {
   const [search, setSearch] = useState('');
   const [term, setTerm] = useState('');
@@ -99,12 +122,12 @@ export function CatalogProductPicker({
     setResults(EMPTY_RESULTS);
     setError(null);
     setActiveIndex(-1);
-    void findProducts(term, 1, serialized, activeOnly, controller.signal)
+    void findProducts(term, 1, serialized, activeOnly, locationId, checkAvailability, controller.signal)
       .then((data) => { if (!controller.signal.aborted) setResults(data); })
       .catch((failure: unknown) => { if (!controller.signal.aborted) setError(asAppError(failure)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [term, revision, serialized, activeOnly]);
+  }, [term, revision, serialized, activeOnly, locationId, checkAvailability]);
 
   useEffect(() => {
     if (expanded && activeIndex >= 0) {
@@ -140,13 +163,15 @@ export function CatalogProductPicker({
     setLoading(true);
     setError(null);
     try {
-      const next = await findProducts(term, results.nextPage, serialized, activeOnly, controller.signal);
+      const next = await findProducts(term, results.nextPage, serialized, activeOnly, locationId, checkAvailability, controller.signal);
       if (!controller.signal.aborted) {
         setResults((current) => ({
           ...next,
           items: [...new Map([...current.items, ...next.items].map((item) => [item.id, item])).values()],
           hasOtherType: current.hasOtherType || next.hasOtherType,
           hasInactive: current.hasInactive || next.hasInactive,
+          hasNoStockInLocation: current.hasNoStockInLocation || next.hasNoStockInLocation,
+          stockMap: { ...current.stockMap, ...next.stockMap },
         }));
       }
     } catch (failure) {
@@ -188,7 +213,9 @@ export function CatalogProductPicker({
     ? 'Los productos encontrados están inactivos. Solicita su activación para registrar unidades.'
     : results.hasOtherType
       ? serialized === false ? 'Los productos encontrados se registran por serie o código.' : 'Los productos encontrados se registran por cantidad.'
-      : activeOnly ? 'No se encontraron productos activos. Prueba otro nombre o código.' : 'No se encontraron productos. Prueba otro nombre o código.';
+      : results.hasNoStockInLocation
+        ? 'No hay productos de este tipo con existencias disponibles en la ubicación de origen.'
+        : activeOnly ? 'No se encontraron productos activos. Prueba otro nombre o código.' : 'No se encontraron productos. Prueba otro nombre o código.';
 
   return (
     <div className="min-w-0 space-y-2" onBlur={(event) => {
@@ -232,22 +259,30 @@ export function CatalogProductPicker({
             </p>
           )}
           <ul id={`${id}-options`} role="listbox" aria-label={`Resultados de ${inputLabel.toLowerCase()}`} className={visibleOptions.length ? 'max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1' : undefined}>
-            {visibleOptions.map((item, index) => (
-              <li key={item.id} role="none">
-                <button
-                  id={`${id}-option-${index}`}
-                  type="button"
-                  role="option"
-                  aria-selected={selected?.id === item.id}
-                  tabIndex={-1}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => choose(item)}
-                  className={`w-full break-words rounded-md px-3 py-2 text-left text-sm text-slate-900 hover:bg-brand-50 ${activeIndex === index ? 'bg-brand-50 ring-1 ring-inset ring-brand-300' : ''}`}
-                >
-                  {item.name} · {item.sku}{!item.active && !activeOnly ? ' (inactivo)' : ''}
-                </button>
-              </li>
-            ))}
+            {visibleOptions.map((item, index) => {
+              const stockCount = results.stockMap[item.id];
+              return (
+                <li key={item.id} role="none">
+                  <button
+                    id={`${id}-option-${index}`}
+                    type="button"
+                    role="option"
+                    aria-selected={selected?.id === item.id}
+                    tabIndex={-1}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => choose(item)}
+                    className={`w-full break-words rounded-md px-3 py-2 text-left text-sm text-slate-900 hover:bg-brand-50 ${activeIndex === index ? 'bg-brand-50 ring-1 ring-inset ring-brand-300' : ''}`}
+                  >
+                    <span>{item.name} · {item.sku}{!item.active && !activeOnly ? ' (inactivo)' : ''}</span>
+                    {stockCount !== undefined && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                        {stockCount} disponible{stockCount === 1 ? '' : 's'}
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
           {results.hasMore && !busy && <button type="button" disabled={disabled} onClick={() => void loadMore()} className={SECONDARY_BUTTON_CLASS}>Más productos</button>}
         </div>

@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react';
-import { CatalogProductPicker, getAvailableSerials, type AvailableSerialItem, type CatalogItem, type HardwareItem } from '../../inventory';
+import { useCallback, useState, type FormEvent } from 'react';
+import { CatalogProductPicker, getAvailableSerials, listQuantityStock, type AvailableSerialItem, type CatalogItem, type HardwareItem } from '../../inventory';
 import { useBarcodeScanner } from '../../../hooks/useBarcodeScanner';
 import { LABEL_CLASS, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, TEXT_INPUT_CLASS } from '../../../utils/formStyles';
 import { useOriginAvailability, useSerializedLookup } from '../hooks/useTransferResources';
@@ -27,6 +27,15 @@ export function QuantityItemPicker({
     available.quantity !== null &&
     quantity + already <= available.quantity;
 
+  const checkQuantityAvailability = useCallback(
+    async (item: CatalogItem, locId: string, signal: AbortSignal) => {
+      const res = await listQuantityStock({ locationId: locId, catalogItemId: item.id, page: 1, limit: 1 }, signal);
+      const row = res.items.find((r) => r.locationId === locId && r.catalogId === item.id);
+      return row && row.quantity > 0 ? row.quantity : 0;
+    },
+    [],
+  );
+
   return (
     <section
       className="space-y-3 rounded-xl border border-slate-200 bg-white p-4"
@@ -36,6 +45,8 @@ export function QuantityItemPicker({
       <CatalogProductPicker
         id="transfer-product"
         serialized={false}
+        locationId={originId}
+        checkAvailability={checkQuantityAvailability}
         onChange={() => setCatalog(null)}
         onSelect={setCatalog}
       />
@@ -139,6 +150,14 @@ export function SerializedItemPicker({
     }
   }
 
+  const checkSerialAvailability = useCallback(
+    async (item: CatalogItem, locId: string, signal: AbortSignal) => {
+      const items = await getAvailableSerials(item.id, locId, signal);
+      return items.length;
+    },
+    [],
+  );
+
   async function addFromCatalog() {
     if (!selectedSerialId) return;
     const found = availableSerials.find((s) => s.id === selectedSerialId);
@@ -180,6 +199,8 @@ export function SerializedItemPicker({
         <CatalogProductPicker
           id="transfer-serialized-catalog"
           serialized={true}
+          locationId={originId}
+          checkAvailability={checkSerialAvailability}
           onChange={() => handleSelectCatalog(null)}
           onSelect={handleSelectCatalog}
         />

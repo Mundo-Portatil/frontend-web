@@ -1,7 +1,7 @@
 import type { ComponentType, SVGProps } from 'react';
 import type { Role } from '../../modules/foundation/auth/models';
 import { ROUTES } from '../../router/routes';
-import { AuditLogIcon, CategoriesIcon, LocationsIcon, TransfersIcon, UsersIcon } from './icons';
+import { AuditLogIcon, CategoriesIcon, LocationsIcon, UsersIcon } from './icons';
 
 /**
  * Centralized, typed navigation definition for the application shell.
@@ -28,7 +28,6 @@ export interface NavGroupDefinition {
 export interface NavChild {
   id: string;
   label: string;
-  icon?: ComponentType<SVGProps<SVGSVGElement>>;
   to: string;
   roles: Role[];
   /** Exact routes represented by this section, including its secondary screens. */
@@ -106,7 +105,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
       {
         id: 'inventory-transfers',
         label: 'Traslados',
-        icon: TransfersIcon,
         to: ROUTES.logistics,
         roles: ['ADMIN', 'ENCARGADO_ALMACEN', 'VENDEDOR', 'TECNICO'],
         activePaths: [ROUTES.logistics, ROUTES.logisticsNew],

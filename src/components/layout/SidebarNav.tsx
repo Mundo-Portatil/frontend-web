@@ -194,7 +194,6 @@ function SidebarItem({
                   }}
                   className={`${LINK_BASE_CLASS} ${childActive ? LINK_ACTIVE_CLASS : LINK_INACTIVE_CLASS}`}
                 >
-                  {child.icon && <child.icon className="h-4 w-4 shrink-0" />}
                   <span className="truncate">{child.label}</span>
                 </Link>
               </li>

@@ -136,8 +136,7 @@ describe('registro accesible de traslados', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Revisar traslado' }));
     dialog = await screen.findByRole('dialog');
-    const confirmBtnName = direction === 'supply' ? 'Confirmar abastecimiento' : 'Confirmar devolución';
-    fireEvent.click(within(dialog).getByRole('button', { name: confirmBtnName }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar traslado' }));
     await screen.findByText('TR-BACKEND');
     expect(mocks.create).toHaveBeenCalledTimes(1);
     expect(mocks.create).toHaveBeenCalledWith({ fromLocationId: direction === 'supply' ? 'central' : 'post', toLocationId: direction === 'supply' ? 'post' : 'central', quantities: [{ catalogId: 'ram', quantity: 2 }] });
@@ -148,7 +147,7 @@ describe('registro accesible de traslados', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Revisar traslado' }));
     const dialog = await screen.findByRole('dialog');
     mocks.stock.mockResolvedValue({ items: [{ catalogId: 'ram', locationId: 'central', quantity: 1 }], total: 1 });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar abastecimiento' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar traslado' }));
     await screen.findByText('Revisa las cantidades y la disponibilidad en el origen.');
     expect(mocks.create).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Cantidad de Memoria RAM')).toHaveValue(2);
@@ -166,8 +165,8 @@ describe('registro accesible de traslados', () => {
     await screen.findByText('Laptop · SN123');
     fireEvent.click(screen.getByRole('button', { name: 'Revisar traslado' }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('button', { name: 'Confirmar abastecimiento' })).toBeEnabled();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar abastecimiento' }));
+    expect(within(dialog).getByRole('button', { name: 'Confirmar traslado' })).toBeEnabled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar traslado' }));
     await screen.findByText('TR-BACKEND');
     expect(mocks.create).toHaveBeenCalledWith({
       fromLocationId: 'central',
