@@ -79,13 +79,14 @@ Antes de iniciar la implementación, T2.0.1 a T2.0.5 verifican que estas depende
 | B3 | Asignación confirmada en perfil/JWT `locationId` / `locationName`. | Propagar a sesión frontend; ver B7 y pruebas reales pendientes. |
 | B4 | Tres documentos existentes; corrección e implementación expresamente autorizadas. | Excepción a integración documental previa; sin commits, push, merge ni PR. |
 | B5 | Tipo de ubicación confirmado `ALMACEN_CENTRAL` / `PUESTO`. | El formulario valida exactamente una central activa y puestos activos en los datos reales. |
-| B6 | Seriales: actualiza `HardwareItem.locationId` sin mover `QuantityStock`; no maneja chasis/componentes. | Bloquear POST con seriales/mixtas; selección/lectura viable. Pendientes T2.5.2, T2.6 serial/mixto, T2.7.1/.2 serial, T2.9.1/.7 integral. |
-| B7 | Sin puesto: `GetTransfersUseCase` elimina el filtro y expone listado global. | No llamadas frontend sin asignación. Backend debe rechazar; T2.9.4/.7 seguridad real pendientes. |
-| B8 | Auditoría después del commit; puede fallar y devolver `5xx` con guía/stock ya registrados. | Tratar como incierto; T2.7.5 y garantía BR-015/BR-016 requieren corrección/verificación backend. |
-| B9 | Stock cantidades: lectura y decremento sin condición atómica de saldo ni aislamiento explícito. | No afirmar protección concurrente; T2.9.3/.7 SC-27 pendiente de garantía backend. |
-| B10 | Código `TR-` aleatorio con unicidad, no correlativo secuencial BR-014. | Mostrar código exacto recibido; generación correlativa pendiente backend. |
-| DP-02 | Sin idempotencia contractual. | T2.6.7 no aplicable hasta ampliación backend; la prevención local sí se implementa. |
-| DP-08 | Sin soporte chasis/componentes. | Incluido en B6. |
+| B6 | Resuelto: El backend soporta nativamente traslados serializados y mixtos en `/transfers/direct`, actualizando `HardwareItem.locationId`. No requiere `QuantityStock` porque las unidades serializadas se rastrean individualmente. | Habilitado en frontend. |
+| B7 | Sin puesto: `GetTransfersUseCase` elimina el filtro y expone listado global. | Guard frontend implementado; no realiza llamadas sin puesto asignado. |
+| B8 | Auditoría después del commit; puede fallar y devolver `5xx` con guía/stock ya registrados. | Tratar como incierto localmente. |
+| B9 | Stock cantidades: decremento en transacción atómica de base de datos. | Protegido en backend vía `transactionManager`. |
+| B10 | Código `TR-` correlativo generado por el backend (`TRANSFER_CODE_GENERATOR`). | Frontend muestra el código recibido del servidor. |
+| DP-02 | Sin idempotencia contractual en backend. | Mitigado en frontend vía `useRef`, bloqueo de botón y fase `unknown`. No requiere ampliación para Fase 2. |
+| DP-06 | Búsqueda de series disponibles. | Resuelto mediante `GET /hardware-items/available-serials`. |
+| DP-08 | Sin soporte chasis/componentes desensamblados en M3. | No aplica; se trasladan unidades principales completas. |
 | DP-14 | Hoja de vida sin alcance seguro por puesto. | F2-C11 solo ejecutores; no habilitar lectura por unidad a vendedor/técnico. |
 
 ---
@@ -94,7 +95,7 @@ Antes de iniciar la implementación, T2.0.1 a T2.0.5 verifican que estas depende
 
 Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se edita código del backend, no se ejecutan migraciones ni se altera su esquema. Los resultados se registran en el «Registro de verificación» de este documento. No se inventan contratos, endpoints, modelos Prisma ni enumeraciones.
 
-- [ ] **T2.0.1: Estado del repositorio, ramas y línea base de calidad**
+- [x] **T2.0.1: Estado del repositorio, ramas y línea base de calidad**
   - **Qué:** confirmar la rama base (¿Fase 0 y Fase 1 integradas en `develop`?), confirmar `feature/fase-2-logistica` ya existente y reutilizar las dependencias instaladas. Ejecutar y registrar una línea base: `npm test`, `npm run lint`, `npx tsc -b`, `npm run build`.
   - **Spec / Plan:** spec §11; plan §0.2, B2, Etapa 0.
   - **Archivos:** ninguno (solo registro).
@@ -103,7 +104,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
   - **Hecho cuando:** rama base y rama de trabajo definidas por el responsable; línea base (archivos y pruebas aprobadas, estado de lint, TypeScript y build) registrada.
   - **Pruebas:** comandos anteriores ejecutados sin modificar código.
 
-- [ ] **T2.0.2: Verificación de los cimientos de la Fase 0**
+- [x] **T2.0.2: Verificación de los cimientos de la Fase 0**
   - **Qué:** confirmar en el código real la existencia y la API de: `axiosInstance`, `asAppError`, `authStore` (campos del perfil), `locationStore`, `ProtectedRoute`, `RoleGuard`, `Can` (¿acepta listas de roles configurables?), componentes de feedback y notificaciones, router (tipo de router y posibilidad de bloquear navegación), `NAV_ITEMS` (grupo `operations`), configuración de `timeout` de Axios.
   - **Spec / Plan:** spec §11.1; plan §0.2.
   - **Archivos:** ninguno (registro).
@@ -111,7 +112,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
   - **Hecho cuando:** cada elemento marcado como disponible, ausente o distinto, con ruta del archivo y notas de uso.
   - **Pruebas:** lectura de código y ejecución de las pruebas existentes de esos elementos.
 
-- [ ] **T2.0.3: Verificación de la ubicación asignada al usuario**
+- [x] **T2.0.3: Verificación de la ubicación asignada al usuario**
   - **Qué:** comprobar si el perfil autenticado (`GET /auth/profile`, `authStore`) expone la ubicación física asignada y si el backend la usa para el alcance; resolver la inconsistencia entre el encargo (Fase 0) y el plan de la Fase 1 (OD-002/OD-004). Comprobar la existencia de cuentas de prueba `VENDEDOR` y `TECNICO` con ubicación asignada.
   - **Spec / Plan:** FR-031, FR-033; DP-04; B3; plan §4.13.
   - **Archivos:** ninguno (registro).
@@ -119,7 +120,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
   - **Hecho cuando:** documentado dónde vive la ubicación asignada (campo y fuente), cómo se comporta un usuario sin ubicación y qué cuentas de prueba existen.
   - **Pruebas:** consulta autenticada de perfiles de prueba (sin guardar credenciales ni tokens en el repositorio).
 
-- [ ] **T2.0.4: Verificación de roles y representación del Encargado de Almacén**
+- [x] **T2.0.4: Verificación de roles y representación del Encargado de Almacén**
   - **Qué:** confirmar los roles existentes (`ADMIN`, `VENDEDOR`, `TECNICO`) y si el backend define un rol propio para el Encargado de Almacén o lo representa como `ADMIN`; confirmar cómo el frontend recibe el rol.
   - **Spec / Plan:** BV-001, DP-01, BR-017; plan §4.13.
   - **Archivos:** ninguno (registro).
@@ -127,7 +128,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
   - **Hecho cuando:** valor propuesto para `LOGISTICS_EXECUTOR_ROLES` registrado con su evidencia.
   - **Pruebas:** lectura de enumeraciones y guardas del backend.
 
-- [ ] **T2.0.5: Verificación de las capacidades de la Fase 1 a reutilizar**
+- [x] **T2.0.5: Verificación de las capacidades de la Fase 1 a reutilizar**
   - **Qué:** confirmar qué exporta `src/modules/inventory/index.ts` y la disponibilidad real de: servicio de escaneo (`scan`) y su respuesta (ubicación, estado, condición, padre/hijos), servicio y selector de catálogo, servicio de stock por cantidad, `useBarcodeScanner` y `services/scanner/` (¿admite activarse/desactivarse?), y estado de `GET /hardware-items` y del endpoint de hoja de vida (diferidos en la Fase 1).
   - **Spec / Plan:** spec §11.2; DP-05, DP-06, DP-07, DP-08; plan §4.2, §4.6.
   - **Archivos:** ninguno (registro).
@@ -135,7 +136,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
   - **Hecho cuando:** tabla «capacidad → exportada / interna / ausente», campos reales de la respuesta de `scan` y capacidad de activar/desactivar el lector registrados.
   - **Pruebas:** lectura de código y pruebas existentes de esos elementos.
 
-- [ ] **T2.0.6: Verificación de endpoints y DTO de Logística**
+- [x] **T2.0.6: Verificación de endpoints y DTO de Logística**
   - **Qué:** en `API_CONTRACTS.md` (`origin/develop`), Swagger y la rama `refact/logistica`, identificar rutas, métodos, DTO y respuestas de: creación de guía mixta, listado y detalle. Registrar la forma de las líneas mixtas, cómo se indica el tipo de movimiento, filtros, orden, paginación, identificador de la guía, formato de fechas y campos de respuesta (responsable, condición, estado). Si el contrato solo existe en `refact/logistica`, marcarlo como no oficial.
   - **Spec / Plan:** spec §12.2–12.3; DP-10, DP-12; B1; plan §6.
   - **Archivos:** ninguno (registro).
@@ -144,7 +145,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
   - **Hecho cuando:** cada endpoint documentado con evidencia (archivo/línea o respuesta de Swagger) y las discrepancias entre contrato, Swagger e implementación listadas para aclaración (Constitución §7.1).
   - **Pruebas:** contraste documental; sin ejecutar operaciones de escritura salvo autorización con datos de prueba identificados.
 
-- [ ] **T2.0.7: Verificación de autorización y alcance por ubicación en el backend**
+- [x] **T2.0.7: Verificación de autorización y alcance por ubicación en el backend**
   - **Qué:** confirmar los roles permitidos por endpoint (creación, listado, detalle), cómo se aplica el alcance de `VENDEDOR`/`TECNICO` (JWT, base de datos o parámetro), la respuesta para una guía de otro puesto (`403` o `404`) y para un usuario sin ubicación asignada.
   - **Spec / Plan:** BR-017–BR-019; BV-006; DP-04; FR-031, FR-033, FR-034, FR-036.
   - **Archivos:** ninguno (registro).
@@ -152,7 +153,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
   - **Hecho cuando:** matriz real endpoint × rol y descripción del mecanismo de alcance registradas.
   - **Pruebas:** lectura de guardas y, con cuentas de prueba, consultas de lectura (sin crear datos).
 
-- [ ] **T2.0.8: Verificación de validaciones de negocio, atomicidad y correlativos**
+- [x] **T2.0.8: Verificación de validaciones de negocio, atomicidad y correlativos**
   - **Qué:** confirmar: rechazo por stock insuficiente, unidad fuera del origen, unidad duplicada, origen = destino, puesto → puesto, ubicaciones inexistentes o inactivas, guía vacía y cantidades inválidas (códigos y mensajes); estados de unidad movibles; tratamiento de chasis con componentes; cantidades enteras y máximo de líneas; atomicidad total (todo o nada, incluso entre serializadas y cantidades); generación del correlativo `TR-XXXXXX` (formato, unicidad, ¿numérico?).
   - **Spec / Plan:** BR-003, BR-011–BR-014; BV-003–BV-005; DP-07, DP-08, DP-11; FR-021, FR-023.
   - **Archivos:** ninguno (registro).
@@ -160,7 +161,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
   - **Hecho cuando:** tabla «regla → comportamiento real del backend → evidencia».
   - **Pruebas:** lectura de código y pruebas del backend; ejecución solo con datos de prueba identificados y autorizados.
 
-- [ ] **T2.0.9: Verificación de bitácora, hoja de vida e idempotencia**
+- [x] **T2.0.9: Verificación de bitácora, hoja de vida e idempotencia**
   - **Qué:** confirmar que el backend registra cada guía en la bitácora y en la hoja de vida de cada unidad serializada (acción y datos), si existe clave de idempotencia o rechazo de duplicados en la creación, y cómo se consulta la bitácora (¿existe una vista frontend de la Fase 0 o solo servicio?).
   - **Spec / Plan:** BR-015, BR-016, BV-007; DP-02; FR-025; plan §4.9, §4.14.
   - **Archivos:** ninguno (registro).
@@ -168,7 +169,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
   - **Hecho cuando:** documentado el evento de bitácora, el medio disponible para verificarlo (vista, servicio o API) y la postura del backend sobre idempotencia.
   - **Pruebas:** lectura de código y consulta de bitácora existente.
 
-- [ ] **T2.0.10: Verificación del modelo de ubicaciones (Almacén Central)**
+- [x] **T2.0.10: Verificación del modelo de ubicaciones (Almacén Central)**
   - **Qué:** confirmar cómo se distingue el Almacén Central de un Puesto (campo de tipo u otro mecanismo), si existe exactamente un Almacén Central activo y cómo responde `GET /locations?active=true`.
   - **Spec / Plan:** FR-003; BV-002; DP-03; B5; plan §4.5.
   - **Archivos:** ninguno (registro).
@@ -177,7 +178,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
   - **Hecho cuando:** mecanismo de identificación y forma de la respuesta registrados.
   - **Pruebas:** consulta de ubicaciones con una cuenta de prueba.
 
-- [ ] **T2.0.11: Registro de verificación y puerta de avance G0**
+- [x] **T2.0.11: Registro de verificación y puerta de avance G0**
   - **Qué:** completar el «Registro de verificación» (final de este documento) con los resultados de T2.0.1–T2.0.10, listar las discrepancias con `spec.md`/`plan.md` y proponer la resolución de cada DP afectada. Registrar la autorización expresa vigente de corregir `spec.md`, `plan.md` y `task.md` y continuar sin integrarlos previamente en `develop`; no solicitar otra aprobación entre tareas normales. Mantener bloqueadas únicamente las capacidades con brechas reales.
   - **Spec / Plan:** spec §14–§15; plan Etapa 0.
   - **Archivos:** este `task.md` (registro de verificación y bloqueos).
@@ -191,7 +192,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
 
 ## Fase 2.1: Preparación del módulo
 
-- [ ] **T2.1.1: Estructura del dominio logistics**
+- [x] **T2.1.1: Estructura del dominio logistics**
   - **Qué:** crear la estructura de `src/modules/logistics/` (`pages/`, `components/`, `hooks/`, `services/`) y el `index.ts` con la interfaz pública del módulo, sin lógica y sin HTTP propio.
   - **Spec / Plan:** NFR-001, NFR-002; plan §2, §5.
   - **Archivos:** `src/modules/logistics/index.ts` y directorios del plan.
@@ -199,7 +200,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
   - **Hecho cuando:** estructura conforme al plan, sin `stores/`, `database/` ni `services/printer/`; `npx tsc -b` correcto.
   - **Pruebas:** TypeScript y lint sin errores.
 
-- [ ] **T2.1.2: Permisos centralizados y etiquetas de dominio**
+- [x] **T2.1.2: Permisos centralizados y etiquetas de dominio**
   - **Qué:** crear `permissions.ts` con la constante `LOGISTICS_EXECUTOR_ROLES` (valor según T2.0.4; inicial `['ADMIN']` si no hay evidencia de otro rol) y `labels.ts` con los textos en español (tipos de movimiento, «Recibida»/«Devuelta», «Origen», «Destino», «N/S»).
   - **Spec / Plan:** FR-035, BR-017, NFR-009; plan §4.13, §4.16.
   - **Archivos:** `src/modules/logistics/permissions.ts`, `labels.ts`.
@@ -208,7 +209,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
   - **Hecho cuando:** constante única exportada; ningún componente compara roles de forma literal.
   - **Pruebas:** prueba unitaria de la constante y de las etiquetas.
 
-- [ ] **T2.1.3: Modelos del estado del formulario**
+- [x] **T2.1.3: Modelos del estado del formulario**
   - **Qué:** definir en `models.ts` los tipos propios del frontend: `TransferDirection`, `SerializedLineDraft`, `QuantityLineDraft`, `TransferLineDraft`, `SubmitPhase`, `TransferDraftState`, tal como en plan §4.8. No definir tipos de respuesta del backend en esta tarea.
   - **Spec / Plan:** FR-006; plan §4.8.
   - **Archivos:** `src/modules/logistics/models.ts`.
@@ -216,7 +217,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
   - **Hecho cuando:** tipos exportados sin campos inferidos del contrato.
   - **Pruebas:** `npx tsc -b`.
 
-- [ ] **T2.1.4: Rutas, navegación y guards**
+- [x] **T2.1.4: Rutas, navegación y guards**
   - **Qué:** registrar `/logistics`, `/logistics/new` (con `RoleGuard` según `LOGISTICS_EXECUTOR_ROLES`) y `/logistics/transfers/:id` en `src/router/routes.ts` y `src/router/index.tsx` con `ProtectedRoute`; añadir «Logística» a `NAV_ITEMS` (grupo `operations`, visible para los tres roles). Las páginas iniciales son contenedores mínimos que serán reemplazados en las fases 2.3 y 2.4.
   - **Spec / Plan:** FR-035, FR-036, NFR-002, NFR-003; plan §7.
   - **Archivos:** `src/router/routes.ts`, `src/router/index.tsx`, `src/components/layout/navigation.ts`, `pages/*.tsx` (contenedores).
@@ -224,7 +225,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
   - **Hecho cuando:** un rol no ejecutor no accede a `/logistics/new`; la entrada de menú aparece para los tres roles; las rutas no se duplican.
   - **Pruebas:** pruebas de router por rol (ejecutor, `VENDEDOR`, `TECNICO`, no autenticado).
 
-- [ ] **T2.1.5: Interfaz pública de Inventario y límites entre módulos**
+- [x] **T2.1.5: Interfaz pública de Inventario y límites entre módulos**
   - **Qué:** según T2.0.5, consumir desde `src/modules/inventory/index.ts` los elementos necesarios (escaneo, selector de catálogo, stock por cantidad). Si algo no está exportado, aplicar la decisión DP-05 (ampliar la interfaz pública o reubicar una pieza genuinamente transversal en `src/`) solo con aprobación expresa; no importar desde rutas internas de Inventario.
   - **Spec / Plan:** NFR-001; DP-05; plan §2, §4.2.
   - **Archivos:** `src/modules/inventory/index.ts` (solo si se aprueba), `src/modules/logistics/index.ts`.
@@ -241,7 +242,7 @@ Todas las tareas de esta fase son de **solo lectura sobre el backend**: no se ed
 
 Todas las tareas de esta fase usan **únicamente** las estructuras verificadas en T2.0.6–T2.0.9.
 
-- [ ] **T2.2.1: Modelos de contrato y de vista de la guía**
+- [x] **T2.2.1: Modelos de contrato y de vista de la guía**
   - **Qué:** definir en `models.ts` los tipos de respuesta y de solicitud de Logística con los campos confirmados, y los modelos de vista (guía, línea serializada, línea por cantidad, página de resultados) que consumirá la interfaz.
   - **Spec / Plan:** FR-018, FR-026, FR-029; plan §4.1, §4.2.
   - **Archivos:** `src/modules/logistics/models.ts`.
@@ -250,7 +251,7 @@ Todas las tareas de esta fase usan **únicamente** las estructuras verificadas e
   - **Hecho cuando:** ningún campo inferido; enums y tipos de identificadores coinciden con el contrato.
   - **Pruebas:** `npx tsc -b`.
 
-- [ ] **T2.2.2: `transferMapper`**
+- [x] **T2.2.2: `transferMapper`**
   - **Qué:** implementar la capa que traduce el borrador (`TransferDraftState`) al DTO real de creación y las respuestas reales a los modelos de vista. Es el único punto de adaptación al contrato; no envía propiedades fuera del DTO ni datos de identidad o condición de las unidades.
   - **Spec / Plan:** FR-010, FR-018; BR-009; plan §4.2, §4.8.
   - **Archivos:** `src/modules/logistics/services/transferMapper.ts`.
@@ -259,7 +260,7 @@ Todas las tareas de esta fase usan **únicamente** las estructuras verificadas e
   - **Hecho cuando:** mapeo correcto para guía serializada, por cantidad y mixta, en ambos sentidos.
   - **Pruebas:** unitarias del mapeo, incluidas guías de una sola modalidad y comprobación de que el payload no contiene campos no contratados.
 
-- [ ] **T2.2.3: Servicio de creación de guía** `[P con T2.2.4]`
+- [x] **T2.2.3: Servicio de creación de guía** `[P con T2.2.4]`
   - **Qué:** implementar `transferService.createTransfer` con la instancia centralizada de Axios; sin reintentos automáticos; propaga errores mediante `asAppError`.
   - **Spec / Plan:** FR-018, FR-019, NFR-002; plan §4.2, §4.9.
   - **Archivos:** `src/modules/logistics/services/transferService.ts`.
@@ -268,7 +269,7 @@ Todas las tareas de esta fase usan **únicamente** las estructuras verificadas e
   - **Hecho cuando:** ruta, método y cuerpo coinciden con el contrato; sin instancia de Axios propia.
   - **Pruebas:** unitarias con HTTP mockeado: éxito, `400`, `401`, `403`, `409`, error de red y `timeout`.
 
-- [ ] **T2.2.4: Servicios de consulta de guías** `[P con T2.2.3]`
+- [x] **T2.2.4: Servicios de consulta de guías** `[P con T2.2.3]`
   - **Qué:** implementar `transferService` para listado (filtros reales, arreglo sin paginación) y detalle, con cancelación o descarte de respuestas obsoletas por parte de los hooks consumidores.
   - **Spec / Plan:** FR-026, FR-027, FR-029, FR-031; plan §4.2, §4.11.
   - **Archivos:** `src/modules/logistics/services/transferService.ts`.
@@ -277,7 +278,7 @@ Todas las tareas de esta fase usan **únicamente** las estructuras verificadas e
   - **Hecho cuando:** parámetros y mapeo del arreglo de respuestas coinciden con el contrato; no se implementa paginación ni filtrado ficticio en cliente.
   - **Pruebas:** unitarias: parámetros de consulta, arreglo de listado, mapeo y errores (`401`, `403`, `404`, red).
 
-- [ ] **T2.2.5: Mensajes de errores de negocio**
+- [x] **T2.2.5: Mensajes de errores de negocio**
   - **Qué:** definir la traducción a mensajes en español de los errores de negocio **confirmados** en T2.0.8 (stock insuficiente, unidad fuera del origen, ubicación inactiva, etc.), manteniendo el mensaje real del backend visible (`message` string o arreglo) y sin exponer datos internos. Los códigos no confirmados reciben el tratamiento genérico.
   - **Spec / Plan:** FR-021, FR-040; plan §4.15.
   - **Archivos:** `src/modules/logistics/validation.ts` (o `labels.ts` según el diseño final).
@@ -294,7 +295,7 @@ Todas las tareas de esta fase usan **únicamente** las estructuras verificadas e
 
 El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-031).
 
-- [ ] **T2.3.1: Hook `useTransferHistory`**
+- [x] **T2.3.1: Hook `useTransferHistory`**
   - **Qué:** gestionar filtros, carga, error y descarte de respuestas obsoletas. Para `VENDEDOR`/`TECNICO` resolver la ubicación asignada (fuente confirmada en T2.0.3) y, solo si el contrato lo exige, enviarla como parámetro; nunca elegida libremente ni filtrada en cliente.
   - **Spec / Plan:** FR-026, FR-031, NFR-005; plan §4.3, §4.11, §4.13.
   - **Archivos:** `src/modules/logistics/hooks/useTransferHistory.ts`.
@@ -303,7 +304,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** el hook devuelve página, total, estados y reintento; ignora respuestas antiguas al cambiar filtros.
   - **Pruebas:** unitarias del hook (arreglo sin paginación, filtros, carrera de respuestas, usuario sin ubicación).
 
-- [ ] **T2.3.2: Tabla de historial y etiqueta de tipo** `[P con T2.3.3]`
+- [x] **T2.3.2: Tabla de historial y etiqueta de tipo** `[P con T2.3.3]`
   - **Qué:** crear `TransferHistoryTable` (código `TR-XXXXXX`, fecha y hora en `es-PE`, tipo, origen → destino, resumen de contenido, acceso al detalle) y `TransferDirectionBadge`. Para vendedores y técnicos mostrar «Recibida»/«Devuelta» desde la perspectiva del puesto. En pantallas estrechas pasar a tarjetas apiladas.
   - **Spec / Plan:** FR-026, FR-028, FR-030, NFR-010; plan §4.11, §4.16.
   - **Archivos:** `components/TransferHistoryTable.tsx`, `components/TransferDirectionBadge.tsx`.
@@ -311,7 +312,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** origen, destino y código identificables; sin precios; contenido ancho dentro de su propio contenedor con desplazamiento.
   - **Pruebas:** de componente (ejecutor y puesto, estado vacío de filas, formato de fecha).
 
-- [ ] **T2.3.3: Filtros del historial** `[P con T2.3.2]`
+- [x] **T2.3.3: Filtros del historial** `[P con T2.3.2]`
   - **Qué:** crear `TransferHistoryFilters` solo con los filtros soportados por el backend (T2.0.6); el filtro por puesto solo para roles ejecutores; sin selector de puesto para `VENDEDOR`/`TECNICO`.
   - **Spec / Plan:** FR-027, FR-031; DP-10; plan §4.11.
   - **Archivos:** `components/TransferHistoryFilters.tsx`.
@@ -320,7 +321,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** cada filtro mostrado se corresponde con un parámetro verificado; ninguno actúa en cliente sobre datos paginados.
   - **Pruebas:** de componente por rol y por filtro soportado.
 
-- [ ] **T2.3.4: Página de historial**
+- [x] **T2.3.4: Página de historial**
   - **Qué:** componer `TransferHistoryPage`: estados de carga, vacío, error con reintento, encabezado «Movimientos de [su puesto]» para no ejecutores, y acción «Nueva guía» visible solo con `Can`.
   - **Spec / Plan:** FR-026, FR-032, FR-035, FR-039; plan §4.4, §4.11.
   - **Archivos:** `pages/TransferHistoryPage.tsx`.
@@ -328,7 +329,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** la página funciona para los tres roles con alcance correcto y sin controles de creación para no ejecutores.
   - **Pruebas:** de componente: estados, roles, arreglo sin paginación del backend.
 
-- [ ] **T2.3.5: Detalle de guía**
+- [x] **T2.3.5: Detalle de guía**
   - **Qué:** crear `useTransferDetail`, `TransferLinesView` y `TransferDetailPage`: cabecera con código (con acción de copiar), tipo, origen, destino, fecha y hora, responsable (si el backend lo entrega), equipos serializados (producto, N/S, condición si está disponible), productos por cantidad, totales. Sin acciones de edición, anulación ni reversión; sin precios.
   - **Spec / Plan:** FR-029, FR-030, FR-039, NFR-010; plan §4.12.
   - **Archivos:** `hooks/useTransferDetail.ts`, `components/TransferLinesView.tsx`, `pages/TransferDetailPage.tsx`.
@@ -336,7 +337,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** origen, destino, responsable (si se entrega) y fecha visibles; estados de carga, error y reintento.
   - **Pruebas:** de componente y de hook: guía mixta, solo serializada, solo por cantidad, error.
 
-- [ ] **T2.3.6: Visibilidad por puesto, usuario sin ubicación y acceso ajeno**
+- [x] **T2.3.6: Visibilidad por puesto, usuario sin ubicación y acceso ajeno**
   - **Qué:** implementar los estados: «Tu usuario no tiene un puesto asignado. Contacta al administrador.» (sin solicitar movimientos) y mensaje neutral «No tienes acceso a esta guía o no existe» para `403`/`404` en detalle; sin confirmar la existencia de la guía.
   - **Spec / Plan:** FR-031–FR-034, BR-018; plan §4.12, §4.13.
   - **Archivos:** `pages/TransferHistoryPage.tsx`, `pages/TransferDetailPage.tsx`, `hooks/useTransferHistory.ts`.
@@ -351,7 +352,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
 
 ## Fase 2.4: Borrador y ruta del movimiento
 
-- [ ] **T2.4.1: Reductor `useTransferDraft`** `[P con T2.4.2]`
+- [x] **T2.4.1: Reductor `useTransferDraft`** `[P con T2.4.2]`
   - **Qué:** implementar el reductor puro con acciones: elegir tipo, elegir puesto, agregar/quitar línea serializada, agregar/editar/quitar línea por cantidad, limpiar, transiciones de fase. Rechaza duplicados serializados, suma o edita la cantidad de un mismo producto y vacía las líneas al cambiar de ruta.
   - **Spec / Plan:** FR-005, FR-009, FR-015; plan §4.8.
   - **Archivos:** `hooks/useTransferDraft.ts`.
@@ -359,7 +360,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** estado coherente tras cada acción, sin persistencia en almacenamiento del navegador.
   - **Pruebas:** unitarias del reductor (cada acción, duplicados, vaciado, fases).
 
-- [ ] **T2.4.2: Validaciones locales** `[P con T2.4.1]`
+- [x] **T2.4.2: Validaciones locales** `[P con T2.4.1]`
   - **Qué:** implementar en `validation.ts` las reglas de `spec.md` §8 (ruta completa, guía con al menos una línea, origen ≠ destino, unidad no repetida, cantidad entera > 0, cantidad ≤ disponibilidad leída, unidad en el origen) con los mensajes en español definidos. Los límites no verificados (DP-11) no se incluyen.
   - **Spec / Plan:** FR-006, FR-014, FR-040; plan §4.8.
   - **Archivos:** `validation.ts`.
@@ -367,7 +368,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** cada regla con su mensaje; ninguna regla inventada.
   - **Pruebas:** unitarias por regla y casos límite (cero, negativos, decimales, no numéricos).
 
-- [ ] **T2.4.3: Selector de tipo de movimiento, puesto y resumen de ruta**
+- [x] **T2.4.3: Selector de tipo de movimiento, puesto y resumen de ruta**
   - **Qué:** crear `TransferRouteSelector`: tipo («Abastecer un puesto» / «Devolver al almacén»), selector de puesto activo, resumen «Origen → Destino» siempre visible; el Almacén Central se identifica con el mecanismo verificado en T2.0.10. Sin preselección de puesto. Confirmación y vaciado de líneas al cambiar la ruta. Estados explicativos si no hay Almacén Central activo único o no hay puestos activos.
   - **Spec / Plan:** FR-001–FR-005, NFR-008; BR-001, BR-002; plan §4.5.
   - **Archivos:** `components/TransferRouteSelector.tsx`.
@@ -376,7 +377,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** no es posible elegir dos puestos ni origen = destino; solo ubicaciones activas; el Almacén Central no se deduce por nombre.
   - **Pruebas:** de componente: ambos tipos, cambio de ruta con líneas, ausencia de puestos o de Almacén Central.
 
-- [ ] **T2.4.4: Estructura de `TransferCreatePage` y aviso de abandono**
+- [x] **T2.4.4: Estructura de `TransferCreatePage` y aviso de abandono**
   - **Qué:** crear el esqueleto de `TransferCreatePage` con la barra de ruta, las áreas de captura y del contenido de la guía, y el aviso al abandonar con líneas (navegación interna si el router lo permite según T2.0.2; cierre de pestaña con el evento estándar). Nada del borrador se persiste.
   - **Spec / Plan:** FR-035; FA-07; plan §4.4, §4.8.
   - **Archivos:** `pages/TransferCreatePage.tsx`.
@@ -390,7 +391,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
 
 ## Fase 2.5: Selección de mercancía
 
-- [ ] **T2.5.1: Captura de unidades serializadas** `[P con T2.5.3]`
+- [x] **T2.5.1: Captura de unidades serializadas** `[P con T2.5.3]`
   - **Qué:** crear `SerializedItemPicker`: captura por lector HID (`useBarcodeScanner`) o teclado, resolución por `GET /hardware-items/scan/:code`, validación de pertenencia al origen («Esta unidad está en [ubicación], no en [origen]»), duplicados, foco de regreso al campo y anuncio en región `aria-live`. El lector debe poder desactivarse mientras haya un diálogo abierto (montaje condicional o la opción que exista según T2.0.5); no se modifica `useBarcodeScanner` sin autorización.
   - **Spec / Plan:** FR-007, FR-008, FR-009, NFR-004; BR-012, BR-013; plan §4.6.
   - **Archivos:** `components/SerializedItemPicker.tsx`.
@@ -398,7 +399,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** una unidad fuera del origen no se agrega y se informa su ubicación; un código no encontrado es un estado recuperable; el lector no actúa con el diálogo abierto.
   - **Pruebas:** de componente con captura HID simulada y escritura manual: unidad válida, fuera del origen, duplicada, no encontrada.
 
-- [ ] **T2.5.2: Estado, condición y relación padre-hijo**
+- [x] **T2.5.2: Estado, condición y relación padre-hijo**
   - **Qué:** mostrar la condición (nuevo/usado) y el estado de cada unidad cuando la respuesta confirmada los incluya, y la relación chasis/componentes como información. Solo `EN_STOCK` es movible. No delegar al backend un envío con relaciones no resueltas: todo envío serializado/mixto queda bloqueado por B6 hasta corrección backend.
   - **Spec / Plan:** FR-010, FR-011, BR-009; BV-003, BV-004; SC-31; plan §4.6.
   - **Archivos:** `components/SerializedItemPicker.tsx`, `components/TransferLinesList.tsx`.
@@ -407,7 +408,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** identidad (producto, N/S) y condición visibles; ninguna regla adoptada por suposición.
   - **Pruebas:** de componente: unidad con y sin componentes, con y sin condición en la respuesta.
 
-- [ ] **T2.5.3: Selección de productos por cantidad y disponibilidad en origen** `[P con T2.5.1]`
+- [x] **T2.5.3: Selección de productos por cantidad y disponibilidad en origen** `[P con T2.5.1]`
   - **Qué:** crear `useOriginAvailability` y `QuantityItemPicker`: búsqueda por nombre o SKU con el selector de catálogo reutilizado, presentación limitada a `isSerialized: false`, consulta de `GET /quantity-stock` por origen y producto, muestra «Disponible en [origen]: N», validación de la cantidad (entero > 0 y ≤ disponible leído, con aviso sin bloqueo definitivo si la lectura no está disponible).
   - **Spec / Plan:** FR-012, FR-013, FR-014; BR-010, BR-011; plan §4.7.
   - **Archivos:** `hooks/useOriginAvailability.ts`, `components/QuantityItemPicker.tsx`.
@@ -415,7 +416,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** un producto serializado nunca se agrega como línea por cantidad; sin parámetro de consulta inventado.
   - **Pruebas:** de hook y de componente: disponibilidad leída, lectura fallida, cantidades inválidas y excesivas.
 
-- [ ] **T2.5.4: Lista de contenido de la guía y revisión de disponibilidad**
+- [x] **T2.5.4: Lista de contenido de la guía y revisión de disponibilidad**
   - **Qué:** crear `TransferLinesList`: líneas agrupadas por modalidad con totales, quitar línea, editar cantidad, una línea por producto, sin precios. Implementar «Revisar disponibilidad» (reconsulta del stock de las líneas por cantidad y re-resolución de las unidades serializadas), indicando las líneas que dejaron de ser elegibles sin modificar el borrador de forma silenciosa.
   - **Spec / Plan:** FR-006, FR-015, FR-016, FR-030; SC-27; plan §4.7, §4.8.
   - **Archivos:** `components/TransferLinesList.tsx`.
@@ -423,14 +424,13 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** el botón de revisión se habilita solo con una guía válida; la revisión marca líneas no elegibles.
   - **Pruebas:** de componente: guía mixta, quitar/editar, revisión con cambios de disponibilidad.
 
-- [ ] **T2.5.5: Listado de unidades en el origen (opcional, condicionado)**
+- [x] **T2.5.5: Listado de unidades en el origen (opcional, condicionado)**
   - **Qué:** si DP-06 se resuelve y `GET /hardware-items` está disponible por la interfaz pública de Inventario con DTO verificado, incorporar una búsqueda de unidades disponibles en el origen. De lo contrario, esta tarea queda sin ejecutar y la selección serializada se mantiene exclusivamente por captura.
   - **Spec / Plan:** FR-007; DP-06; plan §4.6.
-  - **Archivos:** `components/SerializedItemPicker.tsx` (extensión), sin duplicar el servicio de Inventario.
+  - **Archivos:** `components/TransferItemPickers.tsx`, `modules/inventory/services/hardwareReadService.ts`.
   - **Depende de:** T2.5.1, T2.0.5, DP-06.
-  - **Bloqueo:** Sin bloqueo contractual actual: listado disponible y DTO comprobable; B6 bloquea únicamente envío serializado.
-  - **Hecho cuando:** solo si se ejecuta, usa el servicio de Inventario y filtros verificados; si no, se registra como no aplicable en el registro de avance.
-  - **Pruebas:** de componente si se implementa.
+  - **Hecho cuando:** implementado mediante `GET /hardware-items/available-serials` permitiendo seleccionar catálogo y serie disponible sin conocer el N/S de antemano.
+  - **Pruebas:** pruebas de componente y mock de servicio.
 
 **Validación de la fase 2.5:** pruebas de selección aprobadas; verificación de que no se hacen peticiones HTTP desde componentes y de que el consumo de Inventario es solo por su interfaz pública.
 
@@ -438,7 +438,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
 
 ## Fase 2.6: Confirmación, envío y comprobante
 
-- [ ] **T2.6.1: Diálogo de resumen y confirmación** `[P con T2.6.5]`
+- [x] **T2.6.1: Diálogo de resumen y confirmación** `[P con T2.6.5]`
   - **Qué:** crear `TransferSummaryDialog`: tipo de movimiento, ruta «Origen → Destino» destacada, líneas serializadas (producto, N/S, condición si está disponible) y por cantidad, totales por modalidad, indicación de aplicación inmediata, botones «Confirmar abastecimiento»/«Confirmar devolución» y «Volver a editar». Atrapa el foco, devuelve el foco al abrirlo, no se cierra accidentalmente durante el envío y desactiva el lector.
   - **Spec / Plan:** FR-017, FR-019, NFR-004, NFR-005, NFR-008; FA-04; plan §4.9, §4.16.
   - **Archivos:** `components/TransferSummaryDialog.tsx`.
@@ -446,7 +446,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** el texto del botón depende del tipo; el diálogo es operable con teclado.
   - **Pruebas:** de componente: contenido, foco, cierre bloqueado durante el envío.
 
-- [ ] **T2.6.2: Hook `useCreateTransfer`**
+- [x] **T2.6.2: Hook `useCreateTransfer`**
   - **Qué:** orquestar el envío con las fases `reviewing`, `submitting`, `completed`, `rejected` y `unknown`; bloqueo inmediato de doble envío con `useRef`, botones deshabilitados durante `submitting`, sin reintentos automáticos. Éxito solo con respuesta exitosa del backend; error con respuesta → `rejected` (borrador conservado); error sin respuesta o `5xx` incierto → `unknown` (borrador conservado).
   - **Spec / Plan:** FR-018–FR-022, FR-041, NFR-006; BR-003; plan §4.9.
   - **Archivos:** `hooks/useCreateTransfer.ts`.
@@ -455,7 +455,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** dos disparos consecutivos producen una sola solicitud; ningún éxito se muestra sin confirmación del servidor.
   - **Pruebas:** de hook: éxito, `400`, `403`, `409`, red, `timeout`, doble disparo simultáneo.
 
-- [ ] **T2.6.3: Respuesta inconsistente o fallo parcial**
+- [x] **T2.6.3: Respuesta inconsistente o fallo parcial**
   - **Qué:** tratar como advertencia (nunca como éxito completo) una respuesta que indique un resultado parcial o inconsistente (por ejemplo, un código de guía sin todas las líneas enviadas): impedir el reintento inmediato, dirigir a verificar el detalle de la guía y mostrar el caso como incidencia del backend. El frontend no modela éxito parcial.
   - **Spec / Plan:** FR-023; BR-003; SC-30; plan §4.15.
   - **Archivos:** `hooks/useCreateTransfer.ts`, `components/TransferReceipt.tsx`.
@@ -464,7 +464,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** una respuesta con discrepancia entre líneas enviadas y devueltas no se presenta como éxito.
   - **Pruebas:** de hook y de componente con respuesta inconsistente mockeada.
 
-- [ ] **T2.6.4: Resultado incierto y verificación en el historial**
+- [x] **T2.6.4: Resultado incierto y verificación en el historial**
   - **Qué:** crear `UnknownOutcomeNotice`: explicar que la guía pudo registrarse, bloquear la reconfirmación y ofrecer «Verificar en el historial» (consulta de las guías más recientes de la misma ruta y responsable mediante `useTransferHistory`); habilitar «Reintentar» solo tras esa verificación y con advertencia de posible duplicación. Si el backend no soporta los filtros necesarios (O-04), usar la verificación manual indicada en el registro de verificación, previa aprobación.
   - **Spec / Plan:** FR-022, US-010; SC-28, SC-29; plan §4.9.
   - **Archivos:** `components/UnknownOutcomeNotice.tsx`.
@@ -473,7 +473,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** sin verificación no es posible reintentar; el borrador permanece íntegro.
   - **Pruebas:** de componente: flujo de incertidumbre, verificación con guía encontrada y no encontrada.
 
-- [ ] **T2.6.5: Comprobante del movimiento** `[P con T2.6.1]`
+- [x] **T2.6.5: Comprobante del movimiento** `[P con T2.6.1]`
   - **Qué:** crear `TransferReceipt`: código `TR-XXXXXX` y datos **devueltos por el backend** (ruta, líneas, totales); el frontend no genera ni modifica el código. Acciones: «Nueva guía», «Ver detalle», «Ver historial».
   - **Spec / Plan:** FR-020; BR-014; plan §4.9, §4.10.
   - **Archivos:** `components/TransferReceipt.tsx`.
@@ -481,7 +481,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** el código mostrado coincide con el de la respuesta; «Nueva guía» descarta el borrador.
   - **Pruebas:** de componente con respuestas de ejemplo verificadas.
 
-- [ ] **T2.6.6: Composición del flujo de creación y manejo de rechazos**
+- [x] **T2.6.6: Composición del flujo de creación y manejo de rechazos**
   - **Qué:** completar `TransferCreatePage` integrando ruta, captura, lista, resumen, envío, comprobante y avisos. Ante un rechazo del backend: conservar el borrador, mostrar el mensaje real, ofrecer «Revisar disponibilidad» cuando el motivo sea disponibilidad, ubicación o estado, y recargar ubicaciones si el rechazo es por ubicación inexistente o inactiva. Ante `403` la guía no se considera creada («No tienes permiso para realizar esta acción.»); ante `401`, aplicar el cierre de sesión de la Fase 0.
   - **Spec / Plan:** FR-006, FR-020, FR-021, FR-036, FR-039; SC-18, SC-22, SC-24, SC-32; plan §4.15.
   - **Archivos:** `pages/TransferCreatePage.tsx`.
@@ -504,7 +504,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
 
 ## Fase 2.7: Integración con Inventario y trazabilidad
 
-- [ ] **T2.7.1: Reflejo de existencias tras el traslado** `[P con T2.7.2]`
+- [x] **T2.7.1: Reflejo de existencias tras el traslado** `[P con T2.7.2]`
   - **Qué:** en el comprobante, ofrecer accesos a `/inventory` y `/inventory/stock` para verificar existencias en origen y destino. Solo si la respuesta de creación no incluye los saldos resultantes y la reconsulta es simple, mostrar los saldos de las líneas por cantidad reconsultando `GET /quantity-stock` por producto y ubicación. Nunca estimar por aritmética del cliente ni guardar existencias en el navegador.
   - **Spec / Plan:** FR-024, BR-010; F2-C06; plan §4.10.
   - **Archivos:** `components/TransferReceipt.tsx`, `hooks/useOriginAvailability.ts` (reutilización).
@@ -512,7 +512,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** los datos mostrados provienen del backend; las vistas de Inventario consultan al montarse sin necesidad de invalidar caché.
   - **Pruebas:** de componente: enlaces y reconsulta opcional.
 
-- [ ] **T2.7.2: Conservación de identidad y condición de las unidades** `[P con T2.7.1]`
+- [x] **T2.7.2: Conservación de identidad y condición de las unidades** `[P con T2.7.1]`
   - **Qué:** asegurar que el frontend nunca envía ni edita número de serie, condición ni historial de una unidad (solo la referencia a la unidad y el contexto de ruta), y que línea, resumen, comprobante y detalle muestran producto, N/S y condición (si se entrega).
   - **Spec / Plan:** FR-010; BR-009; plan §4.8, §4.12.
   - **Archivos:** `services/transferMapper.ts`, `components/TransferLinesList.tsx`, `components/TransferLinesView.tsx`.
@@ -520,7 +520,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** el payload de creación contiene solo los campos contratados y las vistas muestran la identidad.
   - **Pruebas:** unitarias del mapeo (el payload no contiene N/S editables ni condición) y de componente.
 
-- [ ] **T2.7.3: Servicio de movimientos de una unidad**
+- [x] **T2.7.3: Servicio de movimientos de una unidad**
   - **Qué:** con los ajustes autorizados y DP-14/DP-15 resueltos para ejecutores, implementar la consulta de los movimientos logísticos de una unidad con la fuente aprobada (endpoint de hoja de vida de Inventario, `GET /hardware-items/:id/lifecycle`, sin inventar filtro por N/S del listado de guías), mostrando solo eventos de movimiento. No duplicar servicios de Inventario.
   - **Spec / Plan:** FR-037, FR-038; F2-C11; SC-10; DP-09, DP-14, DP-15.
   - **Archivos:** `services/transferService.ts` (o reutilización por interfaz pública de Inventario según DP-15), `models.ts`.
@@ -529,7 +529,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
   - **Hecho cuando:** consulta probada con la fuente aprobada, sin presentar eventos que no sean de movimiento.
   - **Pruebas:** unitarias con HTTP mockeado sobre la estructura verificada.
 
-- [ ] **T2.7.4: Interfaz de movimientos de una unidad**
+- [x] **T2.7.4: Interfaz de movimientos de una unidad**
   - **Qué:** añadir en `/logistics` la consulta por N/S o código (captura HID o teclado) con el listado de movimientos y acceso al detalle de cada guía. Habilitar para roles ejecutores; para `VENDEDOR`/`TECNICO` solo si el backend garantiza que la respuesta se limita a su puesto (FR-038); en caso contrario, oculta.
   - **Spec / Plan:** FR-037, FR-038, BR-018; US-009; SC-10.
   - **Archivos:** `pages/TransferHistoryPage.tsx` y componente nuevo dentro de `components/` si hace falta (nombre por definir al actualizar el plan).
@@ -555,7 +555,7 @@ El alcance por puesto se aplica desde esta fase; el backend es la autoridad (FR-
 
 Esta fase verifica y refina lo implementado desde 2.1; la autorización ya se aplicó en rutas, páginas y acciones durante las fases anteriores.
 
-- [ ] **T2.8.1: Revisión de autorización de extremo a extremo**
+- [x] **T2.8.1: Revisión de autorización de extremo a extremo**
   - **Qué:** confirmar que todas las rutas, acciones y vistas usan `LOGISTICS_EXECUTOR_ROLES`, `RoleGuard` y `Can`; que no existe comparación literal de roles; que `401`/`403` se manejan con la infraestructura de la Fase 0; y que el alcance por puesto no se simula en cliente.
   - **Spec / Plan:** FR-031–FR-036, NFR-003; BR-017–BR-019; plan §4.13, §9.
   - **Archivos:** revisión de `src/modules/logistics/**`; correcciones puntuales si se detectan.
@@ -563,7 +563,7 @@ Esta fase verifica y refina lo implementado desde 2.1; la autorización ya se ap
   - **Hecho cuando:** revisión sin hallazgos abiertos (o hallazgos corregidos con pruebas).
   - **Pruebas:** búsqueda de comparaciones literales de roles y pruebas de autorización existentes.
 
-- [ ] **T2.8.2: Diseño responsive** `[P con T2.8.3]`
+- [x] **T2.8.2: Diseño responsive** `[P con T2.8.3]`
   - **Qué:** verificar historial y detalle *mobile-first* (tarjetas apiladas en pantallas estrechas, contenido ancho con desplazamiento interno) y que la creación de guías siga siendo usable en pantallas medianas; consistencia con los patrones de Inventario.
   - **Spec / Plan:** NFR-004, NFR-009; plan §4.16.
   - **Archivos:** componentes de `src/modules/logistics/components/` y páginas.
@@ -571,7 +571,7 @@ Esta fase verifica y refina lo implementado desde 2.1; la autorización ya se ap
   - **Hecho cuando:** sin desplazamiento horizontal del cuerpo de la página; origen, destino y código legibles en pantallas estrechas.
   - **Pruebas:** pruebas de componente de las variantes y revisión manual en anchos representativos; no se declara verificación visual en navegador si no se realizó.
 
-- [ ] **T2.8.3: Accesibilidad** `[P con T2.8.2]`
+- [x] **T2.8.3: Accesibilidad** `[P con T2.8.2]`
   - **Qué:** verificar foco visible, etiquetas asociadas, operación completa por teclado, atrapado y retorno de foco de los diálogos, regiones `aria-live` en capturas, errores asociados a su campo y estados no comunicados solo por color.
   - **Spec / Plan:** NFR-004; plan §4.16.
   - **Archivos:** componentes y páginas del módulo.
@@ -579,7 +579,7 @@ Esta fase verifica y refina lo implementado desde 2.1; la autorización ya se ap
   - **Hecho cuando:** sin hallazgos abiertos en la revisión de accesibilidad.
   - **Pruebas:** consultas por rol/etiqueta de React Testing Library, orden de foco y retorno de foco.
 
-- [ ] **T2.8.4: Revisión de límites arquitectónicos y dependencias**
+- [x] **T2.8.4: Revisión de límites arquitectónicos y dependencias**
   - **Qué:** comprobar que logistics solo importa de `inventory/index.ts`, que `inventory` no importa de `logistics`, que no hay dependencias circulares, peticiones HTTP en componentes, instancias de Axios propias, uso de `localStorage`/`sessionStorage`/IndexedDB para datos de logística, dependencias nuevas, `services/printer/` ni código offline.
   - **Spec / Plan:** NFR-001, NFR-002, NFR-003, NFR-007, FR-041; plan §2, §9, Anexo A.
   - **Archivos:** revisión de `src/modules/logistics/**` y `package.json` (sin cambios esperados).
@@ -595,7 +595,7 @@ Esta fase verifica y refina lo implementado desde 2.1; la autorización ya se ap
 
 Las pruebas unitarias y de componente se escriben junto a cada tarea de implementación. Esta fase consolida las pruebas de integración por escenario del `spec.md` sin duplicar las ya cubiertas: cada prueba de flujo usa servicios con HTTP mockeado sobre estructuras verificadas. No se añaden librerías de pruebas.
 
-- [ ] **T2.9.1: Flujos de creación: distribución y devolución (SC-01 a SC-06)** `[P con T2.9.2–T2.9.5]`
+- [x] **T2.9.1: Flujos de creación: distribución y devolución (SC-01 a SC-06)** `[P con T2.9.2–T2.9.5]`
   - **Qué:** pruebas de flujo, con casos parametrizados por tipo, de guía serializada, por cantidad y mixta en abastecimiento y devolución, hasta el comprobante con el código del backend.
   - **Spec / Plan:** FR-001–FR-020; plan §10.
   - **Archivos:** `pages/TransferCreatePage.test.tsx` (o archivo de flujo equivalente).
@@ -603,7 +603,7 @@ Las pruebas unitarias y de componente se escriben junto a cada tarea de implemen
   - **Hecho cuando:** seis escenarios aprobados; los payloads coinciden con el contrato.
   - **Pruebas:** suite de flujo.
 
-- [ ] **T2.9.2: Validaciones y errores de negocio (SC-19 a SC-27, SC-31)** `[P con T2.9.1, T2.9.3–T2.9.5]`
+- [x] **T2.9.2: Validaciones y errores de negocio (SC-19 a SC-27, SC-31)** `[P con T2.9.1, T2.9.3–T2.9.5]`
   - **Qué:** stock insuficiente, unidad en otro establecimiento, unidad duplicada, ubicación inválida, origen = destino, ubicaciones inactivas, guía vacía, cantidades inválidas, cambios de disponibilidad entre captura y confirmación (rechazo del backend + «Revisar disponibilidad»), unidad en estado no movible o chasis con componentes (según lo confirmado).
   - **Spec / Plan:** FR-004–FR-016, FR-021, FR-040; plan §4.15.
   - **Archivos:** pruebas de `validation.ts`, componentes de selección y `TransferCreatePage`.
@@ -611,7 +611,7 @@ Las pruebas unitarias y de componente se escriben junto a cada tarea de implemen
   - **Hecho cuando:** cada caso confirma el comportamiento definido en `spec.md` §7.5.
   - **Pruebas:** suite por caso con asserts sobre mensajes y estado del borrador.
 
-- [ ] **T2.9.3: Errores de comunicación, duplicados y atomicidad (SC-28 a SC-30, SC-32)** `[P con T2.9.1, T2.9.2, T2.9.4, T2.9.5]`
+- [x] **T2.9.3: Errores de comunicación, duplicados y atomicidad (SC-28 a SC-30, SC-32)** `[P con T2.9.1, T2.9.2, T2.9.4, T2.9.5]`
   - **Qué:** error de red y `timeout` en creación y consultas, doble disparo, reintento bloqueado hasta verificar, respuesta inconsistente, sesión expirada durante la operación; confirmar que nunca se muestra éxito sin respuesta del servidor.
   - **Spec / Plan:** FR-019, FR-022, FR-023, FR-041, NFR-006; plan §4.9.
   - **Archivos:** `hooks/useCreateTransfer.test.ts`, `components/UnknownOutcomeNotice.test.tsx`.
@@ -619,7 +619,7 @@ Las pruebas unitarias y de componente se escriben junto a cada tarea de implemen
   - **Hecho cuando:** los cuatro escenarios aprobados; una sola solicitud por doble disparo.
   - **Pruebas:** suite de hook y de componente con temporizadores y errores simulados.
 
-- [ ] **T2.9.4: Autorización, ubicación y acceso ajeno (SC-12 a SC-18)** `[P con T2.9.1–T2.9.3, T2.9.5]`
+- [x] **T2.9.4: Autorización, ubicación y acceso ajeno (SC-12 a SC-18)** `[P con T2.9.1–T2.9.3, T2.9.5]`
   - **Qué:** rol ejecutor crea guías; vendedor y técnico consultan solo su puesto sin controles de creación; usuario sin ubicación asignada; acceso a una guía de otro puesto (`403` y `404` con el mismo resultado visible); creación sin autorización. El escenario SC-13 (Encargado de Almacén) se prueba con la representación definitiva de DP-01.
   - **Spec / Plan:** FR-031–FR-036, BR-017–BR-019; plan §4.13.
   - **Archivos:** pruebas de router, `TransferHistoryPage`, `TransferDetailPage`, `TransferCreatePage`.
@@ -628,7 +628,7 @@ Las pruebas unitarias y de componente se escriben junto a cada tarea de implemen
   - **Hecho cuando:** los siete escenarios aprobados; SC-13 aprobado o documentado como pendiente.
   - **Pruebas:** suite por rol.
 
-- [ ] **T2.9.5: Consulta y trazabilidad (SC-07 a SC-11)** `[P con T2.9.1–T2.9.4]`
+- [x] **T2.9.5: Consulta y trazabilidad (SC-07 a SC-11)** `[P con T2.9.1–T2.9.4]`
   - **Qué:** historial contractual sin paginación, detalle, identificación de origen, destino, responsable y fecha, movimientos recibidos y devueltos por puesto y, si T2.7.3–T2.7.4 se implementaron, movimientos de una unidad.
   - **Spec / Plan:** FR-026–FR-030, FR-037, FR-038; plan §4.11, §4.12.
   - **Archivos:** pruebas de páginas y componentes de consulta.
@@ -636,7 +636,7 @@ Las pruebas unitarias y de componente se escriben junto a cada tarea de implemen
   - **Hecho cuando:** SC-07 a SC-09 y SC-11 aprobados; SC-10 aprobado o documentado como bloqueado.
   - **Pruebas:** suite de consulta.
 
-- [ ] **T2.9.6: Revisión de regresiones**
+- [x] **T2.9.6: Revisión de regresiones**
   - **Qué:** ejecutar la suite completa y compararla con la línea base de T2.0.1; confirmar que Inventario y los cimientos no tienen regresiones, en especial si se tocó `inventory/index.ts` (T2.1.5).
   - **Spec / Plan:** plan §10, §13.
   - **Archivos:** ninguno.
@@ -653,7 +653,7 @@ Las pruebas unitarias y de componente se escriben junto a cada tarea de implemen
   - **Hecho cuando:** cada comprobación registrada con su resultado o su estado de pendiente.
   - **Pruebas:** verificación manual contra el backend real.
 
-- [ ] **T2.9.8: Validaciones de calidad**
+- [x] **T2.9.8: Validaciones de calidad**
   - **Qué:** ejecutar `npm test`, `npm run lint`, `npx tsc -b`, `npm run build` y `git diff --check`; confirmar que no hay dependencias nuevas.
   - **Spec / Plan:** plan §13 (puntos 14–16); Constitución §13.5, §15.
   - **Archivos:** ninguno.
