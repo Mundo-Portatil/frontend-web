@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearAccessToken, getAccessToken, saveAccessToken } from '../../../../config/authToken';
 import { useAuthStore } from '../../../../stores/authStore';
 import { getProfile } from '../../auth/services/authService';
+import { listActiveLocations } from '../../locations/services/locationService';
 import { UsersPage } from './UsersPage';
 import * as userService from '../services/userService';
 
@@ -18,6 +19,11 @@ vi.mock('../services/userService', () => ({
   deactivateUser: vi.fn(),
   reactivateUser: vi.fn(),
 }));
+
+const POST = { id: '550e8400-e29b-41d4-a716-446655440000', name: 'Puesto 212', type: 'PUESTO' as const, active: true, createdAt: '' };
+const CENTRAL = { ...POST, id: '550e8400-e29b-41d4-a716-446655440001', name: 'Almacén Central', type: 'ALMACEN_CENTRAL' as const };
+beforeEach(() => vi.mocked(listActiveLocations).mockResolvedValue([POST, CENTRAL]));
+vi.mock('../../locations/services/locationService', () => ({ listActiveLocations: vi.fn(() => Promise.resolve([POST, CENTRAL])) }));
 
 const ADMIN_SESSION = {
   status: 'authenticated' as const,
@@ -86,7 +92,7 @@ describe('UsersPage', () => {
 
     render(<UsersPage />);
 
-    expect(screen.getByRole('status')).toHaveTextContent('Cargando usuarios...');
+    expect(screen.getByText('Cargando usuarios...')).toBeInTheDocument();
   });
 
   it('shows empty state when there are no users', async () => {
@@ -140,6 +146,7 @@ describe('UsersPage', () => {
     await user.type(screen.getByLabelText('Correo electrónico'), 'carlos.vendedor@mundoportatil.pe');
     await user.type(screen.getByLabelText('Nombre completo'), 'Carlos Mendoza');
     await user.type(screen.getByLabelText('Contraseña'), 'Password123!');
+    await user.selectOptions(screen.getByLabelText('Ubicación física *'), POST.id);
     await user.click(screen.getByRole('button', { name: 'Crear usuario' }));
 
     expect(
@@ -155,6 +162,7 @@ describe('UsersPage', () => {
     vi.mocked(userService.listUsers).mockResolvedValueOnce([]);
     vi.mocked(userService.createUser).mockResolvedValueOnce({
       id: 'user-2',
+      locationId: POST.id, locationName: POST.name,
       email: 'carlos.vendedor@mundoportatil.pe',
       name: 'Carlos Mendoza',
       role: 'VENDEDOR',
@@ -169,6 +177,7 @@ describe('UsersPage', () => {
     await user.type(screen.getByLabelText('Correo electrónico'), 'carlos.vendedor@mundoportatil.pe');
     await user.type(screen.getByLabelText('Nombre completo'), 'Carlos Mendoza');
     await user.type(screen.getByLabelText('Contraseña'), 'Password123!');
+    await user.selectOptions(screen.getByLabelText('Ubicación física *'), POST.id);
     await user.click(screen.getByRole('button', { name: 'Crear usuario' }));
 
     await waitFor(() => {
@@ -177,6 +186,7 @@ describe('UsersPage', () => {
         name: 'Carlos Mendoza',
         password: 'Password123!',
         role: 'VENDEDOR',
+        locationId: POST.id,
       });
     });
     expect(await screen.findByText('Usuario creado correctamente.')).toBeInTheDocument();
@@ -274,6 +284,7 @@ describe('UsersPage', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Editar' }));
     await user.selectOptions(screen.getByLabelText('Rol'), 'TECNICO');
+    await user.selectOptions(screen.getByLabelText('Ubicación física *'), POST.id);
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
     await user.click(screen.getByRole('button', { name: 'Confirmar cambios' }));
 
@@ -440,4 +451,53 @@ it('ends a confirmed own-account deactivation even if the profile refresh has a 
   await waitFor(() => expect(useAuthStore.getState().status).toBe('unauthenticated'));
   expect(getProfile).toHaveBeenCalledTimes(1);
   expect(getAccessToken()).toBeNull();
+});
+
+it('updates a real assigned location and reads it again after remounting', async () => {
+  useAuthStore.setState(ADMIN_SESSION);
+  const original = { ...SAMPLE_USERS[0], role: 'ENCARGADO_ALMACEN' as const, locationId: POST.id, locationName: POST.name };
+  const updated = { ...original, locationId: CENTRAL.id, locationName: CENTRAL.name };
+  vi.mocked(userService.listUsers).mockResolvedValueOnce([original]).mockResolvedValueOnce([updated]);
+  vi.mocked(userService.updateUser).mockResolvedValueOnce(updated);
+  const mounted = render(<UsersPage />); const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: 'Editar' }));
+  await user.selectOptions(screen.getByLabelText('Ubicación física'), CENTRAL.id);
+  await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  await waitFor(() => expect(userService.updateUser).toHaveBeenLastCalledWith(original.id, { name: original.name, role: original.role, locationId: CENTRAL.id }));
+  expect(await screen.findByRole('cell', { name: CENTRAL.name })).toBeInTheDocument();
+  mounted.unmount(); render(<UsersPage />);
+  expect(await screen.findByRole('cell', { name: CENTRAL.name })).toBeInTheDocument();
+});
+
+it('requires an active post for sellers and technicians without offering the central warehouse', async () => {
+  useAuthStore.setState(ADMIN_SESSION); vi.mocked(userService.listUsers).mockResolvedValue([]);
+  const user = userEvent.setup(); render(<UsersPage />);
+  await screen.findByRole('option', { name: POST.name });
+  expect(screen.queryByRole('option', { name: CENTRAL.name })).not.toBeInTheDocument();
+  await user.type(screen.getByLabelText('Correo electrónico'), 'new@mp.pe');
+  await user.type(screen.getByLabelText('Nombre completo'), 'Empleado');
+  await user.type(screen.getByLabelText('Contraseña'), 'Password123!');
+  const calls = vi.mocked(userService.createUser).mock.calls.length;
+  await user.click(screen.getByRole('button', { name: 'Crear usuario' }));
+  expect(await screen.findByText('Selecciona un puesto para este empleado.')).toBeInTheDocument();
+  expect(userService.createUser).toHaveBeenCalledTimes(calls);
+  await user.selectOptions(screen.getByLabelText('Rol'), 'ENCARGADO_ALMACEN');
+  expect(screen.getByRole('option', { name: 'Almacén Central (automático)' })).toBeInTheDocument();
+  await user.selectOptions(screen.getByLabelText('Ubicación física'), CENTRAL.id);
+  await user.selectOptions(screen.getByLabelText('Rol'), 'TECNICO');
+  expect(screen.getByLabelText('Ubicación física *')).toHaveValue('');
+  await user.selectOptions(screen.getByLabelText('Rol'), 'ADMIN');
+  expect(screen.queryByLabelText(/Ubicación física/)).not.toBeInTheDocument();
+});
+
+it('does not silently discard an inactive current assignment and requires an active replacement', async () => {
+  useAuthStore.setState(ADMIN_SESSION);
+  const old = { ...SAMPLE_USERS[0], role: 'TECNICO' as const, locationId: 'inactive', locationName: 'Puesto antiguo' };
+  vi.mocked(userService.listUsers).mockResolvedValueOnce([old]);
+  const user = userEvent.setup(); render(<UsersPage />);
+  await user.click(await screen.findByRole('button', { name: 'Editar' }));
+  await screen.findByRole('option', { name: POST.name });
+  expect(screen.getByRole('option', { name: 'Puesto antiguo (no disponible)' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  expect(await screen.findByText('Selecciona una ubicación activa válida para este rol.')).toBeInTheDocument();
 });

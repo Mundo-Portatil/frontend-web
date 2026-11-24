@@ -23,6 +23,9 @@ import { isValidEmail, isValidPassword, MIN_PASSWORD_LENGTH } from '../../../../
 import { Notification } from '../../../../components/notifications/Notification';
 import type { NotificationKind } from '../../../../components/notifications/Notification';
 
+import { listActiveLocations } from '../../locations/services/locationService';
+import type { Location } from '../../locations/models';
+
 const ROLE_OPTIONS: Role[] = ['ADMIN', 'ENCARGADO_ALMACEN', 'VENDEDOR', 'TECNICO'];
 
 interface Feedback {
@@ -36,6 +39,7 @@ interface UserFormState {
   role: Role;
   password: string;
   active: boolean;
+  locationId: string;
 }
 
 interface UserFormErrors {
@@ -43,6 +47,7 @@ interface UserFormErrors {
   name?: string;
   role?: string;
   password?: string;
+  locationId?: string;
 }
 
 const EMPTY_FORM: UserFormState = {
@@ -51,6 +56,7 @@ const EMPTY_FORM: UserFormState = {
   role: 'VENDEDOR',
   password: '',
   active: true,
+  locationId: '',
 };
 
 function inputClass(hasError: boolean): string {
@@ -108,6 +114,7 @@ function userFormFromEntity(user: User): UserFormState {
     role: user.role,
     password: '',
     active: user.active,
+    locationId: user.locationId ?? '',
   };
 }
 
@@ -116,6 +123,11 @@ function userFormFromEntity(user: User): UserFormState {
  * update users and perform soft-delete via active=false.
  */
 export function UsersPage() {
+  const role = useAuthStore((state) => state.user?.role);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(true);
+  const [locationsError, setLocationsError] = useState<AppError | null>(null);
+  const [locationsRevision, setLocationsRevision] = useState(0);
   const currentUserId = useAuthStore((state) => state.user?.id);
   const refreshProfile = useAuthStore((state) => state.refreshProfile);
   const [users, setUsers] = useState<User[]>([]);
@@ -162,6 +174,20 @@ export function UsersPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadUsers();
   }, []);
+
+  useEffect(() => {
+    if (role !== 'ADMIN') return;
+    let current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLocationsLoading(true);
+    setLocationsError(null);
+    void listActiveLocations().then((data) => { if (current) setLocations(data); })
+      .catch((failure) => { if (current) setLocationsError(asAppError(failure)); })
+      .finally(() => { if (current) setLocationsLoading(false); });
+    return () => { current = false; };
+  }, [role, locationsRevision]);
+  const availableLocations = locations.filter((location) => location.active && (form.role === 'ENCARGADO_ALMACEN' || location.type === 'PUESTO'));
+  const needsPost = form.role === 'VENDEDOR' || form.role === 'TECNICO';
 
   const activeUsersCount = useMemo(() => users.filter((user) => user.active).length, [users]);
 
@@ -224,6 +250,11 @@ export function UsersPage() {
     event.preventDefault();
     if (savingRef.current || pendingSave || useAuthStore.getState().user?.role !== 'ADMIN') return;
     const errors = isEditing ? validateEditForm(form) : validateCreateForm(form);
+    if (form.role !== 'ADMIN') {
+      if (locationsLoading || locationsError) errors.locationId = 'Espera a que se carguen las ubicaciones.';
+      else if (needsPost && !form.locationId) errors.locationId = 'Selecciona un puesto para este empleado.';
+      else if (form.locationId && !availableLocations.some((location) => location.id === form.locationId)) errors.locationId = 'Selecciona una ubicación activa válida para este rol.';
+    }
     setFormErrors(errors);
     setFormError(null);
     setFormSuccessMessage(null);
@@ -231,6 +262,7 @@ export function UsersPage() {
     if (Object.keys(errors).length > 0) return;
     if (selectedUser) {
       const payload: UpdateUserInput = { name: form.name.trim(), role: form.role };
+      if (form.locationId !== (selectedUser.locationId ?? '') || form.role === 'ADMIN' && selectedUser.locationId) payload.locationId = form.role === 'ADMIN' ? null : form.locationId || null;
       if (form.active !== selectedUser.active) payload.active = form.active;
       if (form.password.trim() !== '') payload.password = form.password;
       if (payload.active !== undefined || form.role !== selectedUser.role || payload.password !== undefined) {
@@ -245,7 +277,7 @@ export function UsersPage() {
     const token = getAccessToken();
     setIsSubmitting(true);
     try {
-      const created = await createUser({ email: form.email.trim(), name: form.name.trim(), password: form.password, role: form.role });
+      const created = await createUser({ email: form.email.trim(), name: form.name.trim(), password: form.password, role: form.role, ...(form.role !== 'ADMIN' && form.locationId ? { locationId: form.locationId } : {}) });
       if (getAccessToken() !== token || useAuthStore.getState().user?.id !== accountId) return;
       setUsers((previous) => [created, ...previous]);
       setFormSuccessMessage('Usuario creado correctamente.');
@@ -357,7 +389,7 @@ export function UsersPage() {
                 id="user-role"
                 value={form.role}
                 disabled={formDisabled}
-                onChange={(event) => setForm((previous) => ({ ...previous, role: event.target.value as Role }))}
+                onChange={(event) => { const nextRole = event.target.value as Role; setForm((previous) => ({ ...previous, role: nextRole, locationId: nextRole === 'ADMIN' || !locations.some((location) => location.id === previous.locationId && location.active && (nextRole === 'ENCARGADO_ALMACEN' || location.type === 'PUESTO')) ? '' : previous.locationId })); }}
                 className={inputClass(Boolean(formErrors.role))}
                 aria-invalid={Boolean(formErrors.role)}
                 aria-describedby={formErrors.role ? 'user-role-error' : undefined}
@@ -372,6 +404,17 @@ export function UsersPage() {
                 <p id="user-role-error" className="mt-1 text-sm text-red-600">{formErrors.role}</p>
               )}
             </div>
+
+            {form.role !== 'ADMIN' && <div>
+              <label className={LABEL_CLASS} htmlFor="user-location">Ubicación física{needsPost ? ' *' : ''}</label>
+              {locationsLoading ? <p role="status" className="text-sm text-slate-500">Cargando ubicaciones…</p> : locationsError ? <ErrorState error={locationsError} onRetry={() => setLocationsRevision((value) => value + 1)} /> : null}
+              <select id="user-location" value={form.locationId} disabled={formDisabled || locationsLoading || Boolean(locationsError)} onChange={(event) => setForm((previous) => ({ ...previous, locationId: event.target.value }))} className={inputClass(Boolean(formErrors.locationId))} aria-invalid={Boolean(formErrors.locationId)} aria-describedby={formErrors.locationId ? 'user-location-error' : undefined} required={needsPost}>
+                <option value="">{needsPost ? 'Seleccionar puesto' : 'Almacén Central (automático)'}</option>
+                {form.locationId && !availableLocations.some((location) => location.id === form.locationId) && <option value={form.locationId} disabled>{selectedUser?.locationName ?? 'Ubicación actual'} (no disponible)</option>}
+                {availableLocations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+              </select>
+              {formErrors.locationId && <p id="user-location-error" className="mt-1 text-sm text-red-600">{formErrors.locationId}</p>}
+            </div>}
 
             <div>
               <label className={LABEL_CLASS} htmlFor="user-password">
@@ -428,6 +471,7 @@ export function UsersPage() {
                 <div><dt className="text-slate-500">Usuario</dt><dd className="break-words font-medium">{pendingSave.payload.name} · {pendingSave.user.email}</dd></div>
                 <div><dt className="text-slate-500">Rol</dt><dd className="font-medium">{ROLE_LABELS[pendingSave.payload.role ?? pendingSave.user.role]}</dd></div>
                 <div><dt className="text-slate-500">Estado de acceso</dt><dd className="font-medium">{(pendingSave.payload.active ?? pendingSave.user.active) ? 'Activo' : 'Inactivo'}</dd></div>
+                <div><dt className="text-slate-500">Ubicación física</dt><dd className="font-medium">{form.role === 'ADMIN' ? 'Sin asignar' : locations.find((location) => location.id === form.locationId)?.name ?? (form.role === 'ENCARGADO_ALMACEN' && !form.locationId ? 'Almacén Central (automático)' : selectedUser?.locationName ?? 'Ubicación no disponible')}</dd></div>
                 {pendingSave.payload.password !== undefined && <div><dt className="text-slate-500">Contraseña</dt><dd>Se actualizará la contraseña.</dd></div>}
               </dl>
               {pendingSave.payload.active === false && <p className="text-sm text-slate-700">Este usuario dejará de tener acceso al sistema.{pendingSave.user.id === currentUserId ? ' Tu sesión se cerrará.' : ''}</p>}
@@ -499,7 +543,7 @@ export function UsersPage() {
                         {user.active ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-slate-700">Sin asignar</td>
+                    <td className="px-3 py-2 text-slate-700">{user.locationId ? user.locationName ?? locations.find((location) => location.id === user.locationId)?.name ?? 'Ubicación no disponible' : 'Sin asignar'}</td>
                     <td className="px-3 py-2">
                       <Can roles={['ADMIN']}>
                         <div className="flex flex-wrap gap-2">
