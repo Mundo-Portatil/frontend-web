@@ -12,7 +12,7 @@ import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, MenuIcon } from './icons'
 import { SidebarNav } from './SidebarNav';
 
 const HEADER_ACTION_BASE_CLASS =
-  'inline-flex shrink-0 items-center justify-center rounded-lg border border-white/25 px-3 py-2 text-sm font-medium text-white transition-colors hover:border-white/50 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80';
+  'inline-flex shrink-0 items-center justify-center min-h-10 rounded-lg border border-white/25 px-3 py-2 text-sm font-medium text-white transition-colors hover:border-white/50 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80';
 
 const DRAWER_ACTION_BASE_CLASS =
   'inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1';
@@ -41,12 +41,12 @@ function UserIdentity({
       </span>
       <span className="min-w-0">
         <span
-          className={`block truncate text-sm font-medium ${isLight ? 'text-slate-900' : 'text-white'}`}
+          className={`block truncate text-sm font-medium leading-5 ${isLight ? 'text-slate-900' : 'text-white'}`}
           title={name}
         >
           {name}
         </span>
-        <span className={`block truncate text-xs ${isLight ? 'text-slate-500' : 'text-brand-200'}`}>
+        <span className={`block truncate text-xs leading-4 ${isLight ? 'text-slate-500' : 'text-brand-200'}`}>
           {ROLE_LABELS[role]}
         </span>
       </span>
@@ -184,7 +184,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
         <header className="sticky top-0 z-40 bg-brand-950 shadow-sm">
           <div className="flex items-center gap-3 px-3 py-2 sm:px-4 lg:py-3 lg:px-6">
             <div className="flex min-w-0 flex-1 items-center gap-2.5 lg:flex-initial">
-              <BrandLogo height={30} tone="white" />
+              <BrandLogo height={30} tone="white" variant="mark" />
               <div className="min-w-0">
                 <span className="block truncate text-base font-semibold text-white">Mundo Portátil</span>
 
@@ -221,9 +221,8 @@ export function AppLayout({ children }: { children?: ReactNode }) {
                     if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.removeAttribute('open');
                   }}
                 >
-                  <summary className="cursor-pointer rounded-lg p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label="Opciones de mi cuenta">
-                    <span className="hidden lg:block"><UserIdentity name={user.name} role={user.role} /></span>
-                    <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 font-semibold text-white lg:hidden">{user.name.trim().charAt(0).toUpperCase() || '?'}</span>
+                  <summary className="flex list-none items-center rounded-lg p-1 [&::-webkit-details-marker]:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label="Opciones de mi cuenta">
+                    <UserIdentity name={user.name} role={user.role} />
                   </summary>
                   <div className="absolute right-0 mt-2 w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
                     <p className="truncate px-3 py-2 text-xs text-slate-500" title={user.email}>{user.email}</p>
@@ -306,7 +305,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
           >
             <div className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-slate-200 px-4">
               <div className="flex min-w-0 items-center gap-2">
-                <BrandLogo height={26} tone="brand" />
+                <BrandLogo height={26} tone="brand" variant="mark" />
                 <span className="truncate text-base font-semibold text-slate-900">
                   Mundo Portátil
                 </span>
