@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearAccessToken, saveAccessToken } from '../../../../config/authToken';
+import { clearAccessToken, getAccessToken, saveAccessToken } from '../../../../config/authToken';
 import { useAuthStore } from '../../../../stores/authStore';
 import { getProfile } from '../../auth/services/authService';
 import { UsersPage } from './UsersPage';
@@ -49,6 +49,15 @@ const INACTIVE_USER = {
   name: 'Usuario Inactivo',
   active: false,
 };
+
+
+async function requestStatusChange(user: ReturnType<typeof userEvent.setup>, active: boolean) {
+  await user.click(await screen.findByRole('button', { name: 'Editar' }));
+  await user.selectOptions(screen.getByLabelText('Estado de acceso'), String(active));
+  await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  expect(userService.updateUser).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: 'Confirmar cambios' }));
+}
 
 describe('UsersPage', () => {
   beforeEach(() => {
@@ -217,6 +226,19 @@ describe('UsersPage', () => {
     });
   });
 
+  it('allows editing a warehouse manager without rejecting the existing role', async () => {
+    const manager = { ...SAMPLE_USERS[0], role: 'ENCARGADO_ALMACEN' as const };
+    vi.mocked(userService.listUsers).mockResolvedValueOnce([manager]);
+    vi.mocked(userService.updateUser).mockResolvedValueOnce({ ...manager, name: 'Encargado actualizado' });
+    render(<UsersPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Editar' }));
+    await user.clear(screen.getByLabelText('Nombre completo'));
+    await user.type(screen.getByLabelText('Nombre completo'), 'Encargado actualizado');
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(userService.updateUser).toHaveBeenCalledWith('user-1', { name: 'Encargado actualizado', role: 'ENCARGADO_ALMACEN' }));
+  });
+
   it('refreshes the session role after editing the current account', async () => {
     saveAccessToken('active-jwt');
     useAuthStore.setState({
@@ -243,6 +265,7 @@ describe('UsersPage', () => {
     await user.click(await screen.findByRole('button', { name: 'Editar' }));
     await user.selectOptions(screen.getByLabelText('Rol'), 'TECNICO');
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await user.click(screen.getByRole('button', { name: 'Confirmar cambios' }));
 
     await waitFor(() => {
       expect(getProfile).toHaveBeenCalledTimes(1);
@@ -252,7 +275,7 @@ describe('UsersPage', () => {
 
   it('deactivates an active user', async () => {
     vi.mocked(userService.listUsers).mockResolvedValueOnce(SAMPLE_USERS);
-    vi.mocked(userService.deactivateUser).mockResolvedValueOnce({
+    vi.mocked(userService.updateUser).mockResolvedValueOnce({
       ...SAMPLE_USERS[0],
       active: false,
       updatedAt: '2026-11-14T20:46:00.000Z',
@@ -261,10 +284,10 @@ describe('UsersPage', () => {
     render(<UsersPage />);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Dar de baja' }));
+    await requestStatusChange(user, false);
 
     await waitFor(() => {
-      expect(userService.deactivateUser).toHaveBeenCalledWith('user-1');
+      expect(userService.updateUser).toHaveBeenCalledWith('user-1', { name: SAMPLE_USERS[0].name, role: 'ADMIN', active: false });
     });
     const confirmation = await screen.findByText('Usuario desactivado correctamente.');
     expect(confirmation.closest('form')).toBeNull();
@@ -274,7 +297,7 @@ describe('UsersPage', () => {
 
   it('reactivates an inactive user and reflects the new status', async () => {
     vi.mocked(userService.listUsers).mockResolvedValueOnce([INACTIVE_USER]);
-    vi.mocked(userService.reactivateUser).mockResolvedValueOnce({
+    vi.mocked(userService.updateUser).mockResolvedValueOnce({
       ...INACTIVE_USER,
       active: true,
       updatedAt: '2026-11-14T20:47:00.000Z',
@@ -283,24 +306,25 @@ describe('UsersPage', () => {
     render(<UsersPage />);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Reactivar' }));
+    await requestStatusChange(user, true);
 
     await waitFor(() => {
-      expect(userService.reactivateUser).toHaveBeenCalledWith('user-2');
+      expect(userService.updateUser).toHaveBeenCalledWith('user-2', { name: INACTIVE_USER.name, role: 'ADMIN', active: true });
     });
     expect(await screen.findByText('Usuario reactivado correctamente.')).toBeInTheDocument();
 
     const listing = screen.getByRole('region', { name: 'Listado de usuarios' });
     expect(within(listing).getByText('Activo')).toBeInTheDocument();
     expect(within(listing).queryByText('Inactivo')).not.toBeInTheDocument();
-    expect(within(listing).getByRole('button', { name: 'Dar de baja' })).toBeInTheDocument();
+    expect(within(listing).getByRole('button', { name: 'Editar' })).toBeInTheDocument();
+    expect(within(listing).queryByRole('button', { name: 'Dar de baja' })).not.toBeInTheDocument();
     expect(within(listing).queryByRole('button', { name: 'Reactivar' })).not.toBeInTheDocument();
     expect(userService.deactivateUser).not.toHaveBeenCalled();
   });
 
   it('shows reactivation failures next to the listing', async () => {
     vi.mocked(userService.listUsers).mockResolvedValueOnce([INACTIVE_USER]);
-    vi.mocked(userService.reactivateUser).mockRejectedValueOnce({
+    vi.mocked(userService.updateUser).mockRejectedValueOnce({
       kind: 'server',
       message: 'No se pudo reactivar el usuario.',
     });
@@ -308,7 +332,7 @@ describe('UsersPage', () => {
     render(<UsersPage />);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Reactivar' }));
+    await requestStatusChange(user, true);
 
     const error = await screen.findByText('No se pudo reactivar el usuario.');
     expect(error.closest('form')).toBeNull();
@@ -316,7 +340,7 @@ describe('UsersPage', () => {
 
   it('shows deactivation failures next to the listing instead of inside the creation form', async () => {
     vi.mocked(userService.listUsers).mockResolvedValueOnce(SAMPLE_USERS);
-    vi.mocked(userService.deactivateUser).mockRejectedValueOnce({
+    vi.mocked(userService.updateUser).mockRejectedValueOnce({
       kind: 'conflict',
       message: 'No se puede desactivar el usuario.',
     });
@@ -324,12 +348,12 @@ describe('UsersPage', () => {
     render(<UsersPage />);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Dar de baja' }));
+    await requestStatusChange(user, false);
 
     const error = await screen.findByText('No se puede desactivar el usuario.');
     expect(error.closest('form')).toBeNull();
-    const createSection = screen.getByRole('heading', { name: 'Registrar usuario' }).closest('section');
-    expect(within(createSection as HTMLElement).queryByText('No se puede desactivar el usuario.')).not.toBeInTheDocument();
+    const editSection = screen.getByRole('heading', { name: 'Editar usuario' }).closest('section');
+    expect(within(editSection as HTMLElement).getByText('No se puede desactivar el usuario.')).toBeInTheDocument();
   });
 
   it('starts with a clean form after leaving and returning to the screen', async () => {
@@ -365,4 +389,45 @@ describe('UsersPage', () => {
     expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Dar de baja' })).not.toBeInTheDocument();
   });
+});
+
+
+it('keeps the draft on review cancellation and submits a critical update only once', async () => {
+  vi.clearAllMocks();
+  clearAccessToken();
+  vi.mocked(userService.listUsers).mockResolvedValueOnce(SAMPLE_USERS);
+  let finish!: (value: typeof SAMPLE_USERS[0]) => void;
+  vi.mocked(userService.updateUser).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  useAuthStore.setState(ADMIN_SESSION);
+  const user = userEvent.setup();
+  render(<UsersPage />);
+  await user.click(await screen.findByRole('button', { name: 'Editar' }));
+  await user.selectOptions(screen.getByLabelText('Estado de acceso'), 'false');
+  await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  expect(screen.getByRole('heading', { name: 'Confirmar cambios del usuario' })).toHaveFocus();
+  expect(screen.getByLabelText('Estado de acceso')).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: 'Volver a editar' }));
+  expect(screen.getByLabelText('Estado de acceso')).toHaveValue('false');
+  expect(screen.getByLabelText('Nombre completo')).toHaveFocus();
+  await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  await user.dblClick(screen.getByRole('button', { name: 'Confirmar cambios' }));
+  expect(userService.updateUser).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('button', { name: 'Volver a editar' })).toBeDisabled();
+  await act(async () => finish({ ...SAMPLE_USERS[0], active: false }));
+  expect(await screen.findByText('Usuario desactivado correctamente.')).toBeInTheDocument();
+});
+
+it('ends a confirmed own-account deactivation even if the profile refresh has a network failure', async () => {
+  vi.clearAllMocks();
+  saveAccessToken('own-session');
+  useAuthStore.setState({ ...ADMIN_SESSION, user: { ...ADMIN_SESSION.user, id: 'user-1' } });
+  vi.mocked(userService.listUsers).mockResolvedValueOnce(SAMPLE_USERS);
+  vi.mocked(userService.updateUser).mockResolvedValueOnce({ ...SAMPLE_USERS[0], active: false });
+  vi.mocked(getProfile).mockRejectedValueOnce({ kind: 'network', message: 'Sin conexión' });
+  const user = userEvent.setup();
+  render(<UsersPage />);
+  await requestStatusChange(user, false);
+  await waitFor(() => expect(useAuthStore.getState().status).toBe('unauthenticated'));
+  expect(getProfile).toHaveBeenCalledTimes(1);
+  expect(getAccessToken()).toBeNull();
 });

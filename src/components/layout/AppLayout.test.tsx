@@ -113,7 +113,6 @@ describe('AppLayout', () => {
       'Inicio',
       'Ventas',
       'POS',
-      'Inventario',
       'Traslados',
       'Servicio técnico',
       'Caja',
@@ -245,6 +244,8 @@ describe('AppLayout', () => {
     const drawer = screen.getByRole('dialog', { name: 'Menú de navegación' });
     expect(menuButton).toHaveAttribute('aria-expanded', 'true');
     expect(within(drawer).getByRole('navigation', { name: 'Navegación móvil' })).toBeInTheDocument();
+    expect(within(drawer).getByRole('region', { name: 'Ubicación de trabajo' })).toBeInTheDocument();
+    expect(within(drawer).getByRole('link', { name: 'Mi perfil' })).toHaveAttribute('href', '/profile');
     expect(within(drawer).getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument();
     expect(within(drawer).getByRole('button', { name: 'Cerrar menú' })).toHaveFocus();
 
@@ -255,6 +256,22 @@ describe('AppLayout', () => {
       expect(menuButton).toHaveAttribute('aria-expanded', 'false');
       expect(menuButton).toHaveFocus();
     });
+  });
+
+  it('changes the operative location from the mobile menu and retains the header summary', async () => {
+    const place = { id: 'warehouse', name: 'Almacén central con un nombre largo', active: true, type: 'ALMACEN_CENTRAL' as const, createdAt: '' };
+    vi.mocked(locationService.listActiveLocations).mockResolvedValue([place]);
+    const user = userEvent.setup();
+    renderLayout();
+    await screen.findByRole('option', { name: place.name });
+    await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
+    const drawer = screen.getByRole('dialog', { name: 'Menú de navegación' });
+    await user.selectOptions(within(drawer).getByRole('combobox', { name: 'Ubicación operativa' }), place.id);
+    expect(useLocationStore.getState().activeLocation?.id).toBe(place.id);
+    await user.click(within(drawer).getByRole('button', { name: 'Cerrar menú' }));
+    const summary = screen.getAllByTitle(place.name).find((element) => element.classList.contains('lg:hidden'));
+    expect(summary).toHaveClass('truncate');
+    expect(screen.getByRole('button', { name: 'Abrir menú' })).toHaveFocus();
   });
 
   it('closes the mobile drawer after selecting a navigation option and focuses the content', async () => {

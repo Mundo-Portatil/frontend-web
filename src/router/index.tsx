@@ -7,6 +7,13 @@ import { AuditLogsPage } from '../modules/foundation/audit-logs/pages/AuditLogsP
 import { LocationsPage } from '../modules/foundation/locations/pages/LocationsPage';
 import { ProfilePage } from '../modules/foundation/users/pages/ProfilePage';
 import { UsersPage } from '../modules/foundation/users/pages/UsersPage';
+import { InventoryPage } from '../modules/inventory/pages/InventoryPage';
+import { MerchandiseInboundPage } from '../modules/inventory/pages/MerchandiseInboundPage';
+import { InventoryLabelsPage } from '../modules/inventory/pages/InventoryLabelsPage';
+import { QuantityAdjustmentPage } from '../modules/inventory/pages/QuantityAdjustmentPage';
+import { QuantityStockPage } from '../modules/inventory/pages/QuantityStockPage';
+import { InventoryLayout } from '../modules/inventory/components/InventoryLayout';
+import { CategoriesPage } from '../modules/inventory';
 import { useAuthStore } from '../stores/authStore';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleGuard } from './RoleGuard';
@@ -59,6 +66,23 @@ export function AppRouter() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
+          <Route path={ROUTES.inventory} element={<InventoryLayout />}>
+            <Route index element={<Navigate to={ROUTES.inventoryCatalog} replace />} />
+            <Route path="stock" element={<QuantityStockPage />} />
+            <Route
+              path="inbound"
+              element={
+                <RoleGuard allowedRoles={['ADMIN', 'ENCARGADO_ALMACEN']}>
+                  <MerchandiseInboundPage />
+                </RoleGuard>
+              }
+            />
+            <Route path="components" element={<InventoryPage allowManagement />} />
+            <Route path="adjustments" element={<RoleGuard allowedRoles={['ADMIN', 'ENCARGADO_ALMACEN']}><QuantityAdjustmentPage /></RoleGuard>} />
+            <Route path="labels" element={<InventoryLabelsPage />} />
+            <Route path="catalog" element={<InventoryPage />} />
+            <Route path="categories" element={<CategoriesPage />} />
+          </Route>
           <Route path={ROUTES.profile} element={<ProfilePage />} />
           <Route path={ROUTES.locations} element={<LocationsPage />} />
           <Route path={ROUTES.unauthorized} element={<UnauthorizedPage />} />

@@ -74,3 +74,7 @@ export function ChevronRightIcon(props: LayoutIconProps) {
     </svg>
   );
 }
+
+export function CategoriesIcon(props: LayoutIconProps) {
+  return <svg {...ICON_BASE_PROPS} {...props}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>;
+}

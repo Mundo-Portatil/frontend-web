@@ -1,8 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Can } from '../../../../components/guards/Can';
 import { asAppError } from '../../../../services/api/errors';
 import type { AppError } from '../../../../services/api/errors';
-import { DANGER_BUTTON_CLASS, LABEL_CLASS, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, TEXT_INPUT_CLASS, TEXT_INPUT_INVALID_CLASS } from '../../../../utils/formStyles';
+import { LABEL_CLASS, PRIMARY_BUTTON_CLASS, SECONDARY_BUTTON_CLASS, TEXT_INPUT_CLASS, TEXT_INPUT_INVALID_CLASS } from '../../../../utils/formStyles';
 import { formatDate } from '../../../../utils/formatDate';
 import { Notification } from '../../../../components/notifications/Notification';
 import type { NotificationKind } from '../../../../components/notifications/Notification';
@@ -12,10 +12,19 @@ import { InlineSpinner } from '../../../../components/feedback/InlineSpinner';
 import { LoadingState } from '../../../../components/feedback/LoadingState';
 import type { Location, LocationType } from '../models';
 import { createLocation, listLocations, updateLocation } from '../services/locationService';
+import { useAuthStore } from '../../../../stores/authStore';
+import { getAccessToken } from '../../../../config/authToken';
 import { useLocationStore } from '../../../../stores/locationStore';
 
 const LOCATION_TYPES: readonly LocationType[] = ['ALMACEN_CENTRAL', 'PUESTO'];
 const TYPE_LABELS: Record<LocationType, string> = { ALMACEN_CENTRAL: 'Almacén central', PUESTO: 'Puesto' };
+
+interface LocationDraft {
+  location: Location | null;
+  name: string;
+  type: LocationType;
+  active: boolean;
+}
 
 interface Feedback {
   kind: NotificationKind;
@@ -33,8 +42,23 @@ export function LocationsPage() {
   const [type, setType] = useState<LocationType>('PUESTO');
   const [nameError, setNameError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Location | null>(null);
+  const [active, setActive] = useState(true);
+  const [confirmation, setConfirmation] = useState<LocationDraft | null>(null);
+  const saving = useRef(false);
+  const nameInput = useRef<HTMLInputElement>(null);
+  const reviewHeading = useRef<HTMLHeadingElement>(null);
+  const resumeEditing = useRef(false);
+
+  useEffect(() => {
+    if (confirmation) reviewHeading.current?.focus();
+    else if (resumeEditing.current) {
+      resumeEditing.current = false;
+      nameInput.current?.focus();
+    }
+  }, [confirmation]);
 
   async function loadLocations() {
+    if (saving.current) return;
     setIsLoading(true);
     setScreenError(null);
     try {
@@ -62,9 +86,13 @@ export function LocationsPage() {
     setType('PUESTO');
     setNameError(null);
     setEditing(null);
+    setActive(true);
+    setConfirmation(null);
   }
 
   function startEdit(location: Location) {
+    if (saving.current || confirmation) return;
+    setActive(location.active);
     setEditing(location);
     setName(location.name);
     setType(location.type);
@@ -72,58 +100,62 @@ export function LocationsPage() {
     setFeedback(null);
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (isSubmitting) {
+  async function save(draft: LocationDraft) {
+    if (saving.current || isLoading || useAuthStore.getState().user?.role !== 'ADMIN') return;
+    const payload = draft.location ? {
+      ...(draft.name !== draft.location.name ? { name: draft.name } : {}),
+      ...(draft.active !== draft.location.active ? { active: draft.active } : {}),
+    } : null;
+    if (draft.location && !Object.keys(payload ?? {}).length) {
+      resetForm();
+      setFeedback({ kind: 'success', message: 'No hay cambios para guardar.' });
       return;
     }
-
-    const trimmedName = name.trim();
-    if (trimmedName === '') {
-      setNameError('El nombre es obligatorio.');
-      return;
-    }
-
-    setNameError(null);
+    saving.current = true;
+    const token = getAccessToken();
+    const accountId = useAuthStore.getState().user?.id;
     setIsSubmitting(true);
     setFeedback(null);
-
     try {
-      if (editing) {
-        const updated = await updateLocation(editing.id, { name: trimmedName });
-        setLocations((items) => items.map((item) => (item.id === updated.id ? updated : item)));
-        useLocationStore.getState().upsertLocation(updated);
-        setFeedback({ kind: 'success', message: 'Ubicación actualizada correctamente.' });
-      } else {
-        const created = await createLocation({ name: trimmedName, type });
-        setLocations((items) => [created, ...items]);
-        useLocationStore.getState().upsertLocation(created);
-        setFeedback({ kind: 'success', message: 'Ubicación creada correctamente.' });
-      }
+      const updated = draft.location
+        ? await updateLocation(draft.location.id, payload!)
+        : await createLocation({ name: draft.name, type: draft.type });
+      if (getAccessToken() !== token || useAuthStore.getState().user?.id !== accountId) return;
+      setLocations((items) => draft.location
+        ? items.map((item) => item.id === updated.id ? updated : item)
+        : [updated, ...items]);
+      useLocationStore.getState().upsertLocation(updated);
+      setFeedback({ kind: 'success', message: !draft.location ? 'Ubicación creada correctamente.'
+        : draft.location.active !== updated.active
+          ? updated.active ? 'Ubicación reactivada correctamente.' : 'Ubicación desactivada correctamente.'
+          : 'Ubicación actualizada correctamente.' });
       resetForm();
     } catch (reason) {
-      setFeedback({ kind: 'error', message: asAppError(reason).message });
+      if (getAccessToken() === token && useAuthStore.getState().user?.id === accountId) {
+        setFeedback({ kind: 'error', message: asAppError(reason).message });
+      }
     } finally {
+      saving.current = false;
       setIsSubmitting(false);
     }
   }
 
-  async function deactivate(location: Location) {
-    if (!location.active || isSubmitting) {
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving.current || isLoading || confirmation || useAuthStore.getState().user?.role !== 'ADMIN') return;
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setNameError('El nombre es obligatorio.');
+      nameInput.current?.focus();
       return;
     }
-
-    setIsSubmitting(true);
+    setNameError(null);
     setFeedback(null);
-    try {
-      const updated = await updateLocation(location.id, { active: false });
-      setLocations((items) => items.map((item) => (item.id === updated.id ? updated : item)));
-      useLocationStore.getState().upsertLocation(updated);
-      setFeedback({ kind: 'success', message: 'Ubicación desactivada correctamente.' });
-    } catch (reason) {
-      setFeedback({ kind: 'error', message: asAppError(reason).message });
-    } finally {
-      setIsSubmitting(false);
+    const draft = { location: editing, name: trimmedName, type, active };
+    if (editing && active !== editing.active) {
+      setConfirmation(draft);
+    } else {
+      void save(draft);
     }
   }
 
@@ -137,10 +169,12 @@ export function LocationsPage() {
       <Can roles={['ADMIN']}>
         <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
           <h2 className="text-lg font-semibold">{editing ? 'Editar ubicación' : 'Registrar ubicación'}</h2>
-          <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={submit} noValidate>
-            <div className="min-w-56 flex-1">
+          <form className="mt-4" onSubmit={submit} noValidate>
+            <fieldset disabled={isSubmitting || isLoading || Boolean(confirmation)} className="flex min-w-0 flex-wrap items-end gap-3">
+            <div className="w-full min-w-0 flex-1 sm:min-w-56">
               <label htmlFor="location-name" className={LABEL_CLASS}>Nombre</label>
               <input
+                ref={nameInput}
                 id="location-name"
                 value={name}
                 onChange={(event) => {
@@ -175,6 +209,15 @@ export function LocationsPage() {
                 </select>
               </div>
             )}
+            {editing && (
+              <div className="w-full sm:w-40">
+                <label htmlFor="location-status" className={LABEL_CLASS}>Estado de la ubicación</label>
+                <select id="location-status" value={String(active)} onChange={(event) => setActive(event.target.value === 'true')} className={TEXT_INPUT_CLASS}>
+                  <option value="true">Activa</option>
+                  <option value="false">Inactiva</option>
+                </select>
+              </div>
+            )}
             <button
               className={`${PRIMARY_BUTTON_CLASS} inline-flex items-center gap-2`}
               disabled={isSubmitting}
@@ -187,7 +230,20 @@ export function LocationsPage() {
                 Cancelar
               </button>
             )}
+            </fieldset>
           </form>
+          {confirmation && (
+            <section aria-labelledby="location-status-review" className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <h3 id="location-status-review" ref={reviewHeading} tabIndex={-1} className="rounded font-semibold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+                {confirmation.active ? 'Confirmar reactivación' : 'Confirmar desactivación'}
+              </h3>
+              <p className="break-words text-sm text-slate-700">{confirmation.name}: {confirmation.active ? 'volverá a estar disponible como ubicación de trabajo.' : 'dejará de estar disponible como ubicación de trabajo.'}</p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={PRIMARY_BUTTON_CLASS} disabled={isSubmitting} onClick={() => void save(confirmation)}>{isSubmitting ? 'Guardando…' : confirmation.active ? 'Confirmar reactivación' : 'Confirmar desactivación'}</button>
+                <button type="button" className={SECONDARY_BUTTON_CLASS} disabled={isSubmitting} onClick={() => { resumeEditing.current = true; setConfirmation(null); }}>Volver a editar</button>
+              </div>
+            </section>
+          )}
         </section>
       </Can>
 
@@ -200,13 +256,13 @@ export function LocationsPage() {
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="mb-4 flex justify-between">
           <h2 className="text-lg font-semibold">Listado de ubicaciones</h2>
-          <button className={SECONDARY_BUTTON_CLASS} type="button" onClick={() => void loadLocations()} disabled={isLoading}>
+          <button className={SECONDARY_BUTTON_CLASS} type="button" onClick={() => void loadLocations()} disabled={isLoading || isSubmitting || Boolean(confirmation)}>
             Recargar
           </button>
         </div>
 
         {screenError ? (
-          <ErrorState error={screenError} onRetry={() => void loadLocations()} />
+          <ErrorState error={screenError} onRetry={isSubmitting || confirmation ? undefined : () => void loadLocations()} />
         ) : isLoading ? (
           <LoadingState message="Cargando ubicaciones..." />
         ) : locations.length === 0 ? (
@@ -242,17 +298,9 @@ export function LocationsPage() {
                             type="button"
                             className={SECONDARY_BUTTON_CLASS}
                             onClick={() => startEdit(location)}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || Boolean(confirmation)}
                           >
                             Editar
-                          </button>
-                          <button
-                            type="button"
-                            className={DANGER_BUTTON_CLASS}
-                            disabled={!location.active || isSubmitting}
-                            onClick={() => void deactivate(location)}
-                          >
-                            Dar de baja
                           </button>
                         </div>
                       </Can>

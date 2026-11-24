@@ -1,0 +1,41 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { BarcodeLabelsPanel } from './BarcodeLabelsPanel';
+import { getBatchLabels } from '../services/barcodeLabelService';
+vi.mock('../services/barcodeLabelService', () => ({ getBatchLabels: vi.fn() }));
+describe('label data panel', () => {
+  it('adds the consulted equipment without entering a manual reference', async () => {
+    vi.clearAllMocks();
+    const user = userEvent.setup();
+    const id = '123e4567-e89b-42d3-a456-426614174000';
+    vi.mocked(getBatchLabels).mockResolvedValue([]);
+    render(<BarcodeLabelsPanel hardwareItem={{ id, serialNumber: 'SN-1', catalogId: id, locationId: id, status: 'EN_STOCK', parentChassisId: null, costPrice: null, salePrice: null, createdAt: '', updatedAt: '' }} />);
+    await user.click(screen.getByRole('button', { name: 'Añadir SN-1 a etiquetas' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Equipos y piezas seleccionados: 1');
+    expect(screen.getByText('Agregar referencias manualmente').closest('details')).not.toHaveAttribute('open');
+    await user.click(screen.getByRole('button', { name: 'Ver etiquetas' }));
+    expect(getBatchLabels).toHaveBeenLastCalledWith([id]);
+    expect(await screen.findByText('No hay etiquetas disponibles.')).toBeInTheDocument();
+  });
+  it('validates IDs and shows contracted label fields without physical printing', async () => {
+    vi.clearAllMocks();
+    const user = userEvent.setup();
+    vi.mocked(getBatchLabels).mockResolvedValue([{ hardwareItemId: 'id', barcodeValue: 'SN1', title: 'Laptop', specsSummary: '16GB', locationName: 'Central', price: 1200 }]);
+    render(<BarcodeLabelsPanel />);
+    await user.click(screen.getByText('Agregar referencias manualmente'));
+    const references = screen.getByRole('textbox', { name: 'Referencias para etiquetas' });
+    expect(references).toHaveAttribute('rows', '3');
+    expect(references).toHaveClass('h-24', 'max-h-24', 'resize-none', 'overflow-y-auto');
+    await user.type(references, 'invalid');
+    await user.click(screen.getByRole('button', { name: 'Ver etiquetas' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('revisa las referencias');
+    expect(getBatchLabels).not.toHaveBeenCalled();
+    await user.clear(screen.getByLabelText('Referencias para etiquetas'));
+    await user.type(screen.getByLabelText('Referencias para etiquetas'), '123e4567-e89b-42d3-a456-426614174000');
+    await user.click(screen.getByRole('button', { name: 'Ver etiquetas' }));
+    expect(await screen.findByText('SN1')).toBeInTheDocument();
+    expect(screen.getByText('16GB')).toBeInTheDocument();
+    expect(screen.queryByText('Precio: 1200')).not.toBeInTheDocument();
+  });
+});

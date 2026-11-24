@@ -1,7 +1,7 @@
 import type { ComponentType, SVGProps } from 'react';
 import type { Role } from '../../modules/foundation/auth/models';
 import { ROUTES } from '../../router/routes';
-import { AuditLogIcon, LocationsIcon, UsersIcon } from './icons';
+import { AuditLogIcon, CategoriesIcon, LocationsIcon, UsersIcon } from './icons';
 
 /**
  * Centralized, typed navigation definition for the application shell.
@@ -25,6 +25,15 @@ export interface NavGroupDefinition {
   label: string;
 }
 
+export interface NavChild {
+  id: string;
+  label: string;
+  to: string;
+  roles: Role[];
+  /** Exact routes represented by this section, including its secondary screens. */
+  activePaths: readonly string[];
+}
+
 export interface NavItem {
   /** Unique identifier for the navigation entry. */
   id: string;
@@ -44,6 +53,7 @@ export interface NavItem {
    * duplicating links across components.
    */
   isAvailable?: () => boolean;
+  children?: readonly NavChild[];
 }
 
 /** Ordered groups. Empty groups are never rendered. */
@@ -55,19 +65,50 @@ export const NAV_GROUPS: readonly NavGroupDefinition[] = [
 ];
 
 /**
- * Phase 0 navigation: only implemented and available modules.
- * Future modules (Ventas/POS, Inventario, Traslados, Servicio técnico, Caja,
- * Auditoría Express, Aprobaciones, Trazabilidad) must not be added until their
- * phase is implemented, integrated and enabled.
+ * Navigation for implemented and available modules.
+ * Future modules (Ventas/POS, Traslados, Servicio técnico, Caja, Auditoría
+ * Express, Aprobaciones, Trazabilidad) must not be added until their phase is
+ * implemented, integrated and enabled.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
+  {
+    id: 'inventory',
+    label: 'Inventario',
+    icon: CategoriesIcon,
+    to: ROUTES.inventory,
+    group: 'operations',
+    roles: ['ADMIN', 'ENCARGADO_ALMACEN', 'VENDEDOR', 'TECNICO'],
+    children: [
+      {
+        id: 'inventory-products',
+        label: 'Productos y existencias',
+        to: ROUTES.inventoryCatalog,
+        roles: ['ADMIN', 'ENCARGADO_ALMACEN', 'VENDEDOR', 'TECNICO'],
+        activePaths: [ROUTES.inventory, ROUTES.inventoryCatalog, ROUTES.inventoryCategories, ROUTES.inventoryStock, ROUTES.inventoryComponents],
+      },
+      {
+        id: 'inventory-inbound',
+        label: 'Ingreso de mercancía',
+        to: ROUTES.inventoryInbound,
+        roles: ['ADMIN', 'ENCARGADO_ALMACEN'],
+        activePaths: [ROUTES.inventoryInbound, ROUTES.inventoryAdjustments],
+      },
+      {
+        id: 'inventory-labels',
+        label: 'Etiquetas',
+        to: ROUTES.inventoryLabels,
+        roles: ['ADMIN', 'ENCARGADO_ALMACEN', 'VENDEDOR', 'TECNICO'],
+        activePaths: [ROUTES.inventoryLabels],
+      },
+    ],
+  },
   {
     id: 'locations',
     label: 'Ubicaciones',
     icon: LocationsIcon,
     to: ROUTES.locations,
     group: 'administration',
-    roles: ['ADMIN', 'VENDEDOR', 'TECNICO'],
+    roles: ['ADMIN', 'ENCARGADO_ALMACEN', 'VENDEDOR', 'TECNICO'],
   },
   {
     id: 'users',

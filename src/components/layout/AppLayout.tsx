@@ -182,10 +182,15 @@ export function AppLayout({ children }: { children?: ReactNode }) {
         </a>
 
         <header className="sticky top-0 z-40 bg-brand-950 shadow-sm">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3 sm:px-4 lg:flex-nowrap lg:px-6">
-            <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex items-center gap-3 px-3 py-2 sm:px-4 lg:py-3 lg:px-6">
+            <div className="flex min-w-0 flex-1 items-center gap-2.5 lg:flex-initial">
               <BrandLogo height={30} tone="white" />
-              <span className="truncate text-base font-semibold text-white">Mundo Portátil</span>
+              <div className="min-w-0">
+                <span className="block truncate text-base font-semibold text-white">Mundo Portátil</span>
+                <span className="block truncate text-xs text-brand-200 lg:hidden" title={activeLocation?.name}>
+                  {activeLocation?.name ?? 'Todas las ubicaciones'}
+                </span>
+              </div>
             </div>
 
             {user && (
@@ -203,12 +208,12 @@ export function AppLayout({ children }: { children?: ReactNode }) {
               </button>
             )}
 
-            <div className="order-last w-full min-w-0 lg:order-none lg:ml-auto lg:w-auto">
+            <div className="hidden min-w-0 lg:ml-auto lg:block lg:w-auto">
               <LocationSelector />
             </div>
 
             {user && (
-              <div className="flex min-w-0 items-center gap-3">
+              <div className="hidden min-w-0 items-center gap-3 lg:flex">
                 <span aria-hidden="true" className="hidden h-8 w-px shrink-0 bg-white/15 lg:block" />
                 <details
                   className="relative min-w-0 max-w-56"
@@ -239,7 +244,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
           </div>
 
           {activeLocation && (
-            <div className="border-y border-brand-100 bg-brand-50">
+            <div className="hidden border-y border-brand-100 bg-brand-50 lg:block">
               <div
                 role="status"
                 aria-live="polite"
@@ -349,7 +354,11 @@ export function AppLayout({ children }: { children?: ReactNode }) {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-2 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 py-4">
+              <section aria-label="Ubicación de trabajo" className="mb-4 rounded-lg bg-brand-950 p-3">
+                <p className="mb-2 text-sm font-medium text-white">Ubicación operativa</p>
+                <LocationSelector />
+              </section>
               <SidebarNav ariaLabel="Navegación móvil" onNavigate={handleMobileNavigate} />
             </div>
 

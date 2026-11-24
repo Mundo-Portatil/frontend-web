@@ -358,7 +358,7 @@ describe('AuditLogsPage', () => {
     expect(screen.getByText('Usuario actualizado')).toBeInTheDocument();
   });
 
-  it('shows category actions in Spanish and flags unknown actions', async () => {
+  it('shows category actions in Spanish and humanizes unknown actions', async () => {
     vi.mocked(auditLogService.listAuditLogs).mockResolvedValueOnce({
       ...SAMPLE_RESULT,
       total: 3,
@@ -391,7 +391,7 @@ describe('AuditLogsPage', () => {
 
     expect(await screen.findByText('Categoría actualizada')).toBeInTheDocument();
     expect(screen.getByText('Categoría creada')).toBeInTheDocument();
-    expect(screen.getByText('Acción no traducida: export report')).toBeInTheDocument();
+    expect(screen.getByText('Export report')).toBeInTheDocument();
     expect(screen.getAllByText('Categorías')).toHaveLength(2);
   });
 
@@ -469,5 +469,25 @@ describe('AuditLogsPage', () => {
 
     expect(await screen.findByText('Creó usuario')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /crear|editar|eliminar/i })).not.toBeInTheDocument();
+  });
+
+  it('shows inventory actions and modules in Spanish and keeps API filter values', async () => {
+    vi.mocked(auditLogService.listAuditLogs).mockResolvedValue({
+      ...SAMPLE_RESULT,
+      total: 2,
+      items: [
+        { ...SAMPLE_RESULT.items[0], id: 'batch', action: 'BATCH_INBOUND_HARDWARE', module: 'hardware-items', payload: { parentCount: 2 } },
+        { ...SAMPLE_RESULT.items[0], id: 'stock', action: 'INBOUND_QUANTITY_STOCK', module: 'quantity-stock', payload: { inboundQuantity: 4, totalResultingQuantity: 9 } },
+      ],
+    });
+    const user = userEvent.setup();
+    render(<AuditLogsPage />);
+    expect(await screen.findByText('Ingreso de equipos por lote · 2 equipos o piezas')).toBeInTheDocument();
+    expect(screen.getByText('Ingreso de unidades al inventario · 4 unidades · Saldo: 9')).toBeInTheDocument();
+    expect(screen.getByText('Equipos y piezas')).toBeInTheDocument();
+    expect(screen.getByText('Inventario por cantidad')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Módulo'), 'Inventario por cantidad');
+    await user.click(screen.getByRole('button', { name: 'Filtrar' }));
+    await waitFor(() => expect(auditLogService.listAuditLogs).toHaveBeenLastCalledWith(expect.objectContaining({ module: 'quantity-stock' })));
   });
 });

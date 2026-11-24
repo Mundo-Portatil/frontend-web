@@ -265,7 +265,7 @@ export function AuditLogsPage() {
             className={TEXT_INPUT_CLASS}
             value={module}
             onChange={(event) => setModule(event.target.value)}
-            placeholder="Ej. users o Usuarios"
+            placeholder="Ej. Usuarios o Equipos y piezas…"
           />
         </div>
 
@@ -426,8 +426,8 @@ export function AuditLogsPage() {
                     <td className="whitespace-nowrap p-2 py-3 text-slate-700">
                       {formatDate(item.createdAt)}
                     </td>
-                    <td className="p-2 py-3 text-slate-900">{formatAuditAction(item)}</td>
-                    <td className="p-2 py-3 text-slate-700">{formatAuditModule(item.module)}</td>
+                    <td className="break-words p-2 py-3 text-slate-900">{formatAuditAction(item)}</td>
+                    <td className="break-words p-2 py-3 text-slate-700">{formatAuditModule(item.module)}</td>
                     <td className="p-2 py-3">{renderUser(item.userId)}</td>
                   </tr>
                 ))}

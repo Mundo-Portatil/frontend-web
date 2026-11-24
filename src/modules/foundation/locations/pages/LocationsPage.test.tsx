@@ -174,7 +174,12 @@ describe('LocationsPage', () => {
     render(<LocationsPage />);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Dar de baja' }));
+    await user.click(await screen.findByRole('button', { name: 'Editar' }));
+    expect(screen.queryByRole('button', { name: 'Dar de baja' })).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Estado de la ubicación'), 'false');
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(locationService.updateLocation).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Confirmar desactivación' }));
 
     await waitFor(() => {
       expect(locationService.updateLocation).toHaveBeenCalledWith('location-1', { active: false });
@@ -193,7 +198,12 @@ describe('LocationsPage', () => {
     render(<LocationsPage />);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: 'Dar de baja' }));
+    await user.click(await screen.findByRole('button', { name: 'Editar' }));
+    expect(screen.queryByRole('button', { name: 'Dar de baja' })).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Estado de la ubicación'), 'false');
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    expect(locationService.updateLocation).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Confirmar desactivación' }));
 
     await waitFor(() => {
       expect(useLocationStore.getState().activeLocation).toBeNull();
@@ -214,4 +224,68 @@ describe('LocationsPage', () => {
     expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Dar de baja' })).not.toBeInTheDocument();
   });
+
+it('reactivates an inactive location from edit and restores it to the work selector', async () => {
+  useAuthStore.setState(ADMIN_SESSION);
+  useLocationStore.getState().reset();
+  vi.mocked(locationService.listLocations).mockResolvedValueOnce([{ ...SAMPLE_LOCATION, active: false }]);
+  vi.mocked(locationService.updateLocation).mockResolvedValueOnce(SAMPLE_LOCATION);
+  const user = userEvent.setup();
+  render(<LocationsPage />);
+  await user.click(await screen.findByRole('button', { name: 'Editar' }));
+  expect(screen.getByLabelText('Estado de la ubicación')).toHaveValue('false');
+  await user.selectOptions(screen.getByLabelText('Estado de la ubicación'), 'true');
+  await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  expect(locationService.updateLocation).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: 'Confirmar reactivación' }));
+  expect(await screen.findByText('Ubicación reactivada correctamente.')).toBeInTheDocument();
+  expect(locationService.updateLocation).toHaveBeenCalledWith(SAMPLE_LOCATION.id, { active: true });
+  expect(useLocationStore.getState().availableLocations).toContainEqual(SAMPLE_LOCATION);
+});
+
+it('preserves the draft when cancelling review and sends a confirmed change only once', async () => {
+  vi.clearAllMocks();
+  useAuthStore.setState(ADMIN_SESSION);
+  vi.mocked(locationService.listLocations).mockResolvedValueOnce([SAMPLE_LOCATION]);
+  let finish!: (value: typeof SAMPLE_LOCATION) => void;
+  vi.mocked(locationService.updateLocation).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+  const user = userEvent.setup();
+  render(<LocationsPage />);
+  await user.click(await screen.findByRole('button', { name: 'Editar' }));
+  await user.selectOptions(screen.getByLabelText('Estado de la ubicación'), 'false');
+  await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  expect(screen.getByRole('heading', { name: 'Confirmar desactivación' })).toHaveFocus();
+  await user.click(screen.getByRole('button', { name: 'Volver a editar' }));
+  expect(screen.getByLabelText('Nombre')).toHaveFocus();
+  expect(screen.getByLabelText('Estado de la ubicación')).toHaveValue('false');
+  expect(locationService.updateLocation).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  await user.dblClick(screen.getByRole('button', { name: 'Confirmar desactivación' }));
+  expect(locationService.updateLocation).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('button', { name: 'Guardando…' })).toBeDisabled();
+  await act(async () => finish({ ...SAMPLE_LOCATION, active: false }));
+  expect(await screen.findByText('Ubicación desactivada correctamente.')).toBeInTheDocument();
+});
+
+
+it('finishes an outstanding reload before allowing the edited location to be saved', async () => {
+  let finish!: (value: (typeof SAMPLE_LOCATION)[]) => void;
+  vi.mocked(locationService.listLocations).mockResolvedValueOnce([SAMPLE_LOCATION]).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+  vi.mocked(locationService.updateLocation).mockResolvedValueOnce({ ...SAMPLE_LOCATION, name: 'Nuevo almacén' });
+  const user = userEvent.setup();
+  render(<LocationsPage />);
+  await user.click(await screen.findByRole('button', { name: 'Editar' }));
+  await user.clear(screen.getByLabelText('Nombre'));
+  await user.type(screen.getByLabelText('Nombre'), 'Nuevo almacén');
+  await user.click(screen.getByRole('button', { name: 'Recargar' }));
+  expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  expect(locationService.updateLocation).not.toHaveBeenCalled();
+  await act(async () => finish([SAMPLE_LOCATION]));
+  expect(screen.getByLabelText('Nombre')).toHaveValue('Nuevo almacén');
+  await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  expect(await screen.findByText('Ubicación actualizada correctamente.')).toBeInTheDocument();
+  expect(useLocationStore.getState().availableLocations[0]?.name).toBe('Nuevo almacén');
+});
+
 });
