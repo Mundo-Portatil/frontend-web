@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import type { Role } from '../../modules/foundation/auth/models';
 import { ROLE_LABELS } from '../../modules/foundation/auth/roleLabels';
-import { LocationSelector } from '../../modules/foundation/locations/components/LocationSelector';
 import { ROUTES } from '../../router/routes';
 import { useAuthStore } from '../../stores/authStore';
 import { useLocationStore } from '../../stores/locationStore';
@@ -58,13 +57,13 @@ function UserIdentity({
 /**
  * Shared application shell for authenticated pages.
  *
- * - Header: brand, operative location selector, authenticated user and logout.
+ * - Header: brand, authenticated user and logout.
  * - Sidebar: grouped, role-filtered navigation built from the centralized
  *   `navigation.ts` config. Collapsible on desktop and a drawer on small
  *   screens.
  * - Main: existing routed screens inside a light content surface.
  *
- * Authentication, authorization, location selection and logout logic are
+ * Authentication, authorization and logout logic are
  * reused as-is. The session profile is revalidated when the tab regains focus
  * so role changes made outside this session update the navigation and guards.
  */
@@ -72,7 +71,8 @@ export function AppLayout({ children }: { children?: ReactNode }) {
   useSessionProfileRefresh();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
-  const activeLocation = useLocationStore((state) => state.activeLocation);
+  // Retire any in-memory selection so it cannot remain as an invisible filter.
+  useEffect(() => { useLocationStore.getState().clearLocation(); }, []);
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -187,9 +187,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
               <BrandLogo height={30} tone="white" />
               <div className="min-w-0">
                 <span className="block truncate text-base font-semibold text-white">Mundo Portátil</span>
-                <span className="block truncate text-xs text-brand-200 lg:hidden" title={activeLocation?.name}>
-                  {activeLocation?.name ?? 'Todas las ubicaciones'}
-                </span>
+
               </div>
             </div>
 
@@ -208,13 +206,9 @@ export function AppLayout({ children }: { children?: ReactNode }) {
               </button>
             )}
 
-            <div className="hidden min-w-0 lg:ml-auto lg:block lg:w-auto">
-              <LocationSelector />
-            </div>
 
             {user && (
-              <div className="hidden min-w-0 items-center gap-3 lg:flex">
-                <span aria-hidden="true" className="hidden h-8 w-px shrink-0 bg-white/15 lg:block" />
+              <div className="hidden min-w-0 items-center gap-3 lg:ml-auto lg:flex">
                 <details
                   className="relative min-w-0 max-w-56"
                   onKeyDown={(event) => {
@@ -243,33 +237,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
             )}
           </div>
 
-          {activeLocation && (
-            <div className="hidden border-y border-brand-100 bg-brand-50 lg:block">
-              <div
-                role="status"
-                aria-live="polite"
-                className="flex w-full items-center gap-2 px-3 py-2 text-xs text-brand-900 sm:px-4 lg:px-6"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4 shrink-0 text-brand-700"
-                >
-                  <path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11Z" />
-                  <circle cx="12" cy="10" r="2.5" />
-                </svg>
-                <span className="shrink-0 font-medium">Ubicación operativa:</span>
-                <span className="truncate" title={activeLocation.name}>
-                  {activeLocation.name}
-                </span>
-              </div>
-            </div>
-          )}
+
         </header>
 
         <div className="flex flex-1 flex-col lg:flex-row">
@@ -355,10 +323,6 @@ export function AppLayout({ children }: { children?: ReactNode }) {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-2 py-4">
-              <section aria-label="Ubicación de trabajo" className="mb-4 rounded-lg bg-brand-950 p-3">
-                <p className="mb-2 text-sm font-medium text-white">Ubicación operativa</p>
-                <LocationSelector />
-              </section>
               <SidebarNav ariaLabel="Navegación móvil" onNavigate={handleMobileNavigate} />
             </div>
 

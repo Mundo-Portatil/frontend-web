@@ -6,12 +6,7 @@ import { clearAccessToken, saveAccessToken } from '../../config/authToken';
 import { useAuthStore } from '../../stores/authStore';
 import { useLocationStore } from '../../stores/locationStore';
 import { AppLayout } from './AppLayout';
-import * as locationService from '../../modules/foundation/locations/services/locationService';
 import { getProfile } from '../../modules/foundation/auth/services/authService';
-
-vi.mock('../../modules/foundation/locations/services/locationService', () => ({
-  listActiveLocations: vi.fn(),
-}));
 
 vi.mock('../../modules/foundation/auth/services/authService', () => ({
   getProfile: vi.fn(),
@@ -69,7 +64,6 @@ describe('AppLayout', () => {
     clearAccessToken();
     act(() => useAuthStore.setState({ status: 'authenticated', user: ADMIN }));
     useLocationStore.getState().reset();
-    vi.mocked(locationService.listActiveLocations).mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -89,7 +83,7 @@ describe('AppLayout', () => {
   it('opens the account options from the header and links to Mi perfil', async () => {
     const user = userEvent.setup();
     renderLayout();
-    await screen.findByText('Sin ubicaciones activas');
+    await screen.findByText('Contenido protegido');
     const trigger = screen.getByLabelText('Opciones de mi cuenta');
     await user.click(trigger);
     expect(trigger.closest('details')).toHaveAttribute('open');
@@ -101,7 +95,7 @@ describe('AppLayout', () => {
 
   it('renders only the implemented modules in the administration group', async () => {
     renderLayout();
-    await screen.findByText('Sin ubicaciones activas');
+    await screen.findByText('Contenido protegido');
     const nav = getDesktopNav();
 
     expect(within(nav).getByText('Administración')).toBeInTheDocument();
@@ -126,7 +120,7 @@ describe('AppLayout', () => {
 
   it('highlights the active route', async () => {
     renderLayout();
-    await screen.findByText('Sin ubicaciones activas');
+    await screen.findByText('Contenido protegido');
     const nav = getDesktopNav();
 
     expect(within(nav).getByRole('link', { name: 'Ubicaciones' })).toHaveAttribute(
@@ -140,7 +134,7 @@ describe('AppLayout', () => {
     act(() => useAuthStore.setState({ status: 'authenticated', user: VENDEDOR }));
 
     renderLayout();
-    await screen.findByText('Sin ubicaciones activas');
+    await screen.findByText('Contenido protegido');
     const nav = getDesktopNav();
 
     expect(within(nav).getByRole('link', { name: 'Ubicaciones' })).toBeInTheDocument();
@@ -152,7 +146,7 @@ describe('AppLayout', () => {
     act(() => useAuthStore.setState({ status: 'authenticated', user: TECNICO }));
 
     renderLayout();
-    await screen.findByText('Sin ubicaciones activas');
+    await screen.findByText('Contenido protegido');
     const nav = getDesktopNav();
 
     expect(within(nav).getByRole('link', { name: 'Ubicaciones' })).toBeInTheDocument();
@@ -162,7 +156,7 @@ describe('AppLayout', () => {
 
   it('updates the visible navigation when the authenticated role changes in-session', async () => {
     renderLayout();
-    await screen.findByText('Sin ubicaciones activas');
+    await screen.findByText('Contenido protegido');
     const nav = getDesktopNav();
 
     expect(within(nav).getByRole('link', { name: 'Usuarios' })).toBeInTheDocument();
@@ -199,7 +193,7 @@ describe('AppLayout', () => {
     });
 
     renderLayout();
-    await screen.findByText('Sin ubicaciones activas');
+    await screen.findByText('Contenido protegido');
     const nav = getDesktopNav();
     expect(within(nav).getByRole('link', { name: 'Bitácora' })).toBeInTheDocument();
 
@@ -244,7 +238,7 @@ describe('AppLayout', () => {
     const drawer = screen.getByRole('dialog', { name: 'Menú de navegación' });
     expect(menuButton).toHaveAttribute('aria-expanded', 'true');
     expect(within(drawer).getByRole('navigation', { name: 'Navegación móvil' })).toBeInTheDocument();
-    expect(within(drawer).getByRole('region', { name: 'Ubicación de trabajo' })).toBeInTheDocument();
+    expect(within(drawer).queryByRole('region', { name: 'Ubicación de trabajo' })).not.toBeInTheDocument();
     expect(within(drawer).getByRole('link', { name: 'Mi perfil' })).toHaveAttribute('href', '/profile');
     expect(within(drawer).getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument();
     expect(within(drawer).getByRole('button', { name: 'Cerrar menú' })).toHaveFocus();
@@ -258,19 +252,22 @@ describe('AppLayout', () => {
     });
   });
 
-  it('changes the operative location from the mobile menu and retains the header summary', async () => {
-    const place = { id: 'warehouse', name: 'Almacén central con un nombre largo', active: true, type: 'ALMACEN_CENTRAL' as const, createdAt: '' };
-    vi.mocked(locationService.listActiveLocations).mockResolvedValue([place]);
+  it('removes the global selector on desktop and mobile and clears stale context without deleting locations', async () => {
+    const place = { id: 'warehouse', name: 'Almacén central', active: true, type: 'ALMACEN_CENTRAL' as const, createdAt: '' };
+    useLocationStore.getState().setAvailableLocations([place]);
+    useLocationStore.getState().selectLocation(place);
     const user = userEvent.setup();
     renderLayout();
-    await screen.findByRole('option', { name: place.name });
+    expect(useLocationStore.getState().activeLocation).toBeNull();
+    expect(useLocationStore.getState().availableLocations).toEqual([place]);
+    expect(screen.queryByRole('combobox', { name: 'Ubicación operativa' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Todas las ubicaciones')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ubicación operativa:')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Abrir menú' }));
     const drawer = screen.getByRole('dialog', { name: 'Menú de navegación' });
-    await user.selectOptions(within(drawer).getByRole('combobox', { name: 'Ubicación operativa' }), place.id);
-    expect(useLocationStore.getState().activeLocation?.id).toBe(place.id);
+    expect(within(drawer).queryByRole('combobox')).not.toBeInTheDocument();
+    expect(within(drawer).getByRole('link', { name: 'Ubicaciones' })).toBeInTheDocument();
     await user.click(within(drawer).getByRole('button', { name: 'Cerrar menú' }));
-    const summary = screen.getAllByTitle(place.name).find((element) => element.classList.contains('lg:hidden'));
-    expect(summary).toHaveClass('truncate');
     expect(screen.getByRole('button', { name: 'Abrir menú' })).toHaveFocus();
   });
 
