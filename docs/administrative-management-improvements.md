@@ -2,20 +2,23 @@
 
 Rama `feature/mejoras-gestion-administrativa`, creada desde `develop` sincronizado con `origin/develop`. Los cambios de Inventario permanecen en sus ramas y commits originales.
 
-## Usuarios: ubicación física pendiente de backend
+## Usuarios: asignación de ubicación implementada
 
-La tabla mantiene Nombre, Correo, Rol, Estado y Acciones, sustituyendo únicamente Actualizado por Ubicación física. `updatedAt` permanece en el modelo y en el contrato. Actualmente se muestra Sin asignar: el backend revisado no dispone de una asignación persistida.
+La fuente vigente de esta integración es la rama `refact/logistica` de `backend-api`, consultada sin cambiarla ni modificar sus archivos. Prisma contiene `User.locationId` opcional y la relación con `Location`. CreateUserHttpDto y UpdateUserHttpDto aceptan `locationId?: string | null`; UserResponseDto devuelve `locationId` y `locationName`. El repositorio persiste la referencia y consulta el nombre relacionado en altas, ediciones y listado. `updatedAt` permanece intacto.
 
-Se contrastaron `backend-api` (checkout `refact/inventario`), `prisma/schema.prisma`, CreateUserHttpDto, UpdateUserHttpDto y UserResponseDto. User no tiene locationId ni relación Location; los DTO tampoco admiten ubicación. No se añaden controles de asignación que aparenten guardar ni almacenamiento local.
+La tabla conserva exactamente Nombre, Correo, Rol, Estado, Ubicación física y Acciones. Muestra el nombre devuelto por el servidor y Sin asignar cuando no existe asignación. No se usa almacenamiento local ni el antiguo filtro global para asignar empleados.
 
-Para habilitar la función se requiere autorización y trabajo en backend:
+### Contratos y reglas verificadas
 
-- Relación opcional User.locationId -> Location.id y relación inversa, conservando usuarios existentes sin asignación. Requiere migración.
-- Extender POST /users y PATCH /users/:id para aceptar locationId opcional, validar existencia y estado activo, y definir cómo desasignar (por ejemplo null).
-- Devolver locationId y nombre de la ubicación en GET /users y respuestas de creación/edición. Definir el comportamiento de asignaciones a ubicaciones posteriormente desactivadas; se recomienda conservar la referencia y permitir cambiarla por una activa.
-- Mantener la asignación exclusiva de ADMIN. PATCH /users/me no debe aceptar la ubicación ni permitir que el empleado la cambie desde su perfil.
+- `GET /users`, `POST /users` y `PATCH /users/:id`: JWT y rol ADMIN. La creación y edición envían la ubicación seleccionada y muestran la respuesta persistida.
+- `GET /locations?active=true`: carga de ubicaciones activas reales para los formularios.
+- ADMIN: el backend fuerza ubicación nula; el formulario no ofrece una asignación incompatible.
+- VENDEDOR y TECNICO: requieren una ubicación activa de tipo PUESTO; no se pueden asignar al almacén ni guardar sin puesto.
+- ENCARGADO_ALMACEN: puede elegir una ubicación activa; cuando no se envía ubicación o es nula, el servidor resuelve automáticamente un Almacén Central activo. Esa opción no representa una desasignación.
+- Una ubicación actual inactiva no se elimina de forma silenciosa: debe elegirse una opción válida antes de guardar según las validaciones actuales del servidor.
+- `PATCH /users/me` sigue admitiendo solo los datos personales existentes. Mi perfil no incorpora edición de ubicación. No se añaden restricciones de ventas ni traslados temporales.
 
-Con ese contrato, el frontend podrá cargar ubicaciones activas desde GET /locations?active=true y persistir la selección; no se implementan restricciones de ventas ni traslados temporales.
+El impedimento contractual anterior queda resuelto. Se verifica la integración de solicitudes/respuestas y la recuperación del listado con pruebas controladas. La comprobación de persistencia contra el backend ejecutándose queda pendiente del entorno: localhost:3000 no estaba accesible durante esta intervención, también fuera del sandbox. No se modifican ni crean usuarios reales para probarlo.
 
 ## Bitácora y encabezado
 
