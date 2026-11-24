@@ -7,7 +7,8 @@ import type { TransferDraft } from '../draftModels';
 import type { TransferDetail } from '../models';
 import { canCreateTransfer } from '../permissions';
 import { createDirectTransfer } from '../services/transferService';
-import { matchesTransferResponse, toTransferInput } from '../validation';
+import { draftToInput, mapTransferDetail } from '../services/transferMapper';
+import { matchesTransferResponse } from '../validation';
 export function useCreateTransfer() {
   const [phase, setPhase] = useState<'editing' | 'submitting' | 'completed' | 'rejected' | 'unknown'>('editing');
   const [error, setError] = useState('');
@@ -21,13 +22,13 @@ export function useCreateTransfer() {
       setError('La sesión cambió. Vuelve a abrir el formulario.'); return;
     }
     let input;
-    try { input = toTransferInput(draft, locations); } catch (cause) { setError((cause as Error).message); return; }
+    try { input = draftToInput(draft, locations); } catch (cause) { setError((cause as Error).message); return; }
     locked.current = true; setPhase('submitting'); setError('');
     try {
       const result = await createDirectTransfer(input);
       if (getAccessToken() !== session.current.token || useAuthStore.getState().user?.id !== session.current.id) { setPhase('unknown'); return; }
       if (!matchesTransferResponse(result, input)) { setPhase('unknown'); return; }
-      setReceipt(result); setPhase('completed');
+      setReceipt(mapTransferDetail(result)); setPhase('completed');
     } catch (cause) {
       const failure = asAppError(cause);
       if (failure.status !== undefined && failure.status >= 400 && failure.status < 500) {

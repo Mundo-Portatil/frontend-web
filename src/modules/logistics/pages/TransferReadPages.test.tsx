@@ -81,3 +81,17 @@ it('cancels stale requests and hides guides when the session scope changes', asy
   expect(screen.queryByRole('link', { name: 'Ver guía TR-ABC123' })).not.toBeInTheDocument();
   expect(screen.getByText(/No tienes un puesto asignado/)).toBeInTheDocument();
 });
+
+it('does not reload history when session profile refreshes with the same user identity and reloads only on explicit action', async () => {
+  const user = userEvent.setup();
+  history();
+  await screen.findByRole('link', { name: 'Ver guía TR-ABC123' });
+  expect(listTransfers).toHaveBeenCalledTimes(1);
+
+  act(() => { useAuthStore.setState({ user: { ...account } }); });
+  expect(screen.queryByText('Cargando guías…')).not.toBeInTheDocument();
+  expect(listTransfers).toHaveBeenCalledTimes(1);
+
+  await user.click(screen.getByRole('button', { name: 'Actualizar guías' }));
+  await waitFor(() => expect(listTransfers).toHaveBeenCalledTimes(2));
+});

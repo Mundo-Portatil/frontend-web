@@ -4,16 +4,29 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CatalogItem, HardwareItem } from '../inventory';
 import type { Location } from '../foundation/locations/models';
 import { emptyTransferDraft, transferDraftReducer, type TransferDraft } from './draftModels';
-import { matchesTransferResponse, SERIAL_TRANSFER_BLOCK, toTransferInput, validateTransferDraft } from './validation';
+import { matchesTransferResponse, toTransferInput, validateTransferDraft } from './validation';
 import { useAuthStore } from '../../stores/authStore';
 import { saveAccessToken } from '../../config/authToken';
 import { TransferCreatePage } from './pages/TransferCreatePage';
 import { useCreateTransfer } from './hooks/useCreateTransfer';
 import type { TransferDetail } from './models';
-const mocks = vi.hoisted(() => ({ stock: vi.fn(), scan: vi.fn(), locations: vi.fn(), create: vi.fn() }));
+
+const mocks = vi.hoisted(() => ({ stock: vi.fn(), scan: vi.fn(), availableSerials: vi.fn(), locations: vi.fn(), create: vi.fn() }));
 vi.mock('../inventory', () => ({
-  listQuantityStock: mocks.stock, scanHardware: mocks.scan,
-  CatalogProductPicker: ({ onSelect }: { onSelect: (item: unknown) => void }) => <button type="button" onClick={() => onSelect({ id: 'ram', name: 'Memoria RAM', model: 'RAM', brand: 'Kingston', active: true, isSerialized: false })}>Elegir memoria</button>,
+  listQuantityStock: mocks.stock,
+  scanHardware: mocks.scan,
+  getAvailableSerials: mocks.availableSerials,
+  CatalogProductPicker: ({ onSelect, serialized }: { onSelect: (item: unknown) => void; serialized?: boolean }) => (
+    <button
+      type="button"
+      onClick={() => onSelect(serialized
+        ? { id: 'laptop', name: 'Laptop', model: 'Inspiron', brand: 'Dell', active: true, isSerialized: true }
+        : { id: 'ram', name: 'Memoria RAM', model: 'RAM', brand: 'Kingston', active: true, isSerialized: false }
+      )}
+    >
+      {serialized ? 'Elegir laptop serializada' : 'Elegir memoria'}
+    </button>
+  ),
 }));
 vi.mock('../foundation/locations/services/locationService', () => ({ listActiveLocations: mocks.locations }));
 vi.mock('./services/transferService', () => ({ createDirectTransfer: mocks.create }));
@@ -34,6 +47,7 @@ beforeEach(() => {
   mocks.locations.mockResolvedValue(locations);
   mocks.stock.mockImplementation((query: { locationId: string }) => Promise.resolve({ items: [{ catalogId: 'ram', locationId: query.locationId, quantity: 5 }], total: 1 }));
   mocks.scan.mockResolvedValue(serial);
+  mocks.availableSerials.mockResolvedValue([{ id: 'unit', serialNumber: 'SN123', catalogId: 'laptop', locationId: 'central', salePrice: null, createdAt: '' }]);
   mocks.create.mockResolvedValue(receipt());
 });
 describe('borrador y contrato de traslados', () => {
@@ -54,10 +68,15 @@ describe('borrador y contrato de traslados', () => {
     expect(validateTransferDraft(draft(), locations.map(item => ({ ...item, active: false })))).toBeTruthy();
     expect(validateTransferDraft({ ...draft(), quantities: [{ catalog: { ...catalog, isSerialized: true }, quantity: 1, available: 5 }] }, locations)).toBeTruthy();
   });
-  it('permite revisar serie pero bloquea envío mixto y no genera cantidades compensatorias', () => {
+  it('permite traslados serializados puros y mixtos hacia el backend', () => {
     const mixed = { ...draft(), serials: [serial] };
     expect(validateTransferDraft(mixed, locations)).toBeNull();
-    expect(() => toTransferInput(mixed, locations)).toThrow(SERIAL_TRANSFER_BLOCK);
+    expect(toTransferInput(mixed, locations)).toEqual({
+      fromLocationId: 'central',
+      toLocationId: 'post',
+      hardwareItemIds: ['unit'],
+      quantities: [{ catalogId: 'ram', quantity: 2 }],
+    });
     expect(validateTransferDraft({ ...mixed, serials: [{ ...serial, status: 'VENDIDO' }] }, locations)).toBeTruthy();
   });
   it('rechaza respuestas inconsistentes sin inventar comprobante', () => {
@@ -86,10 +105,8 @@ describe('confirmación segura', () => {
     expect(mocks.create).toHaveBeenCalledTimes(1);
     expect(hook.result.current.receipt).toBeNull();
   });
-  it('respeta permisos, cambio de sesión y bloqueo de seriales sin peticiones', async () => {
+  it('respeta permisos y cambio de sesión sin peticiones', async () => {
     const hook = renderHook(() => useCreateTransfer());
-    await act(async () => hook.result.current.submit({ ...draft(), serials: [serial] }, locations));
-    expect(hook.result.current.error).toBe(SERIAL_TRANSFER_BLOCK);
     useAuthStore.setState({ user: { ...useAuthStore.getState().user!, role: 'VENDEDOR' } });
     await act(async () => hook.result.current.submit(draft(), locations));
     expect(mocks.create).not.toHaveBeenCalled();
@@ -119,7 +136,8 @@ describe('registro accesible de traslados', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Revisar traslado' }));
     dialog = await screen.findByRole('dialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar traslado' }));
+    const confirmBtnName = direction === 'supply' ? 'Confirmar abastecimiento' : 'Confirmar devolución';
+    fireEvent.click(within(dialog).getByRole('button', { name: confirmBtnName }));
     await screen.findByText('TR-BACKEND');
     expect(mocks.create).toHaveBeenCalledTimes(1);
     expect(mocks.create).toHaveBeenCalledWith({ fromLocationId: direction === 'supply' ? 'central' : 'post', toLocationId: direction === 'supply' ? 'post' : 'central', quantities: [{ catalogId: 'ram', quantity: 2 }] });
@@ -130,23 +148,32 @@ describe('registro accesible de traslados', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Revisar traslado' }));
     const dialog = await screen.findByRole('dialog');
     mocks.stock.mockResolvedValue({ items: [{ catalogId: 'ram', locationId: 'central', quantity: 1 }], total: 1 });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar traslado' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar abastecimiento' }));
     await screen.findByText('Revisa las cantidades y la disponibilidad en el origen.');
     expect(mocks.create).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Cantidad de Memoria RAM')).toHaveValue(2);
   });
-  it('unidad disponible se agrega una vez y no puede confirmarse', async () => {
+  it('permite confirmar un traslado serializado o mixto directamente', async () => {
+    mocks.create.mockResolvedValue({
+      ...receipt(),
+      items: [{ id: 'line-serial', catalogId: 'laptop', hardwareItemId: 'unit', serialNumber: 'SN123', quantity: 1, sku: 'LAP', brand: 'Dell', model: 'Inspiron' }],
+    });
     render(<MemoryRouter><TransferCreatePage /></MemoryRouter>);
     await screen.findByRole('option', { name: 'Puesto 212' });
     fireEvent.change(screen.getByLabelText('Puesto'), { target: { value: 'post' } });
-    fireEvent.click(screen.getByText('Unidades con serie o código'));
-    fireEvent.change(screen.getByLabelText('Serie o código de unidad'), { target: { value: 'SN123' } });
+    fireEvent.change(screen.getByLabelText('Serie o código de unidad (escáner o teclado)'), { target: { value: 'SN123' } });
     fireEvent.click(screen.getByRole('button', { name: 'Agregar unidad' }));
     await screen.findByText('Laptop · SN123');
     fireEvent.click(screen.getByRole('button', { name: 'Revisar traslado' }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('button', { name: 'Confirmar traslado' })).toBeDisabled();
-    expect(mocks.create).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole('button', { name: 'Confirmar abastecimiento' })).toBeEnabled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar abastecimiento' }));
+    await screen.findByText('TR-BACKEND');
+    expect(mocks.create).toHaveBeenCalledWith({
+      fromLocationId: 'central',
+      toLocationId: 'post',
+      hardwareItemIds: ['unit'],
+    });
   });
   it('un rol lector no monta ni consulta el formulario', async () => {
     useAuthStore.setState({ user: { ...useAuthStore.getState().user!, role: 'TECNICO' } });
