@@ -18,8 +18,6 @@ export interface IntakeReview {
   warehouse: Location;
   quantity: number;
   serials: string[];
-  costPrice?: number;
-  salePrice?: number;
 }
 export type IntakeResult = UnifiedInboundResult;
 
@@ -38,12 +36,6 @@ export function intakeModelData(model: IntakeModel) {
   return model.kind === 'existing' ? model.item : model.input;
 }
 
-function optionalPrice(value: string, name: string): number | undefined {
-  if (!value.trim()) return undefined;
-  const price = Number(value);
-  if (!Number.isFinite(price) || price < 0) throw new Error(`${name} debe ser un número igual o mayor que cero.`);
-  return price;
-}
 
 export function useMerchandiseInbound() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -54,8 +46,6 @@ export function useMerchandiseInbound() {
   const [model, setModelState] = useState<IntakeModel | null>(null);
   const [quantity, setQuantity] = useState('1');
   const [serialText, setSerialText] = useState('');
-  const [costPrice, setCostPrice] = useState('');
-  const [salePrice, setSalePrice] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [review, setReview] = useState<IntakeReview | null>(null);
@@ -111,21 +101,19 @@ export function useMerchandiseInbound() {
       if (!warehouse || loading || referenceError) throw new Error('Es necesario un único Almacén Central activo.');
       if (!model) throw new Error('Selecciona un modelo existente o completa los datos de uno nuevo.');
       const product = intakeModelData(model);
-      if (product.isSecondHand) throw new Error('Las piezas usadas requieren aprobación administrativa. Este ingreso no las incorpora al stock.');
+      if (product.isSecondHand && product.isSerialized === false) throw new Error('Los productos de segunda mano deben registrarse una por una, con serie o código. Selecciona un modelo con control individual.');
       if (model.kind === 'existing' && !model.item.active) throw new Error('Selecciona un modelo activo.');
       const count = Number(quantity);
       if (!quantity.trim() || !Number.isSafeInteger(count) || count < 1) throw new Error('Indica una cantidad entera mayor que cero.');
       const serials = product.isSerialized === false ? [] : serialText.split(/[\r\n,]+/).map((value) => value.trim().toUpperCase()).filter(Boolean);
       if (product.isSerialized !== false && serials.length !== count) throw new Error('Ingresa una serie por cada unidad recibida.');
       if (new Set(serials).size !== serials.length) throw new Error('Hay números de serie repetidos en este ingreso.');
-      const cost = optionalPrice(costPrice, 'El costo');
-      const sale = optionalPrice(salePrice, 'El precio');
       if (serials.length) {
         const validation = await validateSerials(serials);
         if (!validation.allValid) throw new Error(`Series ya registradas: ${validation.existingSerials.join(', ')}`);
       }
       if (!mounted.current || getAccessToken() !== token || useAuthStore.getState().user?.id !== accountId || !canReceive()) return;
-      setReview({ model, warehouse, quantity: count, serials, ...(cost === undefined ? {} : { costPrice: cost }), ...(sale === undefined ? {} : { salePrice: sale }) });
+      setReview({ model, warehouse, quantity: count, serials });
     } catch (failure) {
       if (mounted.current && getAccessToken() === token && useAuthStore.getState().user?.id === accountId) setError(failure instanceof Error ? failure.message : asAppError(failure).message);
     } finally {
@@ -149,20 +137,18 @@ export function useMerchandiseInbound() {
       else if (createdModelRef.current) product = createdModelRef.current;
       else {
         writeStarted = true;
-        product = await createCatalogItem({ ...review.model.input, active: true, isSecondHand: false });
+        product = await createCatalogItem({ ...review.model.input, active: true });
         if (!currentSession()) return;
         createdModelRef.current = product;
         setCreatedModel(product);
       }
       if (!currentSession()) return;
-      const prices = { ...(review.costPrice === undefined ? {} : { costPrice: review.costPrice }), ...(review.salePrice === undefined ? {} : { salePrice: review.salePrice }) };
       writeStarted = true;
       const saved = await receiveInventory({ items: [{
         catalogId: product.id,
         quantity: review.quantity,
         hasSerialNumbers: product.isSerialized,
         ...(product.isSerialized ? { serialNumbers: review.serials } : {}),
-        ...prices,
       }] });
       if (!currentSession()) return;
       setResult(saved);
@@ -189,8 +175,8 @@ export function useMerchandiseInbound() {
     if (operationPending.current || uncertain) return;
     createdModelRef.current = null;
     setCreatedModel(null); setModelState(null); setQuantity('1'); setSerialText('');
-    setCostPrice(''); setSalePrice(''); setError(null); setReview(null); setResult(null);
+    setError(null); setReview(null); setResult(null);
   }
 
-  return { categories, warehouse, loading, referenceError, reloadReferences: () => setRevision((value) => value + 1), model, setModel, quantity, setQuantity, serialText, setSerialText, costPrice, setCostPrice, salePrice, setSalePrice, busy, error, review, prepare, confirm, editReview, createdModel, result, uncertain, reset };
+  return { categories, warehouse, loading, referenceError, reloadReferences: () => setRevision((value) => value + 1), model, setModel, quantity, setQuantity, serialText, setSerialText, busy, error, review, prepare, confirm, editReview, createdModel, result, uncertain, reset };
 }

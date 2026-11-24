@@ -46,6 +46,8 @@ it('keeps laptop technical values in a compact expandable section regardless of 
   render(<CatalogDetailPanel id="product" onClose={vi.fn()} />);
   await screen.findByText('Laptop de trabajo');
   const summary = screen.getByText('Características técnicas');
+  expect(summary.tagName).toBe('SUMMARY');
+  expect(summary).toHaveClass('w-full', 'cursor-pointer', 'hover:bg-slate-50');
   expect(summary.closest('details')).not.toHaveAttribute('open');
   await user.click(summary);
   for (const value of ['Intel i5', '16 GB', '512 GB', 'Iris Xe', '15.6 pulgadas']) {
@@ -70,4 +72,16 @@ it('does not present a fabricated zero while loading or after a failed detail re
   expect(screen.queryByText('Stock total disponible: 0')).not.toBeInTheDocument();
   expect(await screen.findByRole('alert')).toHaveTextContent('Sin conexión');
   expect(screen.queryByText('Stock total disponible: 0')).not.toBeInTheDocument();
+});
+
+
+it('identifies second-hand components without presenting their stored minimum as applicable', async () => {
+  vi.mocked(getCatalogDetail).mockResolvedValue({ ...detail, item: { ...item, isSecondHand: true, minStockThreshold: 2 } });
+  render(<CatalogDetailPanel id="product" onClose={vi.fn()} />);
+  await screen.findByText('Memoria 16GB');
+  const general = screen.getByRole('region', { name: 'Información general' });
+  expect(within(general).getByText('Segunda mano')).toBeInTheDocument();
+  expect(within(general).getByText('No aplica')).toBeInTheDocument();
+  expect(within(general).queryByText('2')).not.toBeInTheDocument();
+  expect(screen.getByText('Stock total disponible: 3')).toBeInTheDocument();
 });

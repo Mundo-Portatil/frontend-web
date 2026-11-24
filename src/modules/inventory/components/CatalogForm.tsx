@@ -31,11 +31,12 @@ interface CatalogFormProps {
   onSaved: () => void;
   /** Prepare a validated new model for a surrounding intake; does not write to the API. */
   onPrepare?: (payload: CreateCatalogInput) => void;
+  onTrackingChange?: (serialized: boolean) => void;
   onCancel?: () => void;
   onBusyChange?: (busy: boolean) => void;
 }
 
-export function CatalogForm({ categories, initialItem, onSaved, onPrepare, onCancel, onBusyChange }: CatalogFormProps) {
+export function CatalogForm({ categories, initialItem, onSaved, onPrepare, onTrackingChange, onCancel, onBusyChange }: CatalogFormProps) {
   const [fields, setFields] = useState<Record<string, string>>(() => initialFields(initialItem));
   const [serialized, setSerialized] = useState(initialItem?.isSerialized ?? true);
   const [secondHand, setSecondHand] = useState(initialItem?.isSecondHand ?? false);
@@ -50,6 +51,17 @@ export function CatalogForm({ categories, initialItem, onSaved, onPrepare, onCan
   const currentCategory = categories.find((category) => category.id === initialItem?.categoryId);
   // Categories have no reliable product-kind discriminator; optional details stay available to every model.
   const showTechnicalFields = true;
+  const effectiveSecondHand = editing ? secondHand : serialized && secondHand;
+  const showCatalogCode = editing || !onPrepare || !serialized;
+
+  function changeTracking(next: boolean) {
+    if (editing || next === serialized) return;
+    setSerialized(next);
+    setSecondHand(false);
+    setError(null);
+    if (onPrepare && next) setFields((current) => ({ ...current, sku: '' }));
+    onTrackingChange?.(next);
+  }
 
   useEffect(() => { headingRef.current?.focus(); }, []);
 
@@ -71,21 +83,22 @@ export function CatalogForm({ categories, initialItem, onSaved, onPrepare, onCan
       return reject('Selecciona una categoría activa.', 'categoryId');
     }
     const price = Number(fields.basePrice);
-    const threshold = Number(fields.minStockThreshold ?? '2');
+    // The API requires an integer; zero is the neutral creation value for used models.
+    const threshold = effectiveSecondHand && !editing ? 0 : Number(fields.minStockThreshold ?? '2');
     if (!Number.isFinite(price) || price < 0) return reject('El precio y el umbral deben ser números mayores o iguales a cero.', 'price');
     if (!Number.isFinite(threshold) || threshold < 0) return reject('El precio y el umbral deben ser números mayores o iguales a cero.', 'threshold');
 
     const payload: CreateCatalogInput = {
-      ...(fields.sku?.trim() ? { sku: fields.sku.trim() } : {}), brand: fields.brand.trim(), model: fields.model.trim(),
+      ...(showCatalogCode && fields.sku?.trim() ? { sku: fields.sku.trim() } : {}), brand: fields.brand.trim(), model: fields.model.trim(),
       categoryId: fields.categoryId, basePrice: price, minStockThreshold: threshold,
-      isSerialized: serialized, isSecondHand: secondHand, active: true,
+      isSerialized: serialized, isSecondHand: effectiveSecondHand, active: true,
     };
     if (showTechnicalFields) {
       for (const [key] of TECHNICAL_FIELDS) if (fields[key]?.trim()) payload[key] = fields[key].trim();
     }
 
     if (onPrepare && !initialItem) {
-      onPrepare({ ...payload, isSecondHand: false });
+      onPrepare(payload);
       return;
     }
 
@@ -103,7 +116,7 @@ export function CatalogForm({ categories, initialItem, onSaved, onPrepare, onCan
       }
       if (fields.categoryId !== initialItem.categoryId) update.categoryId = fields.categoryId;
       if (price !== initialItem.basePrice) update.basePrice = price;
-      if (threshold !== initialItem.minStockThreshold) update.minStockThreshold = threshold;
+      if (!secondHand && threshold !== initialItem.minStockThreshold) update.minStockThreshold = threshold;
       if (secondHand !== initialItem.isSecondHand) update.isSecondHand = secondHand;
       if (active !== initialItem.active) update.active = active;
     }
@@ -159,11 +172,12 @@ export function CatalogForm({ categories, initialItem, onSaved, onPrepare, onCan
                 </select>
               </div>
               <div><label htmlFor="catalog-price" className={LABEL_CLASS}>Precio base (PEN) *</label><input id="catalog-price" name="basePrice" type="number" inputMode="decimal" min="0" step="any" required value={fields.basePrice ?? ''} onChange={(event) => field('basePrice', event.target.value)} className={TEXT_INPUT_CLASS} /></div>
-              <div><label htmlFor="catalog-sku" className={LABEL_CLASS}>{editing ? 'Código de producto' : 'Código de producto (opcional)'}</label><input id="catalog-sku" name="sku" value={fields.sku ?? ''} readOnly={editing} onChange={(event) => field('sku', event.target.value)} className={TEXT_INPUT_CLASS} autoComplete="off" spellCheck={false} /></div>
-              <div><label htmlFor="catalog-threshold" className={LABEL_CLASS}>Mínimo recomendado</label><input id="catalog-threshold" name="minStockThreshold" type="number" inputMode="decimal" min="0" step="any" value={fields.minStockThreshold ?? '2'} onChange={(event) => field('minStockThreshold', event.target.value)} className={TEXT_INPUT_CLASS} /></div>
-              <div><label htmlFor="catalog-tracking" className={LABEL_CLASS}>Cómo registrar las unidades</label><select id="catalog-tracking" name="tracking" value={String(serialized)} disabled={editing} onChange={(event) => setSerialized(event.target.value === 'true')} className={TEXT_INPUT_CLASS}><option value="true">Una por una, con serie o código</option><option value="false">Agrupadas por cantidad</option></select></div>
+              {showCatalogCode && <div><label htmlFor="catalog-sku" className={LABEL_CLASS}>{editing ? 'Código de producto' : 'Código de producto (opcional)'}</label><input id="catalog-sku" name="sku" value={fields.sku ?? ''} readOnly={editing} onChange={(event) => field('sku', event.target.value)} className={TEXT_INPUT_CLASS} autoComplete="off" spellCheck={false} /></div>}
+              {!editing && serialized && <div><label htmlFor="catalog-condition" className={LABEL_CLASS}>Condición</label><select id="catalog-condition" value={secondHand ? 'used' : 'new'} onChange={(event) => setSecondHand(event.target.value === 'used')} className={TEXT_INPUT_CLASS}><option value="new">Nuevo</option><option value="used">Segunda mano</option></select></div>}
+              {!effectiveSecondHand && <div><label htmlFor="catalog-threshold" className={LABEL_CLASS}>Mínimo recomendado</label><input id="catalog-threshold" name="minStockThreshold" type="number" inputMode="decimal" min="0" step="any" value={fields.minStockThreshold ?? '2'} onChange={(event) => field('minStockThreshold', event.target.value)} className={TEXT_INPUT_CLASS} /></div>}
+              <div><label htmlFor="catalog-tracking" className={LABEL_CLASS}>Cómo registrar las unidades</label><select id="catalog-tracking" name="tracking" value={String(serialized)} disabled={editing} onChange={(event) => changeTracking(event.target.value === 'true')} className={TEXT_INPUT_CLASS}><option value="true">Una por una, con serie o código</option><option value="false">Agrupadas por cantidad</option></select></div>
               {(!onPrepare || editing) && <div className="grid min-w-0 gap-3 sm:col-span-2 lg:col-span-3 sm:grid-cols-2">
-                {!onPrepare && <CheckboxField
+                {editing && !onPrepare && <CheckboxField
                   id="catalog-second-hand"
                   label="Segunda mano"
                   description="Marca el producto como usado o reacondicionado."

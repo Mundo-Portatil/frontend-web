@@ -22,9 +22,11 @@ beforeEach(() => {
 });
 
 async function fillGeneral(user: ReturnType<typeof userEvent.setup>, categoryId: string) {
-  for (const [label, value] of [['Marca *', 'Marca'], ['Modelo *', 'X1'], ['Precio base (PEN) *', '100'], ['Código de producto (opcional)', 'CODE-X']]) {
+  for (const [label, value] of [['Marca *', 'Marca'], ['Modelo *', 'X1'], ['Precio base (PEN) *', '100']]) {
     await user.type(screen.getByLabelText(label), value);
   }
+  const code = screen.queryByLabelText('Código de producto (opcional)');
+  if (code) await user.type(code, 'CODE-X');
   await user.selectOptions(screen.getByLabelText('Categoría *'), categoryId);
 }
 
@@ -33,7 +35,7 @@ it('creates a quantity product with technical fields optional and collapsed', as
   render(<CatalogForm categories={[otherCategory]} onSaved={vi.fn()} />);
   expect(screen.getByLabelText('Procesador')).not.toBeVisible();
   expect(screen.queryByRole('checkbox', { name: 'Activo' })).not.toBeInTheDocument();
-  expect(screen.getByRole('checkbox', { name: 'Segunda mano' })).toBeInTheDocument();
+  expect(screen.getByLabelText('Condición')).toHaveValue('new');
   await fillGeneral(user, otherCategory.id);
   await user.selectOptions(screen.getByLabelText('Cómo registrar las unidades'), 'false');
   expect(screen.getByText('Características técnicas (opcional)')).toBeInTheDocument();
@@ -123,9 +125,88 @@ it('prepares a model without name or SKU, leaving its code generation to the bac
   const user = userEvent.setup();
   useAuthStore.setState((state) => ({ user: state.user ? { ...state.user, role: 'ENCARGADO_ALMACEN' } : null }));
   render(<CatalogForm categories={[category]} onSaved={vi.fn()} onPrepare={onPrepare} />);
+  expect(screen.queryByLabelText(/Código de producto/)).not.toBeInTheDocument();
   for (const [label, value] of [['Marca *', 'Acer'], ['Modelo *', 'Aspire 5'], ['Precio base (PEN) *', '1500']]) await user.type(screen.getByLabelText(label), value);
   await user.selectOptions(screen.getByLabelText('Categoría *'), category.id);
   await user.click(screen.getByRole('button', { name: 'Continuar con el ingreso' }));
   expect(onPrepare).toHaveBeenCalledWith({ brand: 'Acer', model: 'Aspire 5', categoryId: category.id, basePrice: 1500, minStockThreshold: 2, isSerialized: true, isSecondHand: false, active: true });
   expect(createCatalogItem).not.toHaveBeenCalled();
+});
+
+it('keeps the optional code for quantity tracking in a prepared model', async () => {
+  const onPrepare = vi.fn();
+  const user = userEvent.setup();
+  render(<CatalogForm categories={[category]} onSaved={vi.fn()} onPrepare={onPrepare} />);
+  await user.selectOptions(screen.getByLabelText('Cómo registrar las unidades'), 'false');
+  expect(screen.getByLabelText('Código de producto (opcional)')).toBeInTheDocument();
+  await fillGeneral(user, category.id);
+  await user.click(screen.getByRole('button', { name: 'Continuar con el ingreso' }));
+  expect(onPrepare).toHaveBeenCalledWith(expect.objectContaining({ sku: 'CODE-X', isSerialized: false }));
+  expect(createCatalogItem).not.toHaveBeenCalled();
+});
+
+it('omits a previously entered code when switching a prepared model to serialized tracking', async () => {
+  const onPrepare = vi.fn();
+  const user = userEvent.setup();
+  render(<CatalogForm categories={[category]} onSaved={vi.fn()} onPrepare={onPrepare} />);
+  await user.selectOptions(screen.getByLabelText('Cómo registrar las unidades'), 'false');
+  await fillGeneral(user, category.id);
+  await user.selectOptions(screen.getByLabelText('Cómo registrar las unidades'), 'true');
+  expect(screen.queryByLabelText(/Código de producto/)).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Continuar con el ingreso' }));
+  expect(onPrepare).toHaveBeenCalledWith(expect.objectContaining({ isSerialized: true }));
+  expect(onPrepare).toHaveBeenCalledWith(expect.not.objectContaining({ sku: expect.anything() }));
+});
+
+
+it('prepares second-hand components with individual tracking and a neutral threshold, preserving fields when switching conditions', async () => {
+  const user = userEvent.setup(); const onPrepare = vi.fn();
+  render(<CatalogForm categories={[otherCategory]} onSaved={vi.fn()} onPrepare={onPrepare} />);
+  await fillGeneral(user, otherCategory.id);
+  await user.clear(screen.getByLabelText('Mínimo recomendado'));
+  await user.type(screen.getByLabelText('Mínimo recomendado'), '5');
+  await user.click(screen.getByText('Características técnicas (opcional)'));
+  await user.type(screen.getByLabelText('Memoria RAM'), '8 GB');
+  await user.selectOptions(screen.getByLabelText('Condición'), 'used');
+  expect(screen.queryByLabelText('Mínimo recomendado')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Cómo registrar las unidades')).toHaveValue('true');
+  expect(screen.getByLabelText('Cómo registrar las unidades')).toBeEnabled();
+  expect(screen.getByLabelText('Cómo registrar las unidades').querySelectorAll('option')).toHaveLength(2);
+  await user.click(screen.getByRole('button', { name: 'Continuar con el ingreso' }));
+  expect(onPrepare).toHaveBeenLastCalledWith(expect.objectContaining({ isSecondHand: true, isSerialized: true, minStockThreshold: 0, ramCapacity: '8 GB', basePrice: 100 }));
+  await user.selectOptions(screen.getByLabelText('Condición'), 'new');
+  expect(screen.getByLabelText('Mínimo recomendado')).toHaveValue(5);
+  expect(screen.getByLabelText('Cómo registrar las unidades')).toHaveValue('true');
+  expect(screen.getByLabelText('Memoria RAM')).toHaveValue('8 GB');
+});
+
+it('keeps an existing used models hidden threshold unchanged during descriptive editing', async () => {
+  const user = userEvent.setup();
+  render(<CatalogForm categories={[category]} initialItem={{ ...laptop, isSecondHand: true, minStockThreshold: 7 }} onSaved={vi.fn()} />);
+  expect(screen.queryByLabelText('Mínimo recomendado')).not.toBeInTheDocument();
+  await user.clear(screen.getByLabelText('Modelo *')); await user.type(screen.getByLabelText('Modelo *'), 'RAM usada');
+  await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+  expect(updateCatalogItem).toHaveBeenCalledWith(laptop.id, { model: 'RAM usada' });
+});
+
+it('resets second-hand condition when changing tracking and submits consistent quantity data', async () => {
+  const onPrepare = vi.fn(); const onTrackingChange = vi.fn(); const user = userEvent.setup();
+  render(<CatalogForm categories={[otherCategory]} onSaved={vi.fn()} onPrepare={onPrepare} onTrackingChange={onTrackingChange} />);
+  await fillGeneral(user, otherCategory.id);
+  await user.clear(screen.getByLabelText('Mínimo recomendado'));
+  await user.type(screen.getByLabelText('Mínimo recomendado'), '4');
+  await user.selectOptions(screen.getByLabelText('Condición'), 'used');
+  expect(screen.queryByLabelText('Mínimo recomendado')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Cómo registrar las unidades')).toBeEnabled();
+  await user.selectOptions(screen.getByLabelText('Cómo registrar las unidades'), 'false');
+  expect(screen.queryByLabelText('Condición')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Mínimo recomendado')).toHaveValue(4);
+  await user.click(screen.getByRole('button', { name: 'Continuar con el ingreso' }));
+  expect(onPrepare).toHaveBeenLastCalledWith(expect.objectContaining({ isSerialized: false, isSecondHand: false, minStockThreshold: 4 }));
+  await user.selectOptions(screen.getByLabelText('Cómo registrar las unidades'), 'true');
+  expect(screen.getByLabelText('Condición')).toHaveValue('new');
+  expect(screen.getByLabelText('Mínimo recomendado')).toHaveValue(4);
+  await user.click(screen.getByRole('button', { name: 'Continuar con el ingreso' }));
+  expect(onPrepare).toHaveBeenLastCalledWith(expect.objectContaining({ isSerialized: true, isSecondHand: false, minStockThreshold: 4 }));
+  expect(onTrackingChange.mock.calls).toEqual([[false], [true]]);
 });

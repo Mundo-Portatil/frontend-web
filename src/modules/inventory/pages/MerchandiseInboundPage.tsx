@@ -94,7 +94,6 @@ function MerchandiseInboundForm() {
         <div className="space-y-3"><Notification kind="error">{intake.referenceError}</Notification><button type="button" className={SECONDARY_BUTTON_CLASS} onClick={intake.reloadReferences}>Reintentar configuración</button></div>
       )}
       {intake.error && <div ref={errorNotice} tabIndex={-1} className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"><Notification kind="error">{intake.error}</Notification></div>}
-      {intake.createdModel && !intake.result && <Notification kind="warning">El modelo {getCatalogDisplayName(intake.createdModel)} ya fue creado. Falta confirmar el ingreso de sus unidades.</Notification>}
       {intake.uncertain && <Link className={`${SECONDARY_BUTTON_CLASS} inline-flex`} to={ROUTES.inventory}>Consultar inventario</Link>}
 
       {intake.result ? (
@@ -108,7 +107,7 @@ function MerchandiseInboundForm() {
                 <p>Saldo confirmado: {item.totalStockResulting} unidades.</p>
                 {item.hasSerialNumbers && item.serialsCreated.length > 0 && (
                   <details open={item.serialsCreated.length <= 5}>
-                    <summary className="cursor-pointer rounded text-sm font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Ver {item.serialsCreated.length} series registradas</summary>
+                    <summary className="w-full cursor-pointer rounded text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Ver {item.serialsCreated.length} series registradas</summary>
                     <ul className="mt-2 list-inside list-disc">{item.serialsCreated.map((serial) => <li key={serial}>{serial}</li>)}</ul>
                   </details>
                 )}
@@ -121,7 +120,7 @@ function MerchandiseInboundForm() {
         <>
           <div hidden={Boolean(intake.review)} className="space-y-5">
             <section className="min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4">
-            <fieldset disabled={intake.busy || intake.loading || Boolean(intake.referenceError) || intake.uncertain || Boolean(modelData?.isSecondHand)} className="min-w-0">
+            <fieldset disabled={intake.busy || intake.loading || Boolean(intake.referenceError) || intake.uncertain} className="min-w-0">
               <legend className="px-1 font-medium text-slate-900">Mercancía recibida</legend>
               <div className="max-w-xs"><label htmlFor="intake-quantity" className={LABEL_CLASS}>Cantidad que ingresa</label><input id="intake-quantity" name="quantity" type="number" min="1" step="1" inputMode="numeric" value={intake.quantity} onChange={(event) => changeQuantity(event.target.value)} className={TEXT_INPUT_CLASS} required /></div>
             </fieldset>
@@ -136,7 +135,7 @@ function MerchandiseInboundForm() {
               {mode === 'new' && (
                 <>
                   <div hidden={!editingNew}>
-                    <CatalogForm key={formKey} categories={intake.categories} onSaved={() => undefined} onPrepare={(input) => { intake.setModel({ kind: 'new', input }); intake.setSerialText(input.isSerialized === false ? '' : serialValues.slice(0, serialCount).join('\n')); setEditingNew(false); }} />
+                    <CatalogForm key={formKey} categories={intake.categories} onSaved={() => undefined} onTrackingChange={() => { intake.setModel(null); intake.setSerialText(''); setSerialValues([]); setSerialError(null); }} onPrepare={(input) => { intake.setModel({ kind: 'new', input }); intake.setSerialText(input.isSerialized === false ? '' : serialValues.slice(0, serialCount).join('\n')); setEditingNew(false); }} />
                   </div>
                   {!editingNew && modelData && <div className="flex flex-wrap items-center justify-between gap-3"><p className="break-words text-sm font-medium text-slate-900">{getCatalogDisplayName(modelData)}{modelData.sku ? ` · ${modelData.sku}` : ''}</p><button type="button" className={SECONDARY_BUTTON_CLASS} onClick={() => setEditingNew(true)}>Cambiar datos del modelo</button></div>}
                 </>
@@ -144,10 +143,9 @@ function MerchandiseInboundForm() {
             </fieldset>
             </section>
 
-            {modelData?.isSecondHand && <Notification kind="warning">Las piezas usadas requieren aprobación administrativa antes de ingresar al stock.</Notification>}
             {modelData && (mode === 'existing' || !editingNew) && (
               <form onSubmit={(event) => { event.preventDefault(); reviewIntake(); }} noValidate className="rounded-xl border border-slate-200 bg-white p-4">
-                <fieldset disabled={intake.busy || intake.loading || Boolean(intake.referenceError) || intake.uncertain || Boolean(modelData.isSecondHand)} className="min-w-0 space-y-4">
+                <fieldset disabled={intake.busy || intake.loading || Boolean(intake.referenceError) || intake.uncertain} className="min-w-0 space-y-4">
                   <legend className="mb-3 font-medium text-slate-900">Unidades recibidas</legend>
                   {modelData.isSerialized !== false && (
                     <fieldset className="min-w-0 space-y-3">
@@ -167,13 +165,6 @@ function MerchandiseInboundForm() {
                       </div>
                     </fieldset>
                   )}
-                  <details className="rounded-lg border border-slate-200 p-3">
-                    <summary className="w-fit cursor-pointer rounded text-sm font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Precios por unidad (opcional)</summary>
-                    <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                      <div><label htmlFor="intake-cost" className={LABEL_CLASS}>Costo unitario</label><input id="intake-cost" name="costPrice" type="number" min="0" step="any" inputMode="decimal" value={intake.costPrice} onChange={(event) => intake.setCostPrice(event.target.value)} className={TEXT_INPUT_CLASS} /></div>
-                      <div><label htmlFor="intake-sale" className={LABEL_CLASS}>Precio de venta por unidad</label><input id="intake-sale" name="salePrice" type="number" min="0" step="any" inputMode="decimal" value={intake.salePrice} onChange={(event) => intake.setSalePrice(event.target.value)} className={TEXT_INPUT_CLASS} /></div>
-                    </div>
-                  </details>
                   <button ref={continueButton} className={PRIMARY_BUTTON_CLASS}>{intake.busy ? 'Validando…' : 'Revisar ingreso'}</button>
                 </fieldset>
               </form>
@@ -187,12 +178,11 @@ function MerchandiseInboundForm() {
                 <div><dt className="text-slate-500">Modelo</dt><dd className="break-words font-medium">{getCatalogDisplayName(intakeModelData(intake.review.model))}{intakeModelData(intake.review.model).sku ? ` · ${intakeModelData(intake.review.model).sku}` : ''}</dd></div>
                 <div><dt className="text-slate-500">Marca y modelo</dt><dd className="break-words font-medium">{intakeModelData(intake.review.model).brand} · {intakeModelData(intake.review.model).model}</dd></div>
                 <div><dt className="text-slate-500">Categoría</dt><dd className="font-medium">{intake.categories.find((category) => category.id === intakeModelData(intake.review!.model).categoryId)?.name ?? 'Categoría del modelo'}</dd></div>
+                <div><dt className="text-slate-500">Condición</dt><dd className="font-medium">{intakeModelData(intake.review.model).isSecondHand ? 'Segunda mano' : 'Nuevo'}</dd></div>
                 <div><dt className="text-slate-500">Precio base</dt><dd className="font-medium">{intakeModelData(intake.review.model).basePrice}</dd></div>
                 <div><dt className="text-slate-500">Destino</dt><dd className="font-medium">{intake.review.warehouse.name} · Almacén Central</dd></div>
                 <div><dt className="text-slate-500">Cantidad que ingresa</dt><dd className="font-medium">{intake.review.quantity}</dd></div>
                 <div><dt className="text-slate-500">Control</dt><dd className="font-medium">{intakeModelData(intake.review.model).isSerialized === false ? 'Por cantidad' : 'Una serie por unidad'}</dd></div>
-                {intake.review.costPrice !== undefined && <div><dt className="text-slate-500">Costo unitario</dt><dd>{intake.review.costPrice}</dd></div>}
-                {intake.review.salePrice !== undefined && <div><dt className="text-slate-500">Precio de venta por unidad</dt><dd>{intake.review.salePrice}</dd></div>}
               </dl>
               {intake.review.serials.length > 0 && <ul className="divide-y divide-slate-100 text-sm">{intake.review.serials.map((serial) => <li key={serial} className="break-words py-2"><span className="font-medium">{serial}</span></li>)}</ul>}
               <div className="flex flex-wrap gap-2">

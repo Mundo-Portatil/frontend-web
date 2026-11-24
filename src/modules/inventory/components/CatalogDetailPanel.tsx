@@ -71,9 +71,9 @@ export function CatalogDetailPanel({ id, onClose }: { id: string; onClose: () =>
                 Marca: detail.item.brand,
                 Modelo: detail.item.model,
                 'Precio base (PEN)': detail.item.basePrice,
-                'Mínimo recomendado': detail.item.minStockThreshold,
+                'Mínimo recomendado': detail.item.isSecondHand ? 'No aplica' : detail.item.minStockThreshold,
                 'Control de unidades': detail.item.isSerialized ? 'Por serie o código' : 'Por cantidad',
-                Condición: detail.item.isSecondHand ? 'Usado' : 'Nuevo',
+                Condición: detail.item.isSecondHand ? 'Segunda mano' : 'Nuevo',
                 Estado: detail.item.active ? 'Activo' : 'Inactivo',
               }).filter(([, value]) => value !== null && value !== undefined && (typeof value !== 'string' || value.trim().length > 0)).map(([label, value]) => (
                 <div key={label} className="min-w-0">
@@ -85,9 +85,9 @@ export function CatalogDetailPanel({ id, onClose }: { id: string; onClose: () =>
           </section>
 
           {technicalFields.length > 0 && (
-            <details className="rounded-lg border border-slate-200 p-3">
-              <summary className="w-fit cursor-pointer rounded text-sm font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Características técnicas</summary>
-              <dl className="mt-3 grid min-w-0 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            <details className="rounded-lg border border-slate-200">
+              <summary className="w-full cursor-pointer rounded-lg px-3 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Características técnicas</summary>
+              <dl className="grid min-w-0 gap-3 px-3 pb-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 {technicalFields.map(([label, value]) => (
                   <div key={label} className="min-w-0">
                     <dt className="text-slate-500">{label}</dt>

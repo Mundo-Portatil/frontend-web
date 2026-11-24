@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -58,6 +58,7 @@ it('prepares a new model without writing until the complete serialized intake is
   await user.click(screen.getByLabelText('Modelo nuevo'));
   await user.clear(screen.getByLabelText('Cantidad que ingresa'));
   await user.type(screen.getByLabelText('Cantidad que ingresa'), '2');
+  expect(screen.queryByLabelText(/Código de producto/)).not.toBeInTheDocument();
   expect(screen.queryByLabelText('Unidad 1: serie')).not.toBeInTheDocument();
   for (const [label, value] of [['Marca *', 'Marca'], ['Modelo *', 'X1'], ['Precio base (PEN) *', '1000']]) await user.type(screen.getByLabelText(label), value);
   await user.selectOptions(screen.getByLabelText('Categoría *'), 'category');
@@ -79,9 +80,32 @@ it('prepares a new model without writing until the complete serialized intake is
   await screen.findByText('Ingreso registrado correctamente.');
   expect(createCatalogItem).toHaveBeenCalledTimes(1);
   expect(receiveInventory).toHaveBeenCalledWith({ items: [{ catalogId: id, quantity: 2, hasSerialNumbers: true, serialNumbers: ['SN1', 'SN2'] }] });
-  expect(createCatalogItem).toHaveBeenCalledWith(expect.not.objectContaining({ name: expect.anything() }));
+  expect(createCatalogItem).toHaveBeenCalledWith(expect.not.objectContaining({ name: expect.anything(), sku: expect.anything() }));
   await user.click(screen.getByRole('button', { name: 'Registrar otro ingreso' }));
   await waitFor(() => expect(screen.getByRole('combobox', { name: 'Buscar modelo' })).toHaveValue(''));
+});
+
+it('does not show a redundant creation warning while a new model is being received', async () => {
+  let finish!: (value: UnifiedInboundResult) => void;
+  vi.mocked(createCatalogItem).mockResolvedValue({ ...product, isSerialized: false });
+  vi.mocked(receiveInventory).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  const user = userEvent.setup();
+  mount();
+  await screen.findByText(/Destino: Principal/);
+  await user.click(screen.getByLabelText('Modelo nuevo'));
+  const quantity = screen.getByLabelText('Cantidad que ingresa');
+  await user.clear(quantity);
+  await user.type(quantity, '2');
+  for (const [label, value] of [['Marca *', 'Lenovo'], ['Modelo *', 'LOQ 15arp10'], ['Precio base (PEN) *', '2500']]) await user.type(screen.getByLabelText(label), value);
+  await user.selectOptions(screen.getByLabelText('Categoría *'), 'category');
+  await user.selectOptions(screen.getByLabelText('Cómo registrar las unidades'), 'false');
+  await user.click(screen.getByRole('button', { name: 'Continuar con el ingreso' }));
+  await user.click(screen.getByRole('button', { name: 'Revisar ingreso' }));
+  await user.click(await screen.findByRole('button', { name: 'Confirmar ingreso' }));
+  await waitFor(() => expect(createCatalogItem).toHaveBeenCalledTimes(1));
+  expect(screen.queryByText(/ya fue creado|Falta confirmar el ingreso/)).not.toBeInTheDocument();
+  await act(async () => finish({ batchId: 'batch', locationId: 'central', locationName: 'Principal', totalItems: 1, totalUnits: 2, results: [{ catalogId: id, catalogSku: 'M170', catalogBrand: 'Lenovo', catalogModel: 'LOQ 15arp10', quantity: 2, hasSerialNumbers: false, serialsCreated: [], totalStockResulting: 2 }], createdAt: '' }));
+  expect(await screen.findByText('Ingreso registrado correctamente.')).toBeInTheDocument();
 });
 
 it.each(['VENDEDOR', 'TECNICO'] as const)('does not expose or load the admission form for %s', (role) => {
@@ -137,4 +161,54 @@ it('registers a new quantity model with the quantity entered before preparing it
   await user.click(await screen.findByRole('button', { name: 'Confirmar ingreso' }));
   await screen.findByText('Ingreso registrado correctamente.');
   expect(receiveInventory).toHaveBeenCalledWith({ items: [{ catalogId: id, quantity: 20, hasSerialNumbers: false }] });
+});
+
+it('receives a new used component through the serial flow without per-unit pricing fields', async () => {
+  const user = userEvent.setup(); mount();
+  await screen.findByText(/Destino: Principal/);
+  await user.click(screen.getByLabelText('Modelo nuevo'));
+  for (const [label, value] of [['Marca *', 'Kingston'], ['Modelo *', 'DDR4 8 GB'], ['Precio base (PEN) *', '30']]) await user.type(screen.getByLabelText(label), value);
+  await user.selectOptions(screen.getByLabelText('Categoría *'), 'category');
+  await user.selectOptions(screen.getByLabelText('Condición'), 'used');
+  expect(screen.queryByLabelText('Mínimo recomendado')).not.toBeInTheDocument();
+  vi.mocked(createCatalogItem).mockResolvedValue({ ...product, isSerialized: true, isSecondHand: true, minStockThreshold: 0 });
+  await user.click(screen.getByRole('button', { name: 'Continuar con el ingreso' }));
+  expect(screen.getByLabelText('Cantidad que ingresa')).toBeEnabled();
+  expect(screen.queryByText('Precios por unidad (opcional)')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Costo unitario')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Precio de venta por unidad')).not.toBeInTheDocument();
+  await user.type(screen.getByLabelText('Unidad 1: serie'), 'RAM-8GB-001');
+  await user.click(screen.getByRole('button', { name: 'Revisar ingreso' }));
+  expect(await screen.findByText('Segunda mano', { selector: 'dd' })).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Confirmar ingreso' }));
+  await screen.findByText('Ingreso registrado correctamente.');
+  expect(createCatalogItem).toHaveBeenCalledWith(expect.objectContaining({ isSecondHand: true, minStockThreshold: 0, isSerialized: true, basePrice: 30 }));
+  expect(receiveInventory).toHaveBeenCalledWith({ items: [{ catalogId: id, quantity: 1, hasSerialNumbers: true, serialNumbers: ['RAM-8GB-001'] }] });
+});
+
+it('clears incompatible serials and used condition when a new model changes to quantity tracking', async () => {
+  const user = userEvent.setup(); mount();
+  await screen.findByText(/Destino: Principal/);
+  await user.click(screen.getByLabelText('Modelo nuevo'));
+  for (const [label, value] of [['Marca *', 'Kingston'], ['Modelo *', 'RAM'], ['Precio base (PEN) *', '30']]) await user.type(screen.getByLabelText(label), value);
+  await user.selectOptions(screen.getByLabelText('Categoría *'), 'category');
+  await user.selectOptions(screen.getByLabelText('Condición'), 'used');
+  await user.click(screen.getByRole('button', { name: 'Continuar con el ingreso' }));
+  await user.type(screen.getByLabelText('Unidad 1: serie'), 'OLD-SERIAL');
+  await user.click(screen.getByRole('button', { name: 'Cambiar datos del modelo' }));
+  await user.selectOptions(screen.getByLabelText('Cómo registrar las unidades'), 'false');
+  expect(screen.queryByLabelText('Condición')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Continuar con el ingreso' }));
+  expect(screen.queryByLabelText('Unidad 1: serie')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Cambiar datos del modelo' }));
+  await user.selectOptions(screen.getByLabelText('Cómo registrar las unidades'), 'true');
+  expect(screen.getByLabelText('Condición')).toHaveValue('new');
+  await user.click(screen.getByRole('button', { name: 'Continuar con el ingreso' }));
+  expect(screen.getByLabelText('Unidad 1: serie')).toHaveValue('');
+  await user.type(screen.getByLabelText('Unidad 1: serie'), 'NEW-SERIAL');
+  await user.click(screen.getByRole('button', { name: 'Revisar ingreso' }));
+  await user.click(await screen.findByRole('button', { name: 'Confirmar ingreso' }));
+  await screen.findByText('Ingreso registrado correctamente.');
+  expect(createCatalogItem).toHaveBeenCalledWith(expect.objectContaining({ isSecondHand: false, isSerialized: true, minStockThreshold: 2 }));
+  expect(receiveInventory).toHaveBeenCalledWith({ items: [{ catalogId: id, quantity: 1, hasSerialNumbers: true, serialNumbers: ['NEW-SERIAL'] }] });
 });

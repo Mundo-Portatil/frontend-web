@@ -52,7 +52,7 @@ it('creates one model and admits five serialized units through the unified endpo
   expect(validateSerials).toHaveBeenCalledWith(['S1', 'S2', 'S3', 'S4', 'S5']);
   await act(async () => result.current.confirm());
   expect(createCatalogItem).toHaveBeenCalledTimes(1);
-  expect(createCatalogItem).toHaveBeenCalledWith({ ...input, active: true, isSecondHand: false });
+  expect(createCatalogItem).toHaveBeenCalledWith({ ...input, active: true });
   expect(receiveInventory).toHaveBeenCalledWith({ items: [{ catalogId: productId, quantity: 5, hasSerialNumbers: true, serialNumbers: ['S1', 'S2', 'S3', 'S4', 'S5'] }] });
   expect(result.current.result).toEqual(receipt);
 });
@@ -128,11 +128,11 @@ it('blocks a blind retry when a mutation response is uncertain', async () => {
   expect(result.current.uncertain).toBe(true);
 });
 
-it('does not admit used merchandise without approval or allow non-admin confirmation', async () => {
+it('rejects used quantity models and prevents non-admin confirmation', async () => {
   const { result } = await mount();
-  act(() => result.current.setModel({ kind: 'existing', item: { ...product, isSecondHand: true } }));
+  act(() => result.current.setModel({ kind: 'existing', item: { ...product, isSecondHand: true, isSerialized: false } }));
   await act(async () => result.current.prepare());
-  expect(result.current.error).toContain('aprobación administrativa');
+  expect(result.current.error).toContain('control individual');
   act(() => { result.current.setModel({ kind: 'existing', item: { ...product, isSerialized: false } }); result.current.setQuantity('1'); });
   await act(async () => result.current.prepare());
   act(() => useAuthStore.setState((state) => ({ user: { ...state.user!, role: 'VENDEDOR' } })));
@@ -149,4 +149,18 @@ it('allows the warehouse manager to confirm a receipt', async () => {
   await act(async () => result.current.prepare());
   await act(async () => result.current.confirm());
   expect(receiveInventory).toHaveBeenCalledTimes(1);
+});
+
+
+it('creates a used serialized model and receives it without optional price overrides', async () => {
+  const usedInput = { ...input, isSecondHand: true, isSerialized: true, minStockThreshold: 0 };
+  vi.mocked(createCatalogItem).mockResolvedValue({ ...product, ...usedInput });
+  const { result } = await mount();
+  act(() => { result.current.setModel({ kind: 'new', input: usedInput }); result.current.setSerialText('RAM-8GB-001'); });
+  await act(async () => result.current.prepare());
+  expect(result.current.review).not.toBeNull();
+  await act(async () => result.current.confirm());
+  expect(createCatalogItem).toHaveBeenCalledWith({ ...usedInput, active: true });
+  expect(receiveInventory).toHaveBeenCalledWith({ items: [{ catalogId: productId, quantity: 1, hasSerialNumbers: true, serialNumbers: ['RAM-8GB-001'] }] });
+  expect(result.current.result).toEqual(receipt);
 });
