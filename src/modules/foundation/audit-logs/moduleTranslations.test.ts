@@ -7,8 +7,8 @@ describe('formatAuditModule', () => {
     expect(formatAuditModule('users')).toBe('Usuarios');
     expect(formatAuditModule('locations')).toBe('Ubicaciones');
     expect(formatAuditModule('categories')).toBe('Categorías');
-    expect(formatAuditModule('catalog')).toBe('Productos y modelos');
-    expect(formatAuditModule('hardware-items')).toBe('Equipos y piezas');
+    expect(formatAuditModule('catalog')).toBe('Catálogo de productos');
+    expect(formatAuditModule('hardware-items')).toBe('Equipos y componentes');
     expect(formatAuditModule('quantity-stock')).toBe('Inventario por cantidad');
   });
 
@@ -17,11 +17,11 @@ describe('formatAuditModule', () => {
     expect(formatAuditModule(' USERS ')).toBe('Usuarios');
   });
 
-  it('humanizes unfamiliar module identifiers without guessing their meaning', () => {
-    expect(formatAuditModule('reports')).toBe('Reports');
-    expect(formatAuditModule('external_stock_updates')).toBe('External stock updates');
-    expect(formatAuditModule('legacyModule')).toBe('Legacy module');
-    expect(formatAuditModule('constructor')).toBe('Constructor');
+  it('uses a neutral Spanish label for unfamiliar modules without guessing their meaning', () => {
+    expect(formatAuditModule('reports')).toBe('Otro módulo');
+    expect(formatAuditModule('external_stock_updates')).toBe('Otro módulo');
+    expect(formatAuditModule('legacyModule')).toBe('Otro módulo');
+    expect(formatAuditModule('constructor')).toBe('Otro módulo');
   });
 });
 
@@ -33,13 +33,25 @@ describe('resolveModuleFilter', () => {
     expect(resolveModuleFilter('Usuarios')).toBe('users');
     expect(resolveModuleFilter('Autenticación')).toBe('auth');
     expect(resolveModuleFilter('Ubicaciones')).toBe('locations');
-    expect(resolveModuleFilter('Equipos y piezas')).toBe('hardware-items');
+    expect(resolveModuleFilter('Equipos y componentes')).toBe('hardware-items');
     expect(resolveModuleFilter('Inventario por cantidad')).toBe('quantity-stock');
-    expect(resolveModuleFilter('Productos y modelos')).toBe('catalog');
+    expect(resolveModuleFilter('Catálogo de productos')).toBe('catalog');
     expect(resolveModuleFilter(' Custom_Module ')).toBe('Custom_Module');
   });
 
   it('returns an empty filter for blank input', () => {
     expect(resolveModuleFilter('   ')).toBe('');
   });
+});
+
+
+it('translates inventory modules while preserving real filter identifiers and historical aliases', () => {
+  expect(formatAuditModule('inventory')).toBe('Inventario');
+  expect(formatAuditModule('product-catalog')).toBe('Catálogo de productos');
+  expect(resolveModuleFilter('Inventario')).toBe('inventory');
+  expect(resolveModuleFilter('Catálogo de productos')).toBe('catalog');
+  expect(resolveModuleFilter('product-catalog')).toBe('product-catalog');
+  expect(resolveModuleFilter('Equipos y componentes')).toBe('hardware-items');
+  expect(resolveModuleFilter('Equipos y piezas')).toBe('hardware-items');
+  expect(resolveModuleFilter('UNKNOWN_SERVICE')).toBe('UNKNOWN_SERVICE');
 });
