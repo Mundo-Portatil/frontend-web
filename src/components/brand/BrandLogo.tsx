@@ -3,9 +3,8 @@ import type { CSSProperties } from 'react';
 const LOGO_ASPECT_RATIO = 382 / 322;
 
 const MASK_STYLE: CSSProperties = {
-  // The SVG alpha channel is the mark: an opaque circle with transparent
-  // lettering. Masking solid layers preserves that geometry instead of
-  // inverting or redrawing the logo.
+  // Preserve the original asset for existing surfaces; the header selects
+  // a silhouette extracted from the same paths without its outer rectangle.
   WebkitMaskImage: "url('/mundoportatil.svg')",
   WebkitMaskRepeat: 'no-repeat',
   WebkitMaskPosition: 'center',
@@ -19,6 +18,8 @@ const MASK_STYLE: CSSProperties = {
 interface BrandLogoProps {
   /** Visual height in pixels; the width keeps the original SVG proportion. */
   height?: number;
+  /** Transparent silhouette for the application header; preserves the original vector geometry. */
+  variant?: 'original' | 'mark';
   /** Use `white` on dark surfaces and `brand` on light surfaces. */
   tone?: 'brand' | 'white';
   className?: string;
@@ -27,17 +28,18 @@ interface BrandLogoProps {
 }
 
 /**
- * Renders the corporate mark through CSS masks, so the original SVG stays
- * untouched while the solid circle and its cut-out lettering can use the
- * brand palette. Two layers keep the lettering readable on any surface.
+ * Recolors the original vector geometry through CSS masks. The transparent
+ * mark variant removes the surrounding rectangle without changing the logo.
  */
 export function BrandLogo({
   height = 32,
+  variant = 'original',
   tone = 'brand',
   className = '',
   label,
 }: BrandLogoProps) {
   const width = Math.round(height * LOGO_ASPECT_RATIO);
+  const markStyle = variant === 'mark' ? { ...MASK_STYLE, WebkitMaskImage: "url('/mundoportatil-mark.svg')", maskImage: "url('/mundoportatil-mark.svg')" } : MASK_STYLE;
   const circleClass = tone === 'white' ? 'bg-white' : 'bg-brand-600';
   const letteringClass = tone === 'white' ? 'bg-brand-950' : 'bg-white';
 
@@ -49,8 +51,8 @@ export function BrandLogo({
       className={`relative inline-block shrink-0 ${className}`}
       style={{ width, height }}
     >
-      <span aria-hidden="true" className={`absolute inset-0 ${letteringClass}`} style={MASK_STYLE} />
-      <span aria-hidden="true" className={`absolute inset-0 ${circleClass}`} style={MASK_STYLE} />
+      {variant === 'original' && <span aria-hidden="true" className={`absolute inset-0 ${letteringClass}`} style={MASK_STYLE} />}
+      <span aria-hidden="true" className={`absolute inset-0 ${circleClass}`} style={markStyle} />
     </span>
   );
 }
