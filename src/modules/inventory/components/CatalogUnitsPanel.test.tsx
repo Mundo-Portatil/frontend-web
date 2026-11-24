@@ -18,15 +18,28 @@ it('loads units only after opening and preserves their series, location and comp
   const user = userEvent.setup();
   render(<CatalogUnitsPanel catalogId="product" locations={places} />);
   expect(listHardwareUnits).not.toHaveBeenCalled();
-  await user.click(screen.getByText('Ver unidades'));
+  const summary = screen.getByText('Ver unidades');
+  const unitsDetails = summary.closest('details')!;
+  expect(summary.tagName).toBe('SUMMARY');
+  expect(summary).toHaveClass('w-full', 'cursor-pointer', 'hover:bg-slate-50');
+  await user.click(summary);
   expect(await screen.findByText('Serie: SN-123')).toBeInTheDocument();
   expect(screen.getByText('RAM-1 · En stock')).toBeInTheDocument();
   expect(listHardwareUnits).toHaveBeenCalledWith({ catalogItemId: 'product', page: 1, limit: 50, status: 'EN_STOCK' }, expect.any(AbortSignal));
   expect(getHardwareLifecycle).not.toHaveBeenCalled();
-  await user.click(screen.getByText('Historial de SN-123'));
+  const historySummary = screen.getByText('Historial de SN-123');
+  const historyDetails = historySummary.closest('details')!;
+  expect(historySummary.tagName).toBe('SUMMARY');
+  expect(historySummary).toHaveClass('-mx-2', 'w-auto', 'px-2', 'cursor-pointer', 'hover:bg-slate-50');
+  await user.click(historySummary);
   expect(await screen.findByText('Ingreso de equipos por lote · 1 equipos o piezas')).toBeInTheDocument();
   expect(screen.getByText('Equipos y piezas · Ana')).toBeInTheDocument();
   expect(getHardwareLifecycle).toHaveBeenCalledWith('unit', expect.any(AbortSignal));
+  expect(historyDetails).toHaveAttribute('open');
+  expect(unitsDetails).toHaveAttribute('open');
+  await user.click(historySummary);
+  expect(historyDetails).not.toHaveAttribute('open');
+  expect(unitsDetails).toHaveAttribute('open');
 });
 
 it('uses server pagination and resets it when the location or status changes', async () => {

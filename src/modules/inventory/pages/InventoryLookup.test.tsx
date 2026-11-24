@@ -42,8 +42,8 @@ it('resolves the series to its real model row with official stock, location and 
   expect(screen.queryByText('No hay productos disponibles.')).not.toBeInTheDocument();
   expect(getCatalogDetail).toHaveBeenCalledTimes(1);
   expect(scanHardware).toHaveBeenCalledWith('PF3A8K2M', expect.any(AbortSignal));
-  await userEvent.click(within(row).getByRole('button', { name: 'Ver unidad' }));
-  expect(within(row).getByText('Sin equipo asociado')).toBeInTheDocument();
+  expect(within(row).queryByRole('button', { name: /Ver unidad|Ocultar unidad/ })).not.toBeInTheDocument();
+  expect(row).not.toHaveClass('bg-brand-50/40');
   expect(within(row).getByRole('button', { name: 'Ver ficha de Lenovo Legion' })).toBeInTheDocument();
 });
 it('does not present a sold unit as available or overwrite the real model stock', async () => {

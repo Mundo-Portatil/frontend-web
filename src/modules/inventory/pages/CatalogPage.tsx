@@ -45,7 +45,6 @@ export function CatalogPage({ mode = 'manage', searchUnits = false }: CatalogPag
   const { query, setQuery, result, loading, error, reload, cancelPending, applySearch: commitSearch, unit, detail, unitError } = useCatalog(searchUnits);
   const pendingTerm = searchInput.trim() !== (query.search ?? '');
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [showUnit, setShowUnit] = useState(false);
   function applySearch(value: string) {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     commitSearch(value);
@@ -56,7 +55,7 @@ export function CatalogPage({ mode = 'manage', searchUnits = false }: CatalogPag
     }, 300);
     return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
   }, [searchInput, commitSearch]);
-  useBarcodeScanner((value) => { cancelPending(); setSearchInput(value); setShowUnit(false); applySearch(value); }, searchUnits);
+  useBarcodeScanner((value) => { cancelPending(); setSearchInput(value); applySearch(value); }, searchUnits);
   const activeLocation = useLocationStore((state) => state.activeLocation);
   const availability = useCatalogAvailability(result.items, !loading && !error && !pendingTerm, detail);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -168,7 +167,6 @@ export function CatalogPage({ mode = 'manage', searchUnits = false }: CatalogPag
                 const value = event.target.value;
                 if (value.trim() !== (query.search ?? '')) cancelPending();
                 setSearchInput(value);
-                setShowUnit(false);
                 if (!value.trim()) applySearch('');
               }}
               className={`${TEXT_INPUT_CLASS} min-w-0 flex-1`}
@@ -266,12 +264,9 @@ export function CatalogPage({ mode = 'manage', searchUnits = false }: CatalogPag
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {result.items.map((item) => (
-                      <tr key={item.id} className={unit?.catalogId === item.id ? 'bg-brand-50/40' : undefined}>
+                      <tr key={item.id}>
                         <td className="px-3 py-2 text-slate-900"><span className="block font-medium">{item.name}</span><span className="block text-xs text-slate-500">{item.brand} · {item.model}</span>
-                          {unit?.catalogId === item.id && <div className="mt-2 space-y-1 text-xs"><p className="break-all font-semibold text-brand-800">Serie encontrada: {unit.serialNumber}</p><p>{unit.locationName ?? 'Ubicación no disponible'} · {UNIT_STATUS[unit.status]}</p>
-                            <button type="button" className="rounded text-brand-800 underline focus-visible:ring-2" aria-expanded={showUnit} aria-controls={`catalog-unit-${unit.id}`} onClick={() => setShowUnit((value) => !value)}>{showUnit ? 'Ocultar unidad' : 'Ver unidad'}</button>
-                            {showUnit && <dl id={`catalog-unit-${unit.id}`} className="space-y-1"><div><dt className="inline font-medium">Equipo asociado: </dt><dd className="inline">{unit.parentChassis?.serialNumber ?? (unit.parentChassisId ? 'Equipo asociado' : 'Sin equipo asociado')}</dd></div><div><dt className="font-medium">Componentes</dt><dd>{unit.components?.length ? unit.components.map((child) => child.serialNumber).join(', ') : 'Sin componentes asociados'}</dd></div></dl>}
-                          </div>}
+                          {unit?.catalogId === item.id && <div className="mt-2 space-y-1 text-xs text-slate-600"><p className="break-all font-medium text-slate-700">Serie encontrada: {unit.serialNumber}</p><p>{unit.locationName ?? 'Ubicación no disponible'} · {UNIT_STATUS[unit.status]}</p></div>}
                         </td>
                         <td className="px-3 py-2 text-slate-700">
                           {categories.items.find((category) => category.id === item.categoryId)

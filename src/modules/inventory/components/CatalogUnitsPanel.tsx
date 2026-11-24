@@ -16,16 +16,17 @@ const STATUS_LABELS: Record<ItemStatus, string> = {
   EN_STOCK: 'En stock', VENDIDO: 'Vendido', SEGUNDA_MANO_PENDIENTE: 'Segunda mano pendiente',
   EN_GARANTIA: 'En garantía', DE_BAJA: 'De baja',
 };
-const DISCLOSURE_CLASS = 'w-fit cursor-pointer rounded text-sm font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500';
+const DISCLOSURE_CLASS = '-mx-2 w-auto cursor-pointer rounded px-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500';
+const PANEL_DISCLOSURE_CLASS = 'w-full cursor-pointer text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500';
 type StockLocations = CatalogDetail['stockSummary'];
 
 /** Both queries are mounted on demand; opening a product never preloads all its units. */
 export function CatalogUnitsPanel({ catalogId, locations }: { catalogId: string; locations: StockLocations }) {
   const [open, setOpen] = useState(false);
   return (
-    <details className="min-w-0 rounded-lg border border-slate-200 p-3" onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary className={DISCLOSURE_CLASS}>Ver unidades</summary>
-      {open && <UnitsList catalogId={catalogId} locations={locations} />}
+    <details className="min-w-0 rounded-lg border border-slate-200" onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary className={`${PANEL_DISCLOSURE_CLASS} rounded-lg px-3 py-3`}>Ver unidades</summary>
+      {open && <div className="px-3 pb-3"><UnitsList catalogId={catalogId} locations={locations} /></div>}
     </details>
   );
 }
@@ -51,7 +52,7 @@ function UnitsList({ catalogId, locations }: { catalogId: string; locations: Sto
   }, [catalogId, locationId, status, page, revision]);
 
   return (
-    <section aria-label="Unidades del modelo" className="mt-3 min-w-0 space-y-3">
+    <section aria-label="Unidades del modelo" className="min-w-0 space-y-3">
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <label className="min-w-0"><span className={LABEL_CLASS}>Ubicación de las unidades</span><select value={locationId} onChange={(event) => { setLocationId(event.target.value); setPage(1); }} className={TEXT_INPUT_CLASS}><option value="">Todas las ubicaciones</option>{locations.map((place) => <option key={place.locationId} value={place.locationId}>{place.locationName}</option>)}</select></label>
         <label className="min-w-0"><span className={LABEL_CLASS}>Estado de las unidades</span><select value={status} onChange={(event) => { setStatus(event.target.value as ItemStatus | ''); setPage(1); }} className={TEXT_INPUT_CLASS}><option value="">Todos los estados</option>{Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
