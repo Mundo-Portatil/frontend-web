@@ -5,7 +5,6 @@ import { ROLE_LABELS } from '../../auth/roleLabels';
 import type { Role } from '../../auth/models';
 import { asAppError } from '../../../../services/api/errors';
 import type { AppError } from '../../../../services/api/errors';
-import { formatDate } from '../../../../utils/formatDate';
 import { EmptyState } from '../../../../components/feedback/EmptyState';
 import { ErrorState } from '../../../../components/feedback/ErrorState';
 import { InlineSpinner } from '../../../../components/feedback/InlineSpinner';
@@ -479,7 +478,7 @@ export function UsersPage() {
                   <th scope="col" className="px-3 py-2 text-left font-medium text-slate-600">Correo</th>
                   <th scope="col" className="px-3 py-2 text-left font-medium text-slate-600">Rol</th>
                   <th scope="col" className="px-3 py-2 text-left font-medium text-slate-600">Estado</th>
-                  <th scope="col" className="px-3 py-2 text-left font-medium text-slate-600">Actualizado</th>
+                  <th scope="col" className="px-3 py-2 text-left font-medium text-slate-600">Ubicación física</th>
                   <th scope="col" className="px-3 py-2 text-left font-medium text-slate-600">Acciones</th>
                 </tr>
               </thead>
@@ -500,7 +499,7 @@ export function UsersPage() {
                         {user.active ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-slate-700">{formatDate(user.updatedAt)}</td>
+                    <td className="px-3 py-2 text-slate-700">Sin asignar</td>
                     <td className="px-3 py-2">
                       <Can roles={['ADMIN']}>
                         <div className="flex flex-wrap gap-2">

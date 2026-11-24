@@ -71,6 +71,16 @@ describe('UsersPage', () => {
     clearAccessToken();
   });
 
+  it('replaces only the updated column with physical location without changing user data', async () => {
+    vi.mocked(userService.listUsers).mockResolvedValueOnce(SAMPLE_USERS);
+    render(<UsersPage />);
+    await screen.findByRole('button', { name: 'Editar' });
+    expect(screen.getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['Nombre', 'Correo', 'Rol', 'Estado', 'Ubicación física', 'Acciones']);
+    expect(screen.getByRole('cell', { name: 'Sin asignar' })).toBeInTheDocument();
+    expect(userService.updateUser).not.toHaveBeenCalled();
+    expect(SAMPLE_USERS[0].updatedAt).toBe('2026-11-14T20:00:00.000Z');
+  });
+
   it('shows the loading state while users are being fetched', async () => {
     vi.mocked(userService.listUsers).mockReturnValueOnce(new Promise(() => {}));
 
