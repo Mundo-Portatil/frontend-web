@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { CatalogDetail, CatalogItem } from '../catalogModels';
+import { getLocationStockCount, getTotalStockCount, type CatalogDetail, type CatalogItem } from '../catalogModels';
 import { getCatalogDetail } from '../services/catalogService';
 
 export type Availability =
@@ -59,6 +59,17 @@ export function useCatalogAvailability(items: readonly CatalogItem[], enabled: b
  * location row means there is no stock, and an invalid value is an error. A
  * missing row is never replaced by a fictitious zero.
  */
+function resolveQuantity(detail: CatalogDetail, locationId?: string): number | undefined {
+  if (locationId) {
+    const row = detail.stockSummary.find((stock) => stock.locationId === locationId);
+    return row ? getLocationStockCount(detail, row) : undefined;
+  }
+  if (!Number.isFinite(detail.totalStockOverall) || detail.totalStockOverall < 0) {
+    return detail.totalStockOverall;
+  }
+  return getTotalStockCount(detail);
+}
+
 export function getAvailabilityDisplay(
   availability: Availability | undefined,
   locationId?: string,
@@ -66,9 +77,7 @@ export function getAvailabilityDisplay(
   if (!availability) return { status: 'loading' };
   if (availability.status === 'error') return { status: 'error' };
 
-  const value = locationId
-    ? availability.detail.stockSummary.find((stock) => stock.locationId === locationId)?.totalAvailable
-    : availability.detail.totalStockOverall;
+  const value = resolveQuantity(availability.detail, locationId);
 
   if (locationId && !availability.detail.stockSummary.some((stock) => stock.locationId === locationId)) {
     return { status: 'empty' };
@@ -82,8 +91,6 @@ export function getAvailabilityDisplay(
 /** A loaded summary row is required for a location; an absent row is not zero stock. */
 export function getAvailableQuantity(availability: Availability | undefined, locationId?: string): number | undefined {
   if (availability?.status !== 'ready') return undefined;
-  const value = locationId
-    ? availability.detail.stockSummary.find((stock) => stock.locationId === locationId)?.totalAvailable
-    : availability.detail.totalStockOverall;
+  const value = resolveQuantity(availability.detail, locationId);
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
 }

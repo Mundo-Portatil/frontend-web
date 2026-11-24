@@ -37,7 +37,7 @@ it('filters through backend and uses its pagination', async () => {
   await waitFor(() => expect(service.listCatalog).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'acer', page: 1 }), expect.any(AbortSignal)));
 });
 it('shows stock breakdown and server total in product detail', async () => {
-  vi.mocked(service.getCatalogDetail).mockResolvedValue({ item, categoryName: 'Laptops', stockSummary: [{ locationId: 'loc', locationName: 'Central', locationType: 'ALMACEN_CENTRAL', serializedCount: 5, quantityCount: 0, totalAvailable: 5 }], totalStockOverall: 7 });
+  vi.mocked(service.getCatalogDetail).mockResolvedValue({ item: { ...item, isSerialized: false }, categoryName: 'Laptops', stockSummary: [{ locationId: 'loc', locationName: 'Central', locationType: 'ALMACEN_CENTRAL', serializedCount: 0, quantityCount: 5, totalAvailable: 5 }], totalStockOverall: 7 });
   render(<MemoryRouter><CatalogPage /></MemoryRouter>); await userEvent.click(await screen.findByRole('button', { name: 'Ver ficha de Acer Aspire' }));
   expect(await screen.findByText('Stock total disponible: 7')).toBeInTheDocument();
   expect(screen.getByText('Central')).toBeInTheDocument();

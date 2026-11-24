@@ -3,7 +3,7 @@ import { LoadingState } from '../../../components/feedback/LoadingState';
 import { ErrorState } from '../../../components/feedback/ErrorState';
 import { asAppError, type AppError } from '../../../services/api/errors';
 import { SECONDARY_BUTTON_CLASS } from '../../../utils/formStyles';
-import type { CatalogDetail } from '../catalogModels';
+import { getLocationStockCount, getTotalStockCount, type CatalogDetail } from '../catalogModels';
 import { getCatalogDetail } from '../services/catalogService';
 import { CatalogUnitsPanel } from './CatalogUnitsPanel';
 
@@ -100,7 +100,7 @@ export function CatalogDetailPanel({ id, onClose }: { id: string; onClose: () =>
 
           <div className="rounded-lg bg-slate-50 p-3">
             <p className="text-sm font-semibold text-slate-900">
-              {`Stock total disponible: ${detail.totalStockOverall}`}
+              {`Stock total disponible: ${getTotalStockCount(detail)}`}
             </p>
             <p className="mt-1 text-xs text-slate-500">Total en ubicaciones activas.</p>
           </div>
@@ -127,7 +127,7 @@ export function CatalogDetailPanel({ id, onClose }: { id: string; onClose: () =>
                     <tr key={stock.locationId}>
                       <td className="px-3 py-2 text-slate-900">{stock.locationName}</td>
                       <td className="px-3 py-2 text-slate-700">{stock.locationType === 'ALMACEN_CENTRAL' ? 'Almacén central' : stock.locationType === 'PUESTO' ? 'Puesto' : '—'}</td>
-                      <td className="px-3 py-2 font-medium text-slate-900">{stock.totalAvailable}</td>
+                      <td className="px-3 py-2 font-medium text-slate-900">{getLocationStockCount(detail, stock)}</td>
                     </tr>
                   ))}
                 </tbody>

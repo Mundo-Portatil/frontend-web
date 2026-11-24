@@ -42,3 +42,21 @@ export type CatalogPageResponse = Omit<CatalogPageResult, 'items'> & { items: Ca
 export function getCatalogDisplayName(product: { brand: string; model: string; sku?: string }): string {
   return [product.brand?.trim(), product.model?.trim()].filter(Boolean).join(' ') || product.sku?.trim() || 'Producto';
 }
+
+/**
+ * Serialized stock is tracked per HardwareItem (`serializedCount`), while
+ * non-serialized stock is tracked in QuantityStock (`totalAvailable`).
+ */
+export function getLocationStockCount(
+  detail: CatalogDetail,
+  stock: CatalogDetail['stockSummary'][number],
+): number {
+  return detail.item.isSerialized ? stock.serializedCount : stock.totalAvailable;
+}
+
+export function getTotalStockCount(detail: CatalogDetail): number {
+  if (!detail.item.isSerialized || !detail.stockSummary.length) {
+    return detail.totalStockOverall;
+  }
+  return detail.stockSummary.reduce((sum, stock) => sum + stock.serializedCount, 0);
+}

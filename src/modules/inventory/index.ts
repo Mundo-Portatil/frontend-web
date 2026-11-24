@@ -9,5 +9,6 @@ export { CatalogProductPicker } from './components/CatalogProductPicker';
 export { scanHardware } from './services/hardwareItemService';
 export { listCatalog, getCatalogDetail } from './services/catalogService';
 export { listQuantityStock } from './services/quantityStockService';
-export { listHardwareUnits, getHardwareLifecycle } from './services/hardwareReadService';
+export { listHardwareUnits, getHardwareLifecycle, getAvailableSerials } from './services/hardwareReadService';
+export type { AvailableSerialItem } from './services/hardwareReadService';
 export type { HardwareLifecycle, HardwareListQuery } from './hardwareReadModels';
