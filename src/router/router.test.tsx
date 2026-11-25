@@ -5,10 +5,16 @@ import { AppRouter } from './index';
 import { useAuthStore } from '../stores/authStore';
 import * as catalogService from '../modules/inventory/services/catalogService';
 import * as stockService from '../modules/inventory/services/quantityStockService';
+import * as hardwareReadService from '../modules/inventory/services/hardwareReadService';
 import * as categoryService from '../modules/inventory/services/categoryService';
 import * as userService from '../modules/foundation/users/services/userService';
 import * as locationService from '../modules/foundation/locations/services/locationService';
 import * as auditLogService from '../modules/foundation/audit-logs/services/auditLogService';
+import * as transferService from '../modules/logistics/services/transferService';
+
+vi.mock('../modules/logistics/services/transferService', () => ({
+  listTransfers: vi.fn(), getTransferDetail: vi.fn(), createDirectTransfer: vi.fn(),
+}));
 
 vi.mock('../modules/foundation/locations/components/LocationSelector', () => ({
   LocationSelector: () => null,
@@ -34,6 +40,7 @@ vi.mock('../modules/foundation/audit-logs/services/auditLogService', () => ({
 
 vi.mock('../modules/inventory/services/catalogService', () => ({ listCatalog: vi.fn(), getCatalogDetail: vi.fn(), createCatalogItem: vi.fn(), updateCatalogItem: vi.fn() }));
 vi.mock('../modules/inventory/services/quantityStockService', () => ({ listQuantityStock: vi.fn() }));
+vi.mock('../modules/inventory/services/hardwareReadService', () => ({ listHardwareUnits: vi.fn() }));
 vi.mock('../modules/inventory/services/categoryService', () => ({ listCategories: vi.fn() }));
 
 const ADMIN = {
@@ -71,6 +78,7 @@ function renderAt(path: string) {
 describe('AppRouter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(transferService.listTransfers).mockResolvedValue([]);
     vi.mocked(categoryService.listCategories).mockResolvedValue([]);
     useAuthStore.setState({ status: 'unauthenticated', user: null });
     vi.mocked(userService.listUsers).mockResolvedValue([]);
@@ -78,6 +86,7 @@ describe('AppRouter', () => {
     vi.mocked(locationService.listActiveLocations).mockResolvedValue([]);
     vi.mocked(catalogService.listCatalog).mockResolvedValue({ items: [], total: 0, page: 1, limit: 50 });
     vi.mocked(stockService.listQuantityStock).mockResolvedValue({ items: [], total: 0, page: 1, limit: 50 });
+    vi.mocked(hardwareReadService.listHardwareUnits).mockResolvedValue({ items: [], total: 0, page: 1, limit: 50 });
     vi.mocked(auditLogService.listAuditLogs).mockResolvedValue({
       items: [],
       total: 0,
@@ -92,10 +101,32 @@ describe('AppRouter', () => {
     expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
   });
 
+  it.each([VENDEDOR, TECNICO])('denies $role the direct logistics creation route', async (user) => {
+    useAuthStore.setState({ status: 'authenticated', user });
+    renderAt('/logistics/new');
+    expect(await screen.findByRole('heading', { name: 'Acceso denegado' })).toBeInTheDocument();
+    expect(transferService.createDirectTransfer).not.toHaveBeenCalled();
+  });
+
+  it('opens logistics history through the operations navigation', async () => {
+    useAuthStore.setState({ status: 'authenticated', user: ADMIN });
+    renderAt('/logistics');
+    expect(await screen.findByText('No hay guías para estos filtros.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Traslados' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Nuevo traslado' })).toHaveAttribute('href', '/logistics/new');
+  });
+
+  it('does not request guides when an operative user has no assigned location', async () => {
+    useAuthStore.setState({ status: 'authenticated', user: VENDEDOR });
+    renderAt('/logistics');
+    expect(await screen.findByText(/No tienes un puesto asignado/)).toBeInTheDocument();
+    expect(transferService.listTransfers).not.toHaveBeenCalled();
+  });
+
   it.each([ADMIN, VENDEDOR, TECNICO])('allows $role to consult inventory and quantity stock', async (user) => {
     useAuthStore.setState({ status: 'authenticated', user });
     renderAt('/inventory/stock');
-    expect(await screen.findByRole('heading', { name: 'Stock por cantidad' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Existencias por ubicación' })).toBeInTheDocument();
     expect(await screen.findByText('No hay existencias para estos filtros.')).toBeInTheDocument();
   });
 

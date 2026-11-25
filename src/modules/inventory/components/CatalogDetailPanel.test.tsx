@@ -85,3 +85,25 @@ it('identifies second-hand components without presenting their stored minimum as
   expect(within(general).queryByText('2')).not.toBeInTheDocument();
   expect(screen.getByText('Stock total disponible: 3')).toBeInTheDocument();
 });
+
+it('displays serializedCount per location for serialized products even when backend totalAvailable reflects stale QuantityStock', async () => {
+  vi.mocked(getCatalogDetail).mockResolvedValue({
+    item: { ...item, name: 'Lenovo LOQ 15arp10', isSerialized: true },
+    categoryName: 'Laptops',
+    totalStockOverall: 4,
+    stockSummary: [
+      { locationId: 'central', locationName: 'Almacén Central', locationType: 'ALMACEN_CENTRAL', serializedCount: 3, quantityCount: 4, totalAvailable: 4 },
+      { locationId: 'puesto-102', locationName: 'Puesto 102', locationType: 'PUESTO', serializedCount: 1, quantityCount: 0, totalAvailable: 0 },
+      { locationId: 'puesto-105', locationName: 'Puesto 105', locationType: 'PUESTO', serializedCount: 0, quantityCount: 0, totalAvailable: 0 },
+    ],
+  });
+  render(<CatalogDetailPanel id="product" onClose={vi.fn()} />);
+  await screen.findByText('Lenovo LOQ 15arp10');
+  expect(screen.getByText('Stock total disponible: 4')).toBeInTheDocument();
+  const centralRow = screen.getByText('Almacén Central').closest('tr')!;
+  const puesto102Row = screen.getByText('Puesto 102').closest('tr')!;
+  const puesto105Row = screen.getByText('Puesto 105').closest('tr')!;
+  expect(within(centralRow).getByRole('cell', { name: '3' })).toBeInTheDocument();
+  expect(within(puesto102Row).getByRole('cell', { name: '1' })).toBeInTheDocument();
+  expect(within(puesto105Row).getByRole('cell', { name: '0' })).toBeInTheDocument();
+});

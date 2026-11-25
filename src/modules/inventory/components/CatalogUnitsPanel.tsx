@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '../../../router/routes';
 import { LoadingState } from '../../../components/feedback/LoadingState';
 import { ErrorState } from '../../../components/feedback/ErrorState';
 import { EmptyState } from '../../../components/feedback/EmptyState';
@@ -93,6 +95,13 @@ function describeEvent(event: HardwareLifecycleEvent) {
   return formatAuditAction({ id: event.id, action: event.action, module: event.module, payload, userId: event.userId ?? null, ipAddress: event.ipAddress ?? null, createdAt: event.timestamp });
 }
 
+function transferReference(event: HardwareLifecycleEvent): string | null {
+  if (event.action !== 'TRANSFER_DIRECT_COMPLETED' || !event.payload || typeof event.payload !== 'object' || Array.isArray(event.payload)) return null;
+  const payload = event.payload as Record<string, unknown>;
+  const reference = payload.transferId ?? payload.code;
+  return typeof reference === 'string' && reference.trim() ? reference : null;
+}
+
 function HistoryEvents({ id }: { id: string }) {
   const [history, setHistory] = useState<HardwareLifecycle | null>(null);
   const [error, setError] = useState<AppError | null>(null);
@@ -112,5 +121,5 @@ function HistoryEvents({ id }: { id: string }) {
   if (error) return <div className="mt-2"><ErrorState error={error} onRetry={() => setRevision((value) => value + 1)} /></div>;
   if (loading) return <LoadingState message="Cargando historial…" />;
   if (!history?.events.length) return <p className="mt-2 text-sm text-slate-500">Sin movimientos registrados.</p>;
-  return <ol className="mt-2 space-y-3 border-l border-slate-200 pl-3">{history.events.map((event) => <li key={event.id} className="min-w-0 text-sm"><p className="break-words font-medium text-slate-900">{describeEvent(event)}</p><p className="break-words text-slate-600">{formatAuditModule(event.module)} · {event.userName ?? 'Usuario no disponible'}</p><time dateTime={event.timestamp} className="text-xs text-slate-500">{formatDate(event.timestamp)}</time></li>)}</ol>;
+  return <ol className="mt-2 space-y-3 border-l border-slate-200 pl-3">{history.events.map((event) => <li key={event.id} className="min-w-0 text-sm"><p className="break-words font-medium text-slate-900">{describeEvent(event)}</p><p className="break-words text-slate-600">{formatAuditModule(event.module)} · {event.userName ?? 'Usuario no disponible'}</p>{transferReference(event) && <Link className="block text-sm font-medium text-brand-700 underline underline-offset-2" to={`${ROUTES.logistics}/${encodeURIComponent(transferReference(event)!)}`}>Ver guía del traslado</Link>}<time dateTime={event.timestamp} className="text-xs text-slate-500">{formatDate(event.timestamp)}</time></li>)}</ol>;
 }

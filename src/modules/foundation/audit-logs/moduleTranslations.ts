@@ -9,6 +9,7 @@
 export const MODULE_LABELS: Record<string, string> = {
   auth: 'Autenticación',
   inventory: 'Inventario',
+  transfers: 'Logística interna',
   'product-catalog': 'Catálogo de productos',
   users: 'Usuarios',
   locations: 'Ubicaciones',
@@ -23,6 +24,9 @@ const MODULE_ALIASES: Record<string, string> = {
   auth: 'auth',
   inventory: 'inventory',
   inventario: 'inventory',
+  transfers: 'transfers',
+  'logistica interna': 'transfers',
+  logistica: 'transfers',
   'product-catalog': 'product-catalog',
   'catalogo de productos': 'catalog',
   'productos y modelos': 'catalog',

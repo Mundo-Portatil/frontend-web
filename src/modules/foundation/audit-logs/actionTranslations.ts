@@ -9,6 +9,7 @@ import type { AuditLog } from './models';
  */
 export const ACTION_LABELS: Record<string, string> = {
   LOGIN: 'Inició sesión',
+  TRANSFER_DIRECT_COMPLETED: 'Registró una distribución o devolución de mercancía',
   DEACTIVATE_USER: 'Desactivó un usuario',
   REACTIVATE_USER: 'Reactivó un usuario',
   UNIFIED_INVENTORY_INBOUND: 'Registró un ingreso de mercancía al Almacén Central',

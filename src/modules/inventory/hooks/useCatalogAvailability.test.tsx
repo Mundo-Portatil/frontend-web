@@ -39,8 +39,23 @@ it('maps raw availability to explicit display states without inventing zero stoc
   expect(getAvailabilityDisplay({ status: 'ready', detail: invalidTotal })).toEqual({ status: 'error' });
 
   const invalidLocation = detail(2);
-  invalidLocation.stockSummary[0].totalAvailable = -1;
+  invalidLocation.stockSummary[0].serializedCount = -1;
   expect(getAvailabilityDisplay({ status: 'ready', detail: invalidLocation }, 'central')).toEqual({ status: 'error' });
+});
+
+it('uses serializedCount instead of stale totalAvailable for serialized products', () => {
+  const summary: CatalogDetail = {
+    item: { ...item, isSerialized: true },
+    categoryName: 'Laptops',
+    totalStockOverall: 4,
+    stockSummary: [
+      { locationId: 'central', locationName: 'Almacén Central', locationType: 'ALMACEN_CENTRAL', serializedCount: 3, quantityCount: 4, totalAvailable: 4 },
+      { locationId: 'puesto-102', locationName: 'Puesto 102', locationType: 'PUESTO', serializedCount: 1, quantityCount: 0, totalAvailable: 0 },
+    ],
+  };
+  expect(getAvailabilityDisplay({ status: 'ready', detail: summary }, 'central')).toEqual({ status: 'ready', quantity: 3 });
+  expect(getAvailabilityDisplay({ status: 'ready', detail: summary }, 'puesto-102')).toEqual({ status: 'ready', quantity: 1 });
+  expect(getAvailabilityDisplay({ status: 'ready', detail: summary })).toEqual({ status: 'ready', quantity: 4 });
 });
 
 it.each([true, false])('uses confirmed typed totals and location balances without mixing inventory classes (%s)', async (isSerialized) => {

@@ -7,6 +7,8 @@ export interface AuthUser {
   email: string;
   name: string;
   role: Role;
+  locationId?: string | null;
+  locationName?: string | null;
 }
 
 /** Session user returned by GET /auth/profile. */

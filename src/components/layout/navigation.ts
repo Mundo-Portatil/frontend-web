@@ -32,6 +32,8 @@ export interface NavChild {
   roles: Role[];
   /** Exact routes represented by this section, including its secondary screens. */
   activePaths: readonly string[];
+  /** Route prefixes for dynamic detail routes (e.g. `/logistics/:id`). */
+  activePrefixes?: readonly string[];
 }
 
 export interface NavItem {
@@ -99,6 +101,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
         to: ROUTES.inventoryLabels,
         roles: ['ADMIN', 'ENCARGADO_ALMACEN', 'VENDEDOR', 'TECNICO'],
         activePaths: [ROUTES.inventoryLabels],
+      },
+      {
+        id: 'inventory-transfers',
+        label: 'Traslados',
+        to: ROUTES.logistics,
+        roles: ['ADMIN', 'ENCARGADO_ALMACEN', 'VENDEDOR', 'TECNICO'],
+        activePaths: [ROUTES.logistics, ROUTES.logisticsNew],
+        activePrefixes: [ROUTES.logistics],
       },
     ],
   },

@@ -2,12 +2,14 @@ import type { HardwareItem, ItemStatus } from './hardwareModels';
 
 /** Verified against the published hardware query DTO and use-case response. */
 export interface HardwareListQuery {
-  catalogItemId: string;
+  catalogItemId?: string;
   locationId?: string;
+  categoryId?: string;
   search?: string;
   status?: ItemStatus;
-  page: number;
-  limit: number;
+  onlyParents?: boolean;
+  page?: number;
+  limit?: number;
 }
 export interface HardwareListResult {
   items: HardwareItem[];
